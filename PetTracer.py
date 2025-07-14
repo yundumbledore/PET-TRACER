@@ -109,8 +109,8 @@ def plot_TAC(data_path):
     plt.plot(tspan, df.iloc[:,2],'--', label='Arterial input function', color='grey')
     plt.plot(tspan, df.iloc[:,3], 'k',label='Time-activity curve')
 
-    plt.xlabel('Time (min)',fontweight='bold',,fontsize=14)
-    plt.ylabel('Concentration (Bq/ml)',fontweight='bold',,fontsize=14)
+    plt.xlabel('Time (min)',fontweight='bold',fontsize=14)
+    plt.ylabel('Concentration (Bq/ml)',fontweight='bold',fontsize=14)
     plt.rcParams['font.size'] = 14
     plt.legend(fontsize=14)
 
