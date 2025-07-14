@@ -112,5 +112,5 @@ def plot_TAC(data_path):
     plt.xlabel('Time (min)',fontweight='bold')
     plt.ylabel('Concentration (Bq/ml)',fontweight='bold')
     plt.rcParams['font.size'] = 14
-    plt.legend(fontsize=18)
+    plt.legend(fontsize=14)
 
