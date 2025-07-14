@@ -99,7 +99,8 @@ def plot_posterior(title, parameter_name, cm, abc=None, xl = None, xr = None):
     mpl.rcParams["font.family"] = "Arial"
     plt.show()
 
-def plot_TAC(df):
+def plot_TAC(data_path):
+    df = pd.read_hdf(data_path)
     tspan = np.array([5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0,
                       40.0, 45.0, 50.0, 55.0, 60.0, 75.0, 90.0,
                       105.0, 120.0, 180.0, 240.0, 300.0, 360.0, 420.0,
