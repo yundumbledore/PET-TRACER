@@ -8,7 +8,7 @@ PET-TRACER is an open-source Python framework designed to bring state-of-the-art
 
 ## Highlights
 1. Processes total body PET containing tens of millions of voxels in **90 minutes**.
-2. Outperforms traditional diffusion models (DDPM, score-based diffusion) by **at least 100×** and is **3×** faster than GPU-based parallel ABC.
+2. Outperforms traditional diffusion models (DDPM, score-based diffusion) by **at least 100×** and is **3×** faster than GPU-based parallel ABC (Approximate Bayesian Computation).
 3. Matches full MCMC-based inference quality, while reducing uncertainty estimation error by **at least 10%** compared to ABC when MCMC posteriors are treated as ground truth.
 
 ## Methods
