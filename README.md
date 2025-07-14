@@ -1,2 +1,2 @@
 # TRACER
-\textbf{T}otal-body Paramet\textbf{R}ic \textbf{A}nalysis via \textbf{C}onsistency \textbf{E}stimation for \textbf{R}adiotracers
+TRACER (**T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers)
