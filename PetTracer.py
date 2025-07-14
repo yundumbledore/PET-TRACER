@@ -112,8 +112,6 @@ def plot_TAC(data_path):
 
     plt.xlabel('Time (min)',fontweight='bold')
     plt.ylabel('Concentration (Bq/ml)',fontweight='bold')
-    plt.rcParams['font.family']     = 'sans-serif'
-    plt.rcParams['font.sans-serif'] = ['Arial']
     plt.rcParams['font.size'] = 20
     plt.legend(fontsize=18)
 
