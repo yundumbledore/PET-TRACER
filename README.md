@@ -19,7 +19,7 @@ The **multistep consistency sampling algorithm** then leverages this trained mod
 ![](Assets/Multistep_consistency_sampling.png)
 
 ## Getting Started
-1. Clone the repo and create a conda environment via
+1. Clone the repo and create a conda environment via environment.yml.
 2. Visualize posteriors predicted by CM with three example TACs.
 
 ## Adaptation to your data
