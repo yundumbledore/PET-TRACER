@@ -99,3 +99,20 @@ def plot_posterior(title, parameter_name, cm, abc=None, xl = None, xr = None):
     mpl.rcParams["font.family"] = "Arial"
     plt.show()
 
+def plot_TAC(df):
+    tspan = np.array([5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0,
+                      40.0, 45.0, 50.0, 55.0, 60.0, 75.0, 90.0,
+                      105.0, 120.0, 180.0, 240.0, 300.0, 360.0, 420.0,
+                      480.0, 600.0, 720.0, 840.0, 960.0, 1080.0, 1260.0,
+                      1440.0, 1620.0, 1800.0, 2100.0, 2400.0, 2700.0, 3000.0])/60
+    fig = plt.figure(figsize=(10,7))
+    plt.plot(tspan, df.iloc[:,2],'--', label='Arterial input function', color='grey')
+    plt.plot(tspan, df.iloc[:,3], 'k',label='Time-activity curve')
+
+    plt.xlabel('Time (min)',fontweight='bold')
+    plt.ylabel('Concentration (Bq/ml)',fontweight='bold')
+    plt.rcParams['font.family']     = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = ['Arial']
+    plt.rcParams['font.size'] = 20
+    plt.legend(fontsize=18)
+
