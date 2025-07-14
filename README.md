@@ -9,7 +9,7 @@ The **consistency model** at the heart of PET-TRACER is a conditional generative
 
 The **multistep consistency sampling algorithm** then leverages this trained model for fast posterior draws. First, a random Gaussian vector $x_T$ is sampled at the highest noise scale $T$ and is fed to the U-Net with TAC + AIF pair and noise level $T$. The U-net produces an initial coarse estimate. Next, one steps through a strictly decreasing sequence of intermediate noise levels $t_1>t_2>\dots> t_{N-1}. At each step $n$, fresh Gaussian noise is injected to corrupt the denoised sample back to noise level $n$ and the U-Net refines it back to noise free sample $x_0$. After processing all $N-1$ levels, the final $x_0$ is returned as a sample from the posterior. By repeating the sampling many times, one can get a bunch of posterior samples. The multistep sampling algorithm is illustrated in the figure below.
 
-![](Assets/Multistep consistency sampling.png)
+![](Assets/Multistep_consistency_sampling.png)
 
 ## Getting Started
 1. Clone the repo and create a conda environment via
