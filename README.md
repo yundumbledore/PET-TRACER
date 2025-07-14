@@ -6,7 +6,7 @@ PET-TRACER is an open-source Python framework designed to bring state-of-the-art
 
 ## Methods
 The conditional consistency model in PET-TRACER reframes diffusion-based posterior estimation as a single-shot denoising task. At its core is a lightweight 1D U-Net $f_{\theta}(x_t, t, y)$ that, given a noisy parameter vector $x_t$ at noise level $t$ and the measured TAC + AIF $y$, predicts the clean kinetic parameters $x_0$. During training, a “student” network $f_{\theta}$ learns to match the outputs of an exponential-moving-average “teacher” network $f_{\theta^-}$ across adjacent noise scales. Paired noisy inputs at levels $t_{n+1}$ and $t_n$ are fed to the student and teacher respectively, and the student is optimized to minimize the consistency loss:
-$
+$$
 \mathcal{L}_{\mathrm{consistency}}(\theta) \;=\; \mathbb{E}_{t_n,\,x_0,\,\epsilon}
 \Bigl\|\,f_{\theta}\bigl(x_{t_{n+1}},\,t_{n+1},\,y\bigr)
 - f_{\theta^-}\bigl(x_{t_n},\,t_n,\,y\bigr)\Bigr\|^2,
@@ -15,7 +15,7 @@ where
 \begin{equation}
 x_{t} \;=\; \sqrt{1 - t^2}\,x_0 \;+\; t\,\epsilon,
 \quad \epsilon \sim \mathcal{N}(0, I).
-$
+$$
 The teacher weights $\theta^-$ are updated via exponential moving average of the student weights $\theta$, enabling the network to collapse a full diffusion trajectory into a single forward pass while preserving conditional fidelity on $y$.
 
 
