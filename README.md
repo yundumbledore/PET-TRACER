@@ -20,7 +20,7 @@ The **multistep consistency sampling algorithm** then leverages this trained mod
 
 ![](Assets/Multistep_consistency_sampling.png)
 
-This figure shows an example of posterior estimation with one TAC-AIF pair predicted by CM, MCMC, and other baselines.
+The figure below shows an example of posterior estimation with one TAC-AIF pair predicted by CM, MCMC, and other baselines.
 ![](Assets/Posterior_estimation_example.png)
 
 ## Getting Started
