@@ -6,7 +6,7 @@ PET-TRACER (PET **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency *
   
 | Total body dynamic PET                          | Parametric imaging of net influx rate Ki               |
 |:------------------------------------------------:|:-----------------------------------------------------:|
-| ![demo1](Assets/Dynamic_pet_data.gif)            | ![demo2](Assets/Example_parametric_map.png)                 |
+| ![demo1](Assets/Dynamic_pet_data.gif)            | <img src="Assets/Example_parametric_map.png" alt="demo2" width="400" />  |
 
 </div>
 
