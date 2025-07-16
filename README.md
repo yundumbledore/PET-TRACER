@@ -1,7 +1,7 @@
 # PET-TRACER
 PET-TRACER (PET **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers)
 #### Yun Zhao, Steven Meikle (The University of Sydney, Australia), Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
-| Total body dynamic PET | Parametric imaging of net influx rate $Ki$ |
+| Total body dynamic PET | Parametric imaging of net influx rate Ki |
 |:----------:|:-----------:|
 | ![demo1](Assets/Dynamic_pet_data.gif) | ![demo2](Assets/Dynamic_pet_data.gif) |
 
