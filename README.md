@@ -2,30 +2,21 @@
 PET-TRACER (PET **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers)
 #### Yun Zhao, Steven Meikle (The University of Sydney, Australia), Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
 
-<div align="center" style="background:#f7f7f7; padding:2em; border-radius:12px; display:flex; justify-content:center; gap:2em; flex-wrap:wrap;">
-  <figure style="margin:0; text-align:center;">
-    <img
-      src="Assets/Dynamic_pet_data.gif"
-      alt="Dynamic PET"
-      width="300"
-      style="border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1);"
-    />
-    <figcaption style="margin-top:0.5em; font-size:0.9em; color:#555;">
-      Total‑body dynamic PET  
-    </figcaption>
-  </figure>
-
-  <figure style="margin:0; text-align:center;">
-    <img
-      src="Assets/Example_parametric_map.png"
-      alt="Parametric Map"
-      width="300"
-      style="border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1);"
-    />
-    <figcaption style="margin-top:0.5em; font-size:0.9em; color:#555;">
-      Parametric imaging of net influx rate Ki  
-    </figcaption>
-  </figure>
+<div align="center">
+  <table border="0" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center">Total body dynamic PET</td>
+      <td align="center">Parametric imaging of net influx rate Ki</td>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="Assets/Dynamic_pet_data.gif" alt="demo1">
+      </td>
+      <td align="center">
+        <img src="Assets/Example_parametric_map.png" alt="demo2" width="196">
+      </td>
+    </tr>
+  </table>
 </div>
 
 <div align="center">
