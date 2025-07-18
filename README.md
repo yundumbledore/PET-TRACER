@@ -37,4 +37,4 @@ The consistency model in PET-TRACER was trained and validated on dynamic PET cur
 tspan = np.array([5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 75.0, 90.0, 105.0, 120.0, 180.0, 240.0, 300.0, 360.0, 420.0, 480.0, 600.0, 720.0, 840.0, 960.0, 1080.0, 1260.0, 1440.0, 1620.0, 1800.0, 2100.0, 2400.0, 2700.0, 3000.0])/60
 
 ## Support and Help
-Please raise your queries via the "Issues" tab or contact me (yun.zhao@sydney.edu.au). I will respond as soon as possible.
+Please raise your queries via the "Issues" tab or contact me (yun.zhao@sydney.edu.au).
