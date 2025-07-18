@@ -25,7 +25,9 @@ The figure below shows an example of posterior estimation with one TAC-AIF pair 
 
 ## Getting Started
 1. Clone the repo and create a conda environment via environment.yml.
-2. Visualize posteriors predicted by CM with three example TACs.
+2. Two examples are provided to show the usage of **PET-TRACER**.
+   Single_TAC_demo.ipynb demonstrates posterior estimation from single TAC and AIF pair.
+   Total_body_parametric_imaging_demo.ipynb demonstrates generating parametric imaging of $K_i$ from total body dynamic PET.
 
 ## Adaptation to your data
 The consistency model in PET-TRACER was trained and validated on dynamic PET curves discretized into 35 frames, as shown below. Because the posterior inference network expects input TACs and AIFs sampled at these exact time points, you should resample your real dynamic PET data to this same 35-frame schedule before running inference. Likewise, if you’re generating synthetic data for training or testing, be sure to simulate both the tissue time–activity curve and arterial input function at these 35 time points. This alignment ensures that the model’s learned temporal features correctly match your input, enabling accurate, uncertainty-aware kinetic parameter estimation.
