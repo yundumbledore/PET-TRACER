@@ -32,6 +32,37 @@ def Sampler(model, y, num_posterior_samples, t=[1.0, 0.75, 0.50, 0.25]):
     
     return x_noisy
 
+def SamplerV2(model, y, num_posterior_samples, t_list=[1.0, 0.75, 0.50, 0.25]):
+    """
+    model: either DataParallel or single-GPU model
+    y:      CPU tensor of shape [B, y_dim]
+    returns: CPU tensor of shape [B, num_posterior_samples, 5]
+    """
+    batch_size, y_dim = y.shape
+
+    # repeat y
+    y_rep = y.unsqueeze(1).repeat(1, num_posterior_samples, 1)
+    y_rep = y_rep.view(-1, y_dim)  # [B * S, y_dim]
+
+    # initialize noise on CPU
+    x_noisy = torch.randn(batch_size * num_posterior_samples, 1, 5, device=y.device)
+
+    for idx, tau in enumerate(t_list):
+        # scalar tensor on CPU
+        t_tensor = torch.full((batch_size * num_posterior_samples,), tau, device=y.device)
+
+        if idx > 0:
+            z = torch.randn_like(x_noisy, device=y.device)
+            x_noisy = x_noisy + tau * z
+
+        with torch.no_grad():
+            # scatter(x_noisy, y_rep, t_tensor) onto each GPU, forward, gather back on GPU0
+            x_noisy = model(x_noisy, y_rep, t_tensor)
+
+    # reshape to [B, S, 5]
+    x_noisy = x_noisy.view(batch_size, num_posterior_samples, 5)
+    return x_noisy
+
 def computeKi(K1, k2, k3):
     return (K1 * k3)/(k2 + k3)
 
@@ -49,7 +80,7 @@ def get_model(device):
     model = OneDUnet(x_dim, y_dim, hidden_dim, channels, embedy)
 
     # Load model
-    model.load_state_dict(torch.load('CM_model_weights.pth', map_location=device))
+    model.load_state_dict(torch.load('Pretrained/2.pth', map_location=device))
     model.to(device)
     model.eval()
     return model
@@ -95,6 +126,7 @@ def tbpet_inference(model, device, data_path, sample_size = 1000, num_timesteps 
     y_std = scaling_params["y_std"]
 
     t_list          = np.linspace(1.0, 0.0, num=num_timesteps, endpoint=False)
+    #########################
 
     # load your data
     y_data = pd.read_hdf(data_path)
@@ -112,9 +144,11 @@ def tbpet_inference(model, device, data_path, sample_size = 1000, num_timesteps 
         batch_np = y_norm[i:i+batch_size]
         obs      = torch.tensor(batch_np, dtype=torch.float32, device=device)  # CPU tensor
 
-        theta_hat_cpu = Sampler(model, obs, sample_size, t_list)
+        # ----- multi-GPU inference -----
+        theta_hat = SamplerV2(model, obs, sample_size, t_list)
 
-        x_pred = theta_hat_cpu * x_std + x_mean
+        # denormalize / exp
+        x_pred = theta_hat * x_std + x_mean
 
         samples = x_pred.cpu().numpy()
 
@@ -122,6 +156,7 @@ def tbpet_inference(model, device, data_path, sample_size = 1000, num_timesteps 
         Ki        = computeKi(samples[:,:,0], samples[:,:,1], samples[:,:,2])
         Ki_mean   = Ki.mean(axis=1)
 
+        # out = np.vstack([Ki_mean, Ki_std, Ki_med, k4_mean, k4_std, k4_med])
         out = np.vstack([Ki_mean])
         outputs.append(out)
 
