@@ -80,7 +80,9 @@ def get_model(device):
     model = OneDUnet(x_dim, y_dim, hidden_dim, channels, embedy)
 
     # Load model
-    model.load_state_dict(torch.load('Pretrained/2.pth', map_location=device))
+    checkpoint = torch.load('Pretrained/model.pth', map_location=device)
+    ema_weights = checkpoint['ema_state_dict']
+    model.load_state_dict(ema_weights)
     model.to(device)
     model.eval()
     return model
