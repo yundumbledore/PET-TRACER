@@ -28,7 +28,7 @@ The figure below shows an example of posterior estimation with one TAC-AIF pair 
 ![](Assets/Posterior_estimation_example.png)
 
 ## Getting Started
-1. Clone the repo and create a conda environment via environment.yml.
+1. Clone the repo and create a conda environment with environment.yml.
 2. Two examples are provided to show the usage of **PET-TRACER**.
    
    Single_TAC_demo.ipynb demonstrates posterior estimation from single TAC and AIF pair.
