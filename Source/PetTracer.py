@@ -68,7 +68,7 @@ def computeKi(K1, k2, k3):
 
 def get_model(device):
     # Load train_params
-    with open("train_config.json", "r") as f:
+    with open("./Assets/train_config.json", "r") as f:
         train_config = json.load(f)
 
     # Model settings
@@ -88,7 +88,7 @@ def get_model(device):
     return model
 
 def demo_single_TAC(model, device, data_path, sample_size = 10000, num_timesteps = 3):
-    with open("scaling_params.json", "r") as f:
+    with open("./Assets/scaling_params.json", "r") as f:
         scaling_params = json.load(f)
 
     x_mean = np.array(scaling_params["x_mean"])[:5]
@@ -117,7 +117,7 @@ def demo_single_TAC(model, device, data_path, sample_size = 10000, num_timesteps
     return Ki
 
 def tbpet_inference(model, device, data_path, sample_size = 1000, num_timesteps = 3, batch_size = 1000):
-    with open("scaling_params.json", "r") as f:
+    with open("./Assets/scaling_params.json", "r") as f:
         scaling_params = json.load(f)
 
     x_mean = np.array(scaling_params["x_mean"])[:5]
