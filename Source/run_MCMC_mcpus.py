@@ -159,7 +159,7 @@ def _run_indexed(ir):
 
 if __name__ == "__main__":
     # Load data
-    y_data = pd.read_hdf('../Yun_realdata/P001_PET_coronal_116_denoised_adjusted.h5')
+    y_data = pd.read_hdf('../Sample_data/P001_PET_coronal_116_denoised_adjusted.h5')
     Cb_meas    = y_data.iloc[:,2].values
 
     # Sampling time points
@@ -187,5 +187,5 @@ if __name__ == "__main__":
             estimates[i] = res
 
     all_samples = np.stack(estimates, axis=0)
-    np.savez_compressed('../Parametric_Imaging/P001_slice116.npz', arr=all_samples)
+    np.savez_compressed('../Output/P001_slice116_MCMC.npz', arr=all_samples)
 
