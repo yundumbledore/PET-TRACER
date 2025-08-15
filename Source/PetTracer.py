@@ -116,7 +116,7 @@ def demo_single_TAC(model, device, data_path, sample_size = 10000, num_timesteps
     Ki = computeKi(samples[:,:,0], samples[:,:,1], samples[:,:,2]).squeeze()
     return Ki
 
-def tbpet_inference(model, device, data_path, sample_size = 1000, num_timesteps = 3, batch_size = 1000):
+def tbpet_inference(model, device, data_path, sample_size = 1000, num_timesteps = 3, batch_size = 1):
     with open("./Assets/scaling_params.json", "r") as f:
         scaling_params = json.load(f)
 
