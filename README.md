@@ -1,6 +1,8 @@
 # PET-TRACER
 PET-TRACER (PET **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) 
-#### Yun Zhao, Steven Meikle (The University of Sydney, Australia), Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
+#### Yun Zhao (The University of Sydney, Australia), Steven Meikle (The University of Sydney, Australia), Andrew Reader (King's College London, UK), Yanan Fan (CSIRO's Data61, Australia)
+
+Contact Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
 
 **PET-TRACER** was used in the below paper
 
