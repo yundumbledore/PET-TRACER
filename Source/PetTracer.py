@@ -114,7 +114,7 @@ def demo_single_TAC(model, device, data_path, sample_size = 10000, num_timesteps
     samples = x_pred.cpu().detach().numpy()
 
     Ki = computeKi(samples[:,:,0], samples[:,:,1], samples[:,:,2]).squeeze()
-    return Ki
+    return samples[0,:,:]
 
 def tbpet_inference(model, device, data_path, sample_size = 1000, num_timesteps = 3, batch_size = 1):
     with open("./Assets/scaling_params.json", "r") as f:
@@ -249,22 +249,22 @@ def parametric_map_interactive(para_array, mask_slice, spacing, parameter_name, 
     ax.format_coord = format_coord
     plt.show()
 
-def plot_posterior(title, parameter_name, cm, abc=None, xl = None, xr = None):
-    custom_colors = ['#FF0000', '#008000', '#01153E', '#7E1E9C', '#F97306', '#7BC8F6', '#0000FF']
+# def plot_posterior(title, parameter_name, cm, abc=None, xl = None, xr = None):
+#     custom_colors = ['#FF0000', '#008000', '#01153E', '#7E1E9C', '#F97306', '#7BC8F6', '#0000FF']
 
-    fig = plt.figure(figsize=(3, 2))
-    if abc is not None:
-        sns.kdeplot(abc, color=custom_colors[1], linewidth=2, label='ABC')
-    sns.kdeplot(cm, color=custom_colors[6],linewidth=2, label='CM')
+#     fig = plt.figure(figsize=(3, 2))
+#     if abc is not None:
+#         sns.kdeplot(abc, color=custom_colors[1], linewidth=2, label='ABC')
+#     sns.kdeplot(cm, color=custom_colors[6],linewidth=2, label='CM')
 
-    plt.xlabel(parameter_name,fontsize=14, fontweight='bold', labelpad=10)
-    plt.ylabel('Density', fontsize=14, fontweight='bold', labelpad=10)
-    plt.tick_params(axis='both', labelsize=10)
-    plt.legend(fontsize=10, loc='best')
-    plt.title(title, fontsize=14)
-    if xl is not None: 
-        plt.xlim([xl,xr])
-    plt.show()
+#     plt.xlabel(parameter_name,fontsize=14, fontweight='bold', labelpad=10)
+#     plt.ylabel('Density', fontsize=14, fontweight='bold', labelpad=10)
+#     plt.tick_params(axis='both', labelsize=10)
+#     plt.legend(fontsize=10, loc='best')
+#     plt.title(title, fontsize=14)
+#     if xl is not None: 
+#         plt.xlim([xl,xr])
+#     plt.show()
 
 def plot_TAC(data_path):
     df = pd.read_hdf(data_path)
@@ -281,4 +281,54 @@ def plot_TAC(data_path):
     plt.ylabel('Concentration (Bq/ml)',fontweight='bold',fontsize=14)
     plt.rcParams['font.size'] = 14
     plt.legend(fontsize=14)
+
+def plot_posterior(samples, abc_samples=None, xlims=None):
+    """
+    Plot KDEs for all five parameters (K1, k2, k3, k4, Vb) in a single-row layout.
+    
+    samples:     np.ndarray or torch.Tensor of shape [S, 5]
+    abc_samples: optional np.ndarray/torch.Tensor of shape [S_abc, 5] to overlay
+    xlims:       optional dict mapping param name -> (xmin, xmax)
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import torch
+    import numpy as np
+
+    if isinstance(samples, torch.Tensor):
+        samples = samples.detach().cpu().numpy()
+    if samples.ndim != 2 or samples.shape[1] != 5:
+        raise ValueError(f"`samples` must have shape [S, 5], got {samples.shape}")
+
+    if abc_samples is not None:
+        if isinstance(abc_samples, torch.Tensor):
+            abc_samples = abc_samples.detach().cpu().numpy()
+        if abc_samples.ndim != 2 or abc_samples.shape[1] != 5:
+            raise ValueError(f"`abc_samples` must have shape [S_abc, 5], got {abc_samples.shape}")
+
+    names = ["K1", "k2", "k3", "k4", "Vb"]
+    cm_color  = "#0000FF"  # CM (your model)
+    abc_color = "#008000"  # ABC (optional overlay)
+
+    fig, axes = plt.subplots(1, 5, figsize=(16, 3))
+
+    for i, name in enumerate(names):
+        ax = axes[i]
+        sns.kdeplot(samples[:, i], ax=ax, linewidth=2, color=cm_color, label="CM")
+        if abc_samples is not None:
+            sns.kdeplot(abc_samples[:, i], ax=ax, linewidth=2, color=abc_color, label="ABC")
+
+        ax.set_xlabel(name, fontsize=12, fontweight="bold")
+        ax.set_ylabel("Density", fontsize=12, fontweight="bold")
+        ax.tick_params(axis="both", labelsize=10)
+        if xlims and name in xlims:
+            ax.set_xlim(*xlims[name])
+        if i == 0 and abc_samples is not None:
+            ax.legend(fontsize=9, loc="best")
+
+    fig.suptitle("Posterior Estimation", fontsize=14, fontweight="bold")
+    plt.tight_layout(rect=[0, 0, 1, 0.9])
+    plt.show()
+
+
 
