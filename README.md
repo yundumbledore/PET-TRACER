@@ -1,10 +1,11 @@
 # PET-TRACER
 PET-TRACER (PET **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) 
-#### Yun Zhao, Steven Meikle (The University of Sydney, Australia), Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
+#### Yun Zhao (The University of Sydney, Australia), Steven Meikle (The University of Sydney, Australia), Andrew Reader (King's College London, UK), Yanan Fan (CSIRO's Data61, Australia)
+
+Contact Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
 
 **PET-TRACER** was used in the below paper
-
-1. *Parametric Imaging of Posterior Kinetic Model Parameter Estimates in Dynamic Total-Body PET Using Generative Consistency Models [About to submit to IEEE Transactions on Medical Imaging]*,
+1. *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET [Submitted to IEEE Transactions on Medical Imaging](https://arxiv.org/abs/2509.13614)*
 
 <p align="center">
   <img src="Assets/Short_demo.gif" alt="demo1" />
