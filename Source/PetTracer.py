@@ -115,7 +115,7 @@ def predict_single_TAC(model, device, Ct, Cp, sample_size = 10000, num_timesteps
     Ki = computeKi(samples[:,:,0], samples[:,:,1], samples[:,:,2]).squeeze()
     return samples[0,:,:]
 
-def demo_single_TAC(model, device, data_path, sample_size = 10000, num_timesteps = 3):
+def demo_single_TAC(model, device, data_path, sample_size = 2000, num_timesteps = 3):
     with open("./Assets/scaling_params.json", "r") as f:
         scaling_params = json.load(f)
 
