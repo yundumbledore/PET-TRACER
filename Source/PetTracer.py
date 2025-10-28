@@ -87,6 +87,34 @@ def get_model(device):
     model.eval()
     return model
 
+def predict_single_TAC(model, device, Ct, Cp, sample_size = 10000, num_timesteps = 3):
+    with open("./Assets/scaling_params.json", "r") as f:
+        scaling_params = json.load(f)
+
+    x_mean = np.array(scaling_params["x_mean"])[:5]
+    x_std = np.array(scaling_params["x_std"])[:5]
+    x_mean = torch.tensor(x_mean, dtype=torch.float32).to(device)
+    x_std = torch.tensor(x_std, dtype=torch.float32).to(device)
+    y_mean = scaling_params["y_mean"]
+    y_std = scaling_params["y_std"]
+
+    t = np.linspace(1.0, 0.0, num=num_timesteps, endpoint=False)
+    AIF = Cp
+    y_data = Ct
+    AIFs = np.tile(AIF, (y_data.shape[0], 1))
+    y_data = np.hstack((y_data, AIFs))
+    y_data = (y_data - y_mean) / y_std
+
+    obs = torch.tensor(y_data, dtype=torch.float32, device=device)
+    # Inference
+    theta_hat = Sampler(model, obs, sample_size, t)
+    # Denormalize and reverse log transformation
+    x_pred = theta_hat * x_std + x_mean
+    samples = x_pred.cpu().detach().numpy()
+
+    Ki = computeKi(samples[:,:,0], samples[:,:,1], samples[:,:,2]).squeeze()
+    return samples[0,:,:]
+
 def demo_single_TAC(model, device, data_path, sample_size = 10000, num_timesteps = 3):
     with open("./Assets/scaling_params.json", "r") as f:
         scaling_params = json.load(f)
