@@ -101,8 +101,8 @@ def predict_single_TAC(model, device, Ct, Cp, sample_size = 10000, num_timesteps
     t = np.linspace(1.0, 0.0, num=num_timesteps, endpoint=False)
     AIF = Cp
     y_data = Ct
-    AIFs = np.tile(AIF, (y_data.shape[0], 1))
-    y_data = np.hstack((y_data, AIFs))
+    # AIFs = np.tile(AIF, (y_data.shape[0], 1))
+    y_data = np.hstack((y_data, AIF))
     y_data = (y_data - y_mean) / y_std
 
     obs = torch.tensor(y_data, dtype=torch.float32, device=device)
