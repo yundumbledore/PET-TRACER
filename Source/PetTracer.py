@@ -105,7 +105,7 @@ def predict_single_TAC(model, device, Ct, Cp, sample_size = 10000, num_timesteps
     y_data = np.hstack((y_data, AIF))
     y_data = (y_data - y_mean) / y_std
 
-    obs = torch.tensor(y_data, dtype=torch.float32, device=device)
+    obs = torch.tensor(y_data, dtype=torch.float32, device=device).unsqueeze(0)
     # Inference
     theta_hat = Sampler(model, obs, sample_size, t)
     # Denormalize and reverse log transformation
