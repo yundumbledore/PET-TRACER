@@ -18,6 +18,54 @@ PET-TRACER is an open-source Python framework designed to bring state-of-the-art
 2. Outperforms traditional diffusion models (DDPM, score-based diffusion) by **at least 100×** and is **3×** faster than GPU-based parallel ABC (Approximate Bayesian Computation).
 3. Matches full MCMC-based inference quality, while reducing uncertainty estimation error by **at least 10%** compared to ABC when MCMC posteriors are treated as ground truth.
 
+## Windows Installation
+
+### 1. Create a New Python Environment
+A dedicated configuration file, `environment_win.yml`, is provided specifically for Windows users.
+
+1. Open your **Anaconda PowerShell Prompt**.
+2. Navigate to the directory containing the `.yml` file.
+3. Run the following command to create the environment (this installs Python 3.11.14):
+
+```bash
+conda env create -f environment_win.yml
+```
+
+### 2. Install NVIDIA GPU Dependencies
+Once the environment is created, you need to install the necessary PyTorch binaries for GPU support.
+
+1. Open Anaconda Navigator.
+2. Click on Environments in the left sidebar and select the environment you just created.
+3. Click the green play button next to the environment name and select Open Terminal.
+4. Run the command below to install PyTorch with CUDA support:
+
+```bash
+pip3 install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu128](https://download.pytorch.org/whl/cu128)
+```
+### 3. Verification & Testing
+To ensure everything is configured correctly: 
+1. In Anaconda Navigator, activate the environment created in Step 1.
+2. Launch Jupyter Notebook and navigate to the PET-TRACER folder.
+3. Open the notebook named Total_body_parametric_imaging_demo.ipynb.
+4. Run the first code block. If it prints "cuda:0", your PyTorch, NVIDIA GPUs, PET-TRACER are configured successfully.
+
+⚠️ Note on Batch Size: In code block 3, please adjust the batch_size according to your GPU memory:
+
+8GB VRAM: batch_size=100 is recommended.
+
+80GB VRAM: You can scale batch_size up to 1,000.
+
+## Getting Started
+Two examples are provided to show the usage of **PET-TRACER**.
+   
+1. Single_TAC_demo.ipynb demonstrates posterior estimation from single TAC and AIF pair.
+2. Total_body_parametric_imaging_demo.ipynb demonstrates generating parametric imaging of $K_i$ from total body dynamic PET.
+
+## Adaptation to your data
+The consistency model in PET-TRACER was trained and validated on dynamic PET curves discretized into 35 frames, as shown below. Because the posterior inference network expects input TACs and AIFs sampled at these exact time points, you should resample your real dynamic PET data to this same 35-frame schedule before running inference. Likewise, if you’re generating synthetic data for training or testing, be sure to simulate both the tissue time–activity curve and arterial input function at these 35 time points. This alignment ensures that the model’s learned temporal features correctly match your input, enabling accurate, uncertainty-aware kinetic parameter estimation.
+
+tspan = np.array([5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 75.0, 90.0, 105.0, 120.0, 180.0, 240.0, 300.0, 360.0, 420.0, 480.0, 600.0, 720.0, 840.0, 960.0, 1080.0, 1260.0, 1440.0, 1620.0, 1800.0, 2100.0, 2400.0, 2700.0, 3000.0])/60
+
 ## Methods
 The **consistency model** at the heart of PET-TRACER is a conditional generative framework that learns to map noisy, partially diffused kinetic parameter estimates back to their true posterior distributions in just a handful of passes. Built on a lightweight 1D U-Net architecture, the model is trained to denoise and “roll back” samples through a learned consistency function, rather than simulating every diffusion timestep. During training, the network sees paired noisy and clean two-tissue compartment parameter curves $K_1, k_2, k_3, k_4, V_b$ alongside their corresponding TAC + AIF inputs and learns to enforce consistency between successive denoising steps. The result is a model that captures the underlying posterior geometry with high fidelity, learning to produce accurate, uncertainty-aware parameter samples from arbitrary starting noise levels.
 
@@ -27,19 +75,6 @@ The **multistep consistency sampling algorithm** then leverages this trained mod
 
 The figure below shows an example of posterior estimation with one TAC-AIF pair predicted by CM, MCMC, and other baselines.
 ![](Assets/Posterior_estimation_example.png)
-
-## Getting Started
-1. Clone the repo and create a conda environment with environment.yml.
-2. Two examples are provided to show the usage of **PET-TRACER**.
-   
-   Single_TAC_demo.ipynb demonstrates posterior estimation from single TAC and AIF pair.
-   
-   Total_body_parametric_imaging_demo.ipynb demonstrates generating parametric imaging of $K_i$ from total body dynamic PET.
-
-## Adaptation to your data
-The consistency model in PET-TRACER was trained and validated on dynamic PET curves discretized into 35 frames, as shown below. Because the posterior inference network expects input TACs and AIFs sampled at these exact time points, you should resample your real dynamic PET data to this same 35-frame schedule before running inference. Likewise, if you’re generating synthetic data for training or testing, be sure to simulate both the tissue time–activity curve and arterial input function at these 35 time points. This alignment ensures that the model’s learned temporal features correctly match your input, enabling accurate, uncertainty-aware kinetic parameter estimation.
-
-tspan = np.array([5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 75.0, 90.0, 105.0, 120.0, 180.0, 240.0, 300.0, 360.0, 420.0, 480.0, 600.0, 720.0, 840.0, 960.0, 1080.0, 1260.0, 1440.0, 1620.0, 1800.0, 2100.0, 2400.0, 2700.0, 3000.0])/60
 
 ## Support and Help
 Please raise your queries via the "Issues" tab or contact me (yun.zhao@sydney.edu.au).
