@@ -18,17 +18,17 @@ PET-TRACER is an open-source Python framework designed to bring state-of-the-art
 2. Outperforms traditional diffusion models (DDPM, score-based diffusion) by **at least 100×** and is **3×** faster than GPU-based parallel ABC (Approximate Bayesian Computation).
 3. Matches full MCMC-based inference quality, while reducing uncertainty estimation error by **at least 10%** compared to ABC when MCMC posteriors are treated as ground truth.
 
-## Windows Installation
+## Installation
 
 ### 1. Create a New Python Environment
-A dedicated configuration file, `environment_win.yml`, is provided specifically for Windows users.
+A dedicated configuration file, `environment_no_builds.yml`, is provided specifically for Windows users.
 
 1. Open your **Anaconda PowerShell Prompt**.
 2. Navigate to the directory containing the `.yml` file.
 3. Run the following command to create the environment (this installs Python 3.11.14):
 
 ```bash
-conda env create -f environment_win.yml
+conda env create -f environment_no_builds.yml
 ```
 
 ### 2. Install NVIDIA GPU Dependencies
@@ -42,6 +42,8 @@ Once the environment is created, you need to install the necessary PyTorch binar
 ```bash
 pip3 install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu128](https://download.pytorch.org/whl/cu128)
 ```
+⚠️ Note on CUDA version: cu128 is compatible with RTX 30, 40 and 50 series. You may need to find the CUDA version for your GPUs.
+
 ### 3. Verification & Testing
 To ensure everything is configured correctly: 
 1. In Anaconda Navigator, activate the environment created in Step 1.
