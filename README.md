@@ -40,7 +40,7 @@ Once the environment is created, you need to install the necessary PyTorch binar
 4. Run the command below to install PyTorch with CUDA support:
 
 ```bash
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 ```
 ⚠️ Note on CUDA version: cu128 is compatible with RTX 30, 40 and 50 series. You may need to find the CUDA version for your GPUs.
 
