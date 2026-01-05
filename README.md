@@ -31,6 +31,14 @@ A dedicated configuration file, `environment_no_builds.yml`, is provided specifi
 conda env create -f environment_no_builds.yml
 ```
 
+If the above fails, in **Anaconda PowerShell Prompt** create a Python 3.11.14 environment and install the dependencies manually:
+
+```bash
+conda create -n <env_name> python=3.11.14
+conda activate <env_name>
+conda install pandas matplotlib seaborn tqdm scipy pytables
+```
+
 ### 2. Install NVIDIA GPU Dependencies
 Once the environment is created, you need to install the necessary PyTorch binaries for GPU support.
 
