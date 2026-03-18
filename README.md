@@ -74,12 +74,43 @@ Two examples are provided to show the usage of **PET-TRACER**.
 ## Adaptation to your data
 The consistency model in PET-TRACER was trained and validated on dynamic PET curves discretized into 35 frames, as shown below. Because the posterior inference network expects input TACs and AIFs sampled at these exact time points, you should resample your real dynamic PET data to this same 35-frame schedule before running inference. Likewise, if you’re generating synthetic data for training or testing, be sure to simulate both the tissue time–activity curve and arterial input function at these 35 time points. This alignment ensures that the model’s learned temporal features correctly match your input, enabling accurate, uncertainty-aware kinetic parameter estimation.
 
-| Header 1 | Header 2 | Header 3 |
-| -------- | -------- | -------- |
-| Row 1    | Data     | More     |
-| Row 2    | Data     | More     |
-
-tspan = np.array([5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 75.0, 90.0, 105.0, 120.0, 180.0, 240.0, 300.0, 360.0, 420.0, 480.0, 600.0, 720.0, 840.0, 960.0, 1080.0, 1260.0, 1440.0, 1620.0, 1800.0, 2100.0, 2400.0, 2700.0, 3000.0])/60
+| Frame Duration (Min) | Mid Time Point (Min) |
+| :------------------- | :------------------- |
+| 0.0833               | 0.0417               |
+| 0.0833               | 0.1250               |
+| 0.0833               | 0.2083               |
+| 0.0833               | 0.2917               |
+| 0.0833               | 0.3750               |
+| 0.0833               | 0.4583               |
+| 0.0833               | 0.5417               |
+| 0.0833               | 0.6250               |
+| 0.0833               | 0.7083               |
+| 0.0833               | 0.7917               |
+| 0.0833               | 0.8750               |
+| 0.0833               | 0.9583               |
+| 0.2500               | 1.1250               |
+| 0.2500               | 1.3750               |
+| 0.2500               | 1.6250               |
+| 0.2500               | 1.8750               |
+| 1.0000               | 2.5000               |
+| 1.0000               | 3.5000               |
+| 1.0000               | 4.5000               |
+| 1.0000               | 5.5000               |
+| 1.0000               | 6.5000               |
+| 1.0000               | 7.5000               |
+| 2.0000               | 9.0000               |
+| 2.0000               | 11.0000              |
+| 2.0000               | 13.0000              |
+| 2.0000               | 15.0000              |
+| 2.0000               | 17.0000              |
+| 3.0000               | 19.5000              |
+| 3.0000               | 22.5000              |
+| 3.0000               | 25.5000              |
+| 3.0000               | 28.5000              |
+| 5.0000               | 32.5000              |
+| 5.0000               | 37.5000              |
+| 5.0000               | 42.5000              |
+| 5.0000               | 47.5000              |
 
 ## Methods
 The **consistency model** at the heart of PET-TRACER is a conditional generative framework that learns to map noisy, partially diffused kinetic parameter estimates back to their true posterior distributions in just a handful of passes. Built on a lightweight 1D U-Net architecture, the model is trained to denoise and “roll back” samples through a learned consistency function, rather than simulating every diffusion timestep. During training, the network sees paired noisy and clean two-tissue compartment parameter curves $K_1, k_2, k_3, k_4, V_b$ alongside their corresponding TAC + AIF inputs and learns to enforce consistency between successive denoising steps. The result is a model that captures the underlying posterior geometry with high fidelity, learning to produce accurate, uncertainty-aware parameter samples from arbitrary starting noise levels.
