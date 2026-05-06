@@ -5,7 +5,7 @@ PET-TRACER (PET **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency *
 Contact Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
 
 **PET-TRACER** was used in the below paper
-1. *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET [Submitted to IEEE Transactions on Medical Imaging](https://arxiv.org/abs/2509.13614)*
+1. *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET [Accepted and early access will be available in IEEE Transactions on Medical Imaging](https://arxiv.org/abs/2509.13614)*
 
 <p align="center">
   <img src="Assets/Short_demo.gif" alt="demo1" />
