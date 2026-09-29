@@ -89,8 +89,6 @@ python infer.py --run runs/scenario1 --multi-gpu --samples 1000 --batch-size 32 
 
 The output `runs/scenario1/predictions.npz` contains correctly named parameter means, medians and standard deviations, and the corresponding Kᵢ statistics. Kᵢ is calculated **for every joint posterior draw**, then summarised. No silent positivity clipping is applied. Nearly zero denominators are excluded and `Ki_valid_fraction` records their effect. Check the negative-draw fractions and Kᵢ tails before interpreting maps.
 
-For an explicitly exploratory run on the supplied files, `--allow-time-mismatch` records the exception in the output metadata. It does not correct or resample either dataset and must not be described as a validated protocol reproduction.
-
 ## 4. Make parametric images
 
 ```bash
