@@ -79,7 +79,11 @@ After the training, run
 python infer.py --run runs/scenario1 --samples 1000 --batch-size 16 --sample-chunk 64
 ```
 
-Posterior draws are generated in small GPU chunks. A voxel batch's samples are retained on CPU to calculate exact medians. Reduce `--batch-size` or `--sample-chunk` if memory is limited.
+Posterior draws are generated in small GPU chunks. A voxel batch's samples are retained on CPU to calculate exact medians. Reduce `--batch-size` or `--sample-chunk` if memory is limited. To enable specific GPUs, for example Mac mps, use the command
+
+```bash
+python infer.py --run runs/scenario1 --device mps --samples 100 --batch-size 16 --sample-chunk 64
+```
 
 For multiple GPUs on one node, expose the allocated GPUs with your cluster's scheduler and add:
 
