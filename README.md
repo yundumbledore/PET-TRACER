@@ -1,17 +1,15 @@
 # PET-TRACER
 
 ### Bayesian kinetic modelling for dynamic total-body PET
-Yun Zhao (The University of Sydney, Australia), Steven Meikle (The University of Sydney, Australia)
+> Yun Zhao (The University of Sydney, Australia), Steven Meikle (The University of Sydney, Australia)
 
-Contact Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
+> Contact Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
 
 PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) uses generative consistency models for rapid posterior estimation from tissue time–activity curves (TACs) and input functions.
 
 **LoRACM** extends PET-TRACER with low-rank adaptation of a pretrained consistency model. This release focuses on **Scenario 1: adapting FDG two-tissue compartment modelling from the Siemens Biograph Vision Quadra protocol to the UC Davis uEXPLORER protocol**.
 
 [Start the LoRACM tutorial](LoRACM/README.md) · [Data formats](LoRACM/docs/DATA_FORMATS.md) · [Original framework](docs/legacy-framework.md) · [Release review](LoRACM/docs/RELEASE_REVIEW.md)
-
-> **Release candidate.** The Scenario 1 workflow is organised for review. Timing and spatial metadata checks described in the release review must be resolved before an exact-reproduction release is advertised.
 
 ## Choose your workflow
 
