@@ -73,7 +73,7 @@ Keep the checkpoint, model configuration and scaling file together. Checkpoints 
 
 ## 3. Predict voxel posteriors
 
-After the time-grid issue is resolved:
+After the training, run
 
 ```bash
 python infer.py --run runs/scenario1 --samples 1000 --batch-size 16 --sample-chunk 64
