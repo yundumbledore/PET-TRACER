@@ -1,6 +1,9 @@
 # PET-TRACER
 
 ### Bayesian kinetic modelling for dynamic total-body PET
+Yun Zhao (The University of Sydney, Australia), Steven Meikle (The University of Sydney, Australia)
+
+Contact Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
 
 PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) uses generative consistency models for rapid posterior estimation from tissue time–activity curves (TACs) and input functions.
 
