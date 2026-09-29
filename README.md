@@ -1,21 +1,15 @@
 # PET-TRACER
 
 ### Bayesian kinetic modelling for dynamic total-body PET
-
-<<<<<<< HEAD
-**Estimate kinetic parameter posteriors. Adapt to a new acquisition. Build parametric images.**
-=======
-**PET-TRACER** was used in the below paper
-1. *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET [Published in IEEE Transactions on Medical Imaging](https://ieeexplore.ieee.org/abstract/document/11517565)*
->>>>>>> 96d9b72f125affa58796f2fc03ee4d54561b54b6
+> Yun Zhao (The University of Sydney, Australia), Steven Meikle (The University of Sydney, Australia)
+>
+> Contact Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
 
 PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) uses generative consistency models for rapid posterior estimation from tissue time–activity curves (TACs) and input functions.
 
 **LoRACM** extends PET-TRACER with low-rank adaptation of a pretrained consistency model. This release focuses on **Scenario 1: adapting FDG two-tissue compartment modelling from the Siemens Biograph Vision Quadra protocol to the UC Davis uEXPLORER protocol**.
 
 [Start the LoRACM tutorial](LoRACM/README.md) · [Data formats](LoRACM/docs/DATA_FORMATS.md) · [Original framework](docs/legacy-framework.md) · [Release review](LoRACM/docs/RELEASE_REVIEW.md)
-
-> **Release candidate.** The Scenario 1 workflow is organised for review. Timing and spatial metadata checks described in the release review must be resolved before an exact-reproduction release is advertised.
 
 ## Choose your workflow
 
@@ -70,7 +64,7 @@ PET-TRACER/
 
 ## Research
 
-- **Original framework:** *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET*. [Preprint](https://arxiv.org/abs/2509.13614). The supplied new manuscript cites this work as IEEE Transactions on Medical Imaging, 2026; final publication metadata should be added before release.
+- **Original framework:** *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET* has been published on [IEEE Transactions on Medical Imaging]([https://arxiv.org/abs/2509.13614](https://ieeexplore.ieee.org/abstract/document/11517565)).
 - **LoRACM extension:** *A General-Purpose Adaptable Foundation Model for Total-Body PET Kinetic Modelling*. Manuscript in preparation for submission to IEEE Transactions on Medical Imaging. Citation metadata will be added when available.
 
 When using LoRACM, please cite both the original framework and the adaptation paper once its public reference is available. Model performance and runtime statements belong to their reported experiments; the smoke test is an installation check.

@@ -2,8 +2,6 @@
 
 Adapt a pretrained PET-TRACER consistency model to **FDG–2TCM on the UC Davis uEXPLORER protocol**, then estimate voxel posteriors and display a coronal parametric image.
 
-> This is a release candidate. The supplied AIF and HDF5 time columns differ, and the spatial mapping needs author confirmation. The code reports these issues explicitly. See [release review](docs/RELEASE_REVIEW.md) before interpreting the demo as a reproduction of the manuscript.
-
 ## 0. Set up
 
 Run all commands below from **`PET-TRACER/LoRACM`**. Paths in configuration files are relative to that working directory.
@@ -75,7 +73,7 @@ Keep the checkpoint, model configuration and scaling file together. Checkpoints 
 
 ## 3. Predict voxel posteriors
 
-After the time-grid issue is resolved:
+After the training, run
 
 ```bash
 python infer.py --run runs/scenario1 --samples 1000 --batch-size 16 --sample-chunk 64
