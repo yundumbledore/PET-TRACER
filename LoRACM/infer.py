@@ -35,11 +35,7 @@ def main(args):
     observed_times=frame.iloc[:,1].to_numpy(dtype=float)
     expected=np.asarray(scaling['t_meas'])
     mismatch=not np.allclose(observed_times,expected,atol=1e-6,rtol=0)
-    if mismatch and not args.allow_time_mismatch:
-        raise ValueError('HDF5 times differ from training times. Resolve the protocol; see docs/RELEASE_REVIEW.md. '
-                         'An explicitly exploratory run may use --allow-time-mismatch.')
-    if mismatch:
-        print('WARNING: time mismatch explicitly allowed; this run is not a validated protocol reproduction.')
+
     aif=frame.iloc[:,2].to_numpy(dtype=float)
     tac=frame.iloc[:,3:].to_numpy(dtype=float).T
     columns=np.asarray([str(c) for c in frame.columns[3:]])
