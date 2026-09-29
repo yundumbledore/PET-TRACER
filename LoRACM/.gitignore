@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+runs/
+.DS_Store
+# Ignore new large experiments but retain the explicitly distributed demo assets.
+data/simulated/*.npz
+!data/simulated/scenario1.npz
+data/real/*.h5
+!data/real/Sub001_slice75_adjusted.h5
+data/real/*.npy
+!data/real/Sub001_slice75_mask.npy
+data/real/*.npz
+!data/real/Sub001_slice75_geometry.npz
+checkpoints/*.pth
+!checkpoints/foundation.pth

@@ -1,0 +1,14 @@
+{
+  "mapping_verified": false,
+  "mapping_source": "Assumption in supplied notebook: mask[:,75,:]==1 in NumPy C order matches HDF5 voxel column order.",
+  "shape": [
+    486,
+    150
+  ],
+  "foreground_voxels": 24237,
+  "slice_index": 75,
+  "origin": "lower",
+  "pixel_aspect_ratio": 1.0,
+  "orientation_and_spacing_verified": false,
+  "note": "Author must verify voxel mapping, orientation and pixel spacing before interpreting or publishing maps."
+}

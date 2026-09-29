@@ -1,0 +1,15 @@
+{
+  "numpy": "2.4.6",
+  "pandas": "3.0.5",
+  "jax": "0.10.2",
+  "jaxlib": "0.10.2",
+  "torch": "2.3.1",
+  "tables": "3.11.1",
+  "matplotlib": "3.11.1",
+  "scipy": "1.17.1",
+  "tqdm": "4.65.0",
+  "tensorboard": "2.16.2",
+  "nbformat": "5.9.2",
+  "python": "3.11.5",
+  "platform": "macOS-27.0-arm64-arm-64bit"
+}

@@ -1,0 +1,12 @@
+# Supporting dependencies; install PyTorch separately for your hardware.
+# This is a dependency list, not a locked cross-platform environment.
+numpy
+pandas
+jax
+scipy
+matplotlib
+tables
+tqdm
+tensorboard
+jupyterlab
+ipykernel

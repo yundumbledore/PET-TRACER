@@ -1,0 +1,66 @@
+{
+  "config": {
+    "aif_csv": "data/aif/UCDavis_1H35.csv",
+    "output": "data/simulated/scenario1.npz",
+    "n_train": 50000,
+    "n_val": 100000,
+    "n_test": 100,
+    "seed": 42,
+    "chunk_size": 256,
+    "half_life_min": 109.8,
+    "noise_prior": {
+      "type": "uniform",
+      "min": 0.1,
+      "max": 7
+    },
+    "kinetic_priors": {
+      "K1": {
+        "type": "uniform",
+        "min": 0.0001,
+        "max": 2.0
+      },
+      "k2": {
+        "type": "uniform",
+        "min": 0.0001,
+        "max": 2.0
+      },
+      "k3": {
+        "type": "uniform",
+        "min": 0.0001,
+        "max": 0.5
+      },
+      "k4": {
+        "type": "uniform",
+        "min": 0.0001,
+        "max": 0.2
+      },
+      "Vb": {
+        "type": "uniform",
+        "min": 0.001,
+        "max": 1.0
+      }
+    },
+    "test_prior_scale": 0.5
+  },
+  "aif_columns": [
+    "Sub001",
+    "Sub011",
+    "Sub080",
+    "Sub087"
+  ],
+  "parameter_order": [
+    "K1",
+    "k2",
+    "k3",
+    "k4",
+    "Vb",
+    "noise_scale"
+  ],
+  "conditioning_order": "TAC then AIF",
+  "aif_sha256": "35da197cc40eac4923b6b3e8c4994b3d0141b5d6e772c3f2e4e88e535d4becfc",
+  "numpy_version": "2.4.6",
+  "jax_version": "0.10.2",
+  "randomness": "Independent keys per split and chunk; chunk size is part of the reproducibility configuration.",
+  "time_convention": "Supplied midpoint sampling; noise delta_t=[t0,diff(t)], not measured frame durations.",
+  "solver": "Original forward Euler, nominal 0.01 min step; searchsorted sampling."
+}

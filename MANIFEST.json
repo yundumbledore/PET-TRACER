@@ -1,0 +1,325 @@
+{
+  "description": "Complete merged PET-TRACER package. Scientific review status: LoRACM/docs/RELEASE_REVIEW.md.",
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 178,
+      "sha256": "63338fe5f455e36f54966f6e7d24d0d1d133fb7342f98ad368b0380059669097"
+    },
+    {
+      "path": "Assets/Example_parametric_map.png",
+      "bytes": 108834,
+      "sha256": "17614ae5f1e1b54a6b44acfa8286f90e04703d7efcddef97e03d19d370a45c3d"
+    },
+    {
+      "path": "Assets/Multistep_consistency_sampling.png",
+      "bytes": 602839,
+      "sha256": "bf9e87662f8a84174ee32e24f4c2e43ae9c583a2d6448d0db2c03e14ede731d4"
+    },
+    {
+      "path": "Assets/P001_mask.npy",
+      "bytes": 31218128,
+      "sha256": "7eb41b34510732d63e5803fe822516c10068f09c84bbe25c6385c3cfb2d7e866"
+    },
+    {
+      "path": "Assets/Posterior_estimation_example.png",
+      "bytes": 391468,
+      "sha256": "ecf5f4bbcb42dc12ed71a7d1853a0c3393d72cccd6d95a3d98a500a2f1f4aabb"
+    },
+    {
+      "path": "Assets/SUV.png",
+      "bytes": 653022,
+      "sha256": "26638fc2779a2f9b8472cd5f90ad3e2cda6458ae80ec2f046981bc40253d5aa0"
+    },
+    {
+      "path": "Assets/Short_demo.gif",
+      "bytes": 35217592,
+      "sha256": "8615a38dcaced6794c3cc4d9b61e260de0fcce88bcdcb36defc0346e1c11e324"
+    },
+    {
+      "path": "Assets/scaling_params.json",
+      "bytes": 613,
+      "sha256": "6fa783fc775dc4aa7437e6270522c2cd916f833de13c599e3bf2b4d075c826e8"
+    },
+    {
+      "path": "Assets/tracer_perfusion.gif",
+      "bytes": 18733694,
+      "sha256": "70db34b0126852c10ecff2f84e42af1a44425f8a670d7d68f4d9f811bb8cadbc"
+    },
+    {
+      "path": "Assets/train_config.json",
+      "bytes": 97,
+      "sha256": "b6c0d8c968d9068ee48882159915f24f32c40ea0e2b7f912c9789c7869c23c57"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1065,
+      "sha256": "dc08c4ba8a523f0a996c4ef088020706d115e67614992e8abebe26c78ca2191a"
+    },
+    {
+      "path": "LoRACM/.gitignore",
+      "bytes": 394,
+      "sha256": "18627278e20e1deced72321a83311ec2ac6c3a0a7481dbd0e52e1e6a7bc1f4c6"
+    },
+    {
+      "path": "LoRACM/README.md",
+      "bytes": 7169,
+      "sha256": "2949b698d0f5df6aefb08daca954d9223b542f132531e5842f6c67e4053c2f8f"
+    },
+    {
+      "path": "LoRACM/checkpoints/foundation.pth",
+      "bytes": 34238048,
+      "sha256": "648cc14bad2c93f15a600865a2f27f15946be6bd3f6ca424af26af29376fc1ba"
+    },
+    {
+      "path": "LoRACM/common.py",
+      "bytes": 2982,
+      "sha256": "c8a16a35a832d22c1c030f5632682b4fe8b6b21f40be2b771c1dca9d4500c7d0"
+    },
+    {
+      "path": "LoRACM/configs/dataset_scenario1.json",
+      "bytes": 744,
+      "sha256": "e57f6eef50c91ac044878318dbc1efffa8dfd2e1422573982ee7353bc63b4361"
+    },
+    {
+      "path": "LoRACM/configs/dataset_smoke.json",
+      "bytes": 730,
+      "sha256": "915a6cb31096ba5699481d9e984abdea5b2d6dd34eb5f6f99d794545b36215f1"
+    },
+    {
+      "path": "LoRACM/configs/train_scenario1.json",
+      "bytes": 653,
+      "sha256": "b192adf3c0d6255f6bfcfda055e8286632df2a5d0d7cbf64ad38ea2e2781b56e"
+    },
+    {
+      "path": "LoRACM/configs/train_smoke.json",
+      "bytes": 637,
+      "sha256": "0df247a99257275009c0bcfcd4fb4ce1900147bdff2e2b124a29d633321e5ec7"
+    },
+    {
+      "path": "LoRACM/create_dataset.py",
+      "bytes": 3366,
+      "sha256": "a85dcf509affec77d8a06e6dc734a1e5833b08f175e91eda42323dda555d6601"
+    },
+    {
+      "path": "LoRACM/data/aif/UCDavis_1H35.csv",
+      "bytes": 2059,
+      "sha256": "35da197cc40eac4923b6b3e8c4994b3d0141b5d6e772c3f2e4e88e535d4becfc"
+    },
+    {
+      "path": "LoRACM/data/real/Sub001_slice75_adjusted.h5",
+      "bytes": 8465696,
+      "sha256": "226f030f5e639cefa42220dd6ebca1c1978ecbec6b68b8da8166be49a98eb94e"
+    },
+    {
+      "path": "LoRACM/data/real/Sub001_slice75_geometry.json",
+      "bytes": 452,
+      "sha256": "d492b9c549d0e357726922ae4a5322ceaea59c32c3e82192f532cb76657b11dd"
+    },
+    {
+      "path": "LoRACM/data/real/Sub001_slice75_geometry.npz",
+      "bytes": 101093,
+      "sha256": "bdd6c97dfcb47a25629b9eebbf3101175f6b2e624cd7fd1c49ddfbfc5a01f518"
+    },
+    {
+      "path": "LoRACM/data/real/Sub001_slice75_mask.npy",
+      "bytes": 73028,
+      "sha256": "7eb4816664efdd239bc866b13768c46b3856190c08ed1ffd775e080ccc8e2773"
+    },
+    {
+      "path": "LoRACM/data/simulated/scenario1.json",
+      "bytes": 1507,
+      "sha256": "f5ff7004365728acfffe43f0ca995e0f36a9e42dd2fd505ea70bba5b8541f3a3"
+    },
+    {
+      "path": "LoRACM/data/simulated/scenario1.npz",
+      "bytes": 47789159,
+      "sha256": "12e5cba0294b5367bdddc48e444ce42ce8f5673d2b5d636ab7a7784863584444"
+    },
+    {
+      "path": "LoRACM/docs/CUSTOM_DATA.md",
+      "bytes": 1881,
+      "sha256": "67ab7c8a44d4c5e1a91244e85b4f8339400e407f89ff31cf262b35dce07e70ab"
+    },
+    {
+      "path": "LoRACM/docs/DATA_FORMATS.md",
+      "bytes": 3159,
+      "sha256": "932020e1c175ae4d56266c65ea645701d6b0988e724a665aa208218f5caa45b6"
+    },
+    {
+      "path": "LoRACM/docs/DATA_PROVENANCE.md",
+      "bytes": 1255,
+      "sha256": "98097d8a93a281d02ec36acc8a6343f66bb2c3e679fe3072fbed109be0d79d22"
+    },
+    {
+      "path": "LoRACM/docs/FILE_MAPPING.md",
+      "bytes": 1218,
+      "sha256": "19da8b31c1fac0338db2a65ae2cc70f9fb3fa2485be836ab5c80e8059c2a9e76"
+    },
+    {
+      "path": "LoRACM/docs/RELEASE_REVIEW.md",
+      "bytes": 4559,
+      "sha256": "3cdd781df8347d31a5a77ca0ee333781033b937bba8dba50e8e1fe4810e39a2a"
+    },
+    {
+      "path": "LoRACM/docs/VALIDATION.md",
+      "bytes": 1997,
+      "sha256": "d4cf763b76809d8f132d78d95b4f45278036aad80248601bbaebd173b29eaa4e"
+    },
+    {
+      "path": "LoRACM/docs/test-environment.json",
+      "bytes": 309,
+      "sha256": "9ef726e2bfaee07258c583ecbc78a98fe38c6f23a6b2d682409985055605dfc4"
+    },
+    {
+      "path": "LoRACM/infer.py",
+      "bytes": 6255,
+      "sha256": "b1b708c2e6a920a70dd97bfc7d7f6929d31c22f12155f4503026ead4a35f0f06"
+    },
+    {
+      "path": "LoRACM/lora.py",
+      "bytes": 7275,
+      "sha256": "b17a15c7ce184bd5bb509f319631c7d77c9c164fc624552fda7e498e8d76d76f"
+    },
+    {
+      "path": "LoRACM/model.py",
+      "bytes": 4745,
+      "sha256": "f25b6c2481ef765970f3a9d72d909b88d5b18ae8c1699d8f825bc2243238cb29"
+    },
+    {
+      "path": "LoRACM/model_lora.py",
+      "bytes": 3568,
+      "sha256": "9fd590009690f4ce133acb0617e2cddc8f2a8bb26678ab239fa876fb6232a4f3"
+    },
+    {
+      "path": "LoRACM/notebooks/01_parametric_imaging.ipynb",
+      "bytes": 5724,
+      "sha256": "0099ba3edc0d25c904ce58fb35a1682e34ab3d78428b9024e1527c64a366b85a"
+    },
+    {
+      "path": "LoRACM/prepare_dataset.py",
+      "bytes": 989,
+      "sha256": "73027dba88a976f49da75a9e3ede2b82f91f22432b81888083a1004cac62abce"
+    },
+    {
+      "path": "LoRACM/requirements.txt",
+      "bytes": 222,
+      "sha256": "216c1751999a3de78819b9e29859ce748a81a4023c96854dd4db12c51a391f49"
+    },
+    {
+      "path": "LoRACM/simulation.py",
+      "bytes": 15119,
+      "sha256": "65a6a4f5d28d16d378f26a7d87b89c7deea88af116540ee2c03176783d782dd6"
+    },
+    {
+      "path": "LoRACM/tests/test_contracts.py",
+      "bytes": 2048,
+      "sha256": "cbb6eee7a68142ad693fc4fc5461c702d754719545840e57c43b80bc56da7eb1"
+    },
+    {
+      "path": "LoRACM/train.py",
+      "bytes": 9693,
+      "sha256": "25b7800636598f9daf328699b0c54e8a4e480aade46dae3104bfb732f6e1e525"
+    },
+    {
+      "path": "LoRACM/utility.py",
+      "bytes": 6837,
+      "sha256": "f4810ea5392085a9c7d92511071e4da6077dc556c591651f57407089862253cb"
+    },
+    {
+      "path": "Output/example_estimates.npy",
+      "bytes": 1587824,
+      "sha256": "e85804837fe4a7d55f0015f7d83a3e5c0889aae57877e1399e24d5cbe06cd195"
+    },
+    {
+      "path": "Output/tbpet_estimates.npy",
+      "bytes": 264744,
+      "sha256": "ff5c693e9b92fc0a071e87fffe97403643aa49d4da12db97871cb190d4a238c7"
+    },
+    {
+      "path": "Pretrained/1.pth",
+      "bytes": 8558308,
+      "sha256": "da045770d20baf4cff3247b644b5362833c3336b9d7b452547da03822b710665"
+    },
+    {
+      "path": "Pretrained/2.pth",
+      "bytes": 8558308,
+      "sha256": "f13135027c30d78a81ae33a4bbbd7ea8a4ce2dca58d5deb47e2c7c85c7f7412f"
+    },
+    {
+      "path": "Pretrained/model.pth",
+      "bytes": 34238048,
+      "sha256": "648cc14bad2c93f15a600865a2f27f15946be6bd3f6ca424af26af29376fc1ba"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5121,
+      "sha256": "1200ac4b7ff4d350765eea4807d83a8159bcb96de563823270dd24c045c9f2f2"
+    },
+    {
+      "path": "Sample_data/P001_PET_coronal_116_denoised_adjusted.h5",
+      "bytes": 17898017,
+      "sha256": "cc496f177278139d2331dc0858f4d267a08c07c88e42f4986862f905ecc99c30"
+    },
+    {
+      "path": "Sample_data/brain_TAC.h5",
+      "bytes": 15544,
+      "sha256": "5f676eb7b76e9c5259dae9e19adc189fcbba7daa5dc4e74202560d542fa01e0d"
+    },
+    {
+      "path": "Sample_data/liverInferiorRight_TAC.h5",
+      "bytes": 15538,
+      "sha256": "6aac2e96b780e1ab3c309f01353cbe414f6c5b88d8d5f9200fb958c2005596f4"
+    },
+    {
+      "path": "Sample_data/myocardium_TAC.h5",
+      "bytes": 15537,
+      "sha256": "5e839136d9c6f2ad84a12d00387a94347448db3197ea38098b0c0bb37abd77fd"
+    },
+    {
+      "path": "Single_TAC_Demo.ipynb",
+      "bytes": 3445,
+      "sha256": "41d36793f150559507ccbce294f7bd8936625f739061b28c03413f52003e548c"
+    },
+    {
+      "path": "Source/PetTracer.py",
+      "bytes": 13376,
+      "sha256": "ddd1c64961d21c2a2552e76889b4eefe2122a060fbcd9b74fc714fc5519d90ca"
+    },
+    {
+      "path": "Source/model.py",
+      "bytes": 4745,
+      "sha256": "f25b6c2481ef765970f3a9d72d909b88d5b18ae8c1699d8f825bc2243238cb29"
+    },
+    {
+      "path": "Source/run_MCMC_mcpus.py",
+      "bytes": 6657,
+      "sha256": "ce7f68081c59ca01247dd49c512211839439dec81e6ab73b4943f39dfc44fb58"
+    },
+    {
+      "path": "Source/utility.py",
+      "bytes": 6837,
+      "sha256": "f4810ea5392085a9c7d92511071e4da6077dc556c591651f57407089862253cb"
+    },
+    {
+      "path": "Total_Body_Parametric_Imaging_Demo.ipynb",
+      "bytes": 2254,
+      "sha256": "45f71b6cd0c48fad8e7a7c8b7772a8aee2fee822fc02f4c06f0afd48393c382e"
+    },
+    {
+      "path": "UPLOAD_GUIDE.md",
+      "bytes": 2148,
+      "sha256": "be8cf6ebf4090d21ae943d4a5ece58b59af0446814b1fb001f308d21946484e2"
+    },
+    {
+      "path": "docs/legacy-framework.md",
+      "bytes": 8704,
+      "sha256": "cc3d953412e8d30ba47ddff50e5ca3d061f079ef47a9abc0ee666654cbeb3f7e"
+    },
+    {
+      "path": "environment_no_builds.yml",
+      "bytes": 8114,
+      "sha256": "db01327e476738a3b6dc232f2c6b1bc381368b829004aa4f4117cf284d290f39"
+    }
+  ]
+}
