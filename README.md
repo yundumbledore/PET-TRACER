@@ -63,7 +63,7 @@ PET-TRACER/
 
 ## Research
 
-- **Original framework:** *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET*. [Preprint](https://arxiv.org/abs/2509.13614). The supplied new manuscript cites this work as IEEE Transactions on Medical Imaging, 2026; final publication metadata should be added before release.
+- **Original framework:** *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET* has been published on [IEEE Transactions on Medical Imaging]([https://arxiv.org/abs/2509.13614](https://ieeexplore.ieee.org/abstract/document/11517565)).
 - **LoRACM extension:** *A General-Purpose Adaptable Foundation Model for Total-Body PET Kinetic Modelling*. Manuscript in preparation for submission to IEEE Transactions on Medical Imaging. Citation metadata will be added when available.
 
 When using LoRACM, please cite both the original framework and the adaptation paper once its public reference is available. Model performance and runtime statements belong to their reported experiments; the smoke test is an installation check.
