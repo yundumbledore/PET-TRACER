@@ -2,13 +2,6 @@
 
 ### Bayesian kinetic modelling for dynamic total-body PET
 
-<<<<<<< HEAD
-**Estimate kinetic parameter posteriors. Adapt to a new acquisition. Build parametric images.**
-=======
-**PET-TRACER** was used in the below paper
-1. *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET [Published in IEEE Transactions on Medical Imaging](https://ieeexplore.ieee.org/abstract/document/11517565)*
->>>>>>> 96d9b72f125affa58796f2fc03ee4d54561b54b6
-
 PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) uses generative consistency models for rapid posterior estimation from tissue time–activity curves (TACs) and input functions.
 
 **LoRACM** extends PET-TRACER with low-rank adaptation of a pretrained consistency model. This release focuses on **Scenario 1: adapting FDG two-tissue compartment modelling from the Siemens Biograph Vision Quadra protocol to the UC Davis uEXPLORER protocol**.
