@@ -1,5 +1,6 @@
 # Supporting dependencies; install PyTorch separately for your hardware.
 # This is a dependency list, not a locked cross-platform environment.
+torch
 numpy
 pandas
 jax
