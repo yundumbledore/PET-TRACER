@@ -1,5 +1,15 @@
 # Workflow validation
 
+## UC Davis numbered workflow and interactive imaging — 14 October 2026
+
+The updated default route was checked on the same Apple Silicon / PyTorch 2.6.0 CPU environment recorded below. **29/29 automated checks passed**, including default-preset agreement with the measured Sub001 schedule, empirical 95% interval widths, joint-draw Kᵢ intervals, voxel-ID reordering, geometry rejection, 3D slice coordinates and imported custom-data configuration without a simulation protocol.
+
+The small UC Davis protocol generated 32 / 16 / 8 labelled pairs on the patient's exact 35-frame schedule, then trained for two CPU epochs. Whole-slice inference completed for **all 24,237 foreground voxels**, with no timing override. Parameter interval-width arrays were finite, nonnegative and correctly shaped. Kᵢ and K₁ interval-width maps exported through the terminal module. A measured voxel was extracted by ID, sampled with 1,000 joint draws, fitted by bounded NLS and plotted with dashed NLS estimates. NLS convergence does not establish goodness of fit or kinetic-model adequacy.
+
+Browser review confirmed a foreground image click selects the matching voxel ID and displays the TAC plus input function and posterior KDE beside the map. Switching from Kᵢ to K₁ and selecting 95% interval-width maps updates the image and corresponding posterior. Voxel samples are cached; whole-image draws are not stored. The author confirmed the supplied geometry's mapping and display convention.
+
+The walkthrough uses an explicitly aligned AIF CSV, actual frame durations and RK4; historical Euler-generated Scenario 1 files remain separate. The two-epoch weights and eight-draw maps are installation artifacts, not scientific results. Windows/Linux hosted CI, acceleration and full research training remain unverified on these local changes.
+
 ## Local browser and terminal workflows — 13 October 2026
 
 Validated on **Apple Silicon macOS, Python 3.11, CPU**, with **PyTorch 2.6.0**. Exact runtime versions are recorded in [workflow-test-environment.json](workflow-test-environment.json). The test environment is an isolated virtual environment that also uses existing scientific packages; it is not a fresh complete dependency installation.

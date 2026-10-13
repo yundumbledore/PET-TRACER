@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{margin:0;font:14px system-ui,sans-serif;color:#153d50;background:transparent}
+.frame{display:flex;justify-content:center;padding:8px;background:#fff;border:1px solid #dce7ec;border-radius:10px}
+canvas{background:#101c27;cursor:crosshair;image-rendering:pixelated;touch-action:manipulation;max-width:100%}
+.legend{height:10px;border-radius:4px;margin-top:12px}.labels{display:flex;justify-content:space-between;font-size:12px;margin:5px 0}
+#hint{margin:6px 0;font-size:12px;min-height:18px}
+</style></head><body>
+<div class="frame"><canvas id="map" role="img" aria-label="Interactive parametric image; click a foreground voxel" tabindex="0"></canvas></div>
+<div class="legend" id="legend"></div><div class="labels"><span id="low"></span><span id="high"></span></div>
+<div id="hint">Click a foreground voxel to inspect its TAC and posterior.</div>
+<script>
+// Streamlit V1 component message protocol; all assets are served locally.
+// https://docs.streamlit.io/develop/concepts/custom-components/components-v1/intro
+const send=(type,data={})=>window.parent.postMessage({isStreamlitMessage:true,type,...data},'*');
+const canvas=document.getElementById('map'),context=canvas.getContext('2d');
+let args=null,image=null,selected=null;
+function draw(){
+ if(!args||!image)return;
+ canvas.width=args.width;canvas.height=args.height;
+ const width=Math.min(document.body.clientWidth-20,560*args.width/(args.height*args.aspect));
+ canvas.style.width=width+'px';canvas.style.height=(width*args.height*args.aspect/args.width)+'px';
+ context.drawImage(image,0,0);
+ if(selected){const {row,col}=selected;context.strokeStyle='#73f7ea';context.lineWidth=1;
+  context.strokeRect(col-2.5,row-2.5,6,6);}
+ send('streamlit:setFrameHeight',{height:Math.ceil(document.querySelector('.frame').getBoundingClientRect().height+80)});
+}
+window.addEventListener('message',event=>{
+ if(event.source!==window.parent||event.data.type!=='streamlit:render')return;
+ const next=event.data.args;
+ if(!args||args.context!==next.context)selected=null;
+ args=next;document.getElementById('low').textContent=args.low;
+ document.getElementById('high').textContent=args.high;
+ document.getElementById('legend').style.background='linear-gradient(to right,'+args.colours.join(',')+')';
+ image=new Image();image.onload=draw;image.src=args.image;
+});
+canvas.addEventListener('pointerdown',event=>{
+ if(!args)return;const box=canvas.getBoundingClientRect();
+ const col=Math.floor((event.clientX-box.left)/box.width*args.width),row=Math.floor((event.clientY-box.top)/box.height*args.height);
+ if(row<0||col<0||row>=args.height||col>=args.width)return;
+ const id=args.ids[row*args.width+col];
+ if(!id){document.getElementById('hint').textContent='Choose a voxel inside the foreground.';return;}
+ selected={row,col};document.getElementById('hint').textContent='Selected voxel '+id;draw();
+ send('streamlit:setComponentValue',{dataType:'json',value:{voxel_id:id,context:args.context,event:Date.now()}});
+});
+window.addEventListener('resize',draw);
+send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:600});
+</script></body></html>

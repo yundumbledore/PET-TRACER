@@ -12,14 +12,19 @@ def dataset_report(filename, modified, size):
     return validate_file(filename)
 
 
-def render(root, workspace, launch, upload_or_path, mode='lora'):
+def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
     is_lora=mode=='lora'
-    prefix=mode+'_'+workspace.name
+    defaults={} if defaults is None else defaults
+    prefix=mode+'_'+workspace.name+'_'+defaults.get('workflow_preset','custom')+'_'+defaults.get('walkthrough_size','full')
     title='Fine-tune with LoRACM' if is_lora else 'Train a CM from scratch'
     st.title(title)
     st.caption('Adapt the foundation model with LoRA and selected trainable layers.' if is_lora else 'Initialize a new consistency model randomly and train all learnable weights.')
     settings_path=workspace/('train.json' if is_lora else 'train_cm.json')
-    previous=json.loads(settings_path.read_text(encoding='utf-8')) if settings_path.exists() else {}
+    previous=json.loads(settings_path.read_text(encoding='utf-8')) if settings_path.exists() else dict(defaults)
+    if not settings_path.exists(): previous.pop('simulation_protocol',None)
+    if not is_lora:
+        previous={k:v for k,v in previous.items() if k not in ('pretrained','lora_r','lora_alpha','lora_dropout','train_norms')}
+        if not settings_path.exists(): previous['exp_name']='cm_scratch'
     selection=workspace/'dataset_selection.json'
     selected=json.loads(selection.read_text(encoding='utf-8'))['path'] if selection.exists() else previous.get('dataset_dir',str(workspace/'dataset.npz'))
     source=st.text_input('Labelled dataset (.npz)',selected,key=prefix+'_data_'+workspace.name)
@@ -88,14 +93,22 @@ def render(root, workspace, launch, upload_or_path, mode='lora'):
         st.markdown('**Kinetic model and provenance**')
         protocol_default=workspace/'protocol.json'
         inferred='2TC' if not report or report['parameter_names']==['K1','k2','k3','k4','Vb'] else 'custom'
-        if protocol_default.exists(): inferred=json.loads(protocol_default.read_text(encoding='utf-8')).get('model',inferred)
+        if protocol_default.exists():
+            saved_protocol=json.loads(protocol_default.read_text(encoding='utf-8'))
+            if not report or saved_protocol.get('parameter_names')==report['parameter_names']:
+                inferred=saved_protocol.get('model',inferred)
         schema='_'.join(report['parameter_names']) if report else 'pending'
-        model_type=st.selectbox('Dataset kinetic model',['2TC','custom'],index=0 if previous.get('kinetic_model',inferred)=='2TC' else 1,key=prefix+'_kinetics_'+schema)
+        chosen_model=previous.get('kinetic_model',inferred) if settings_path.exists() else inferred
+        if report and report['parameter_names']!=['K1','k2','k3','k4','Vb']: chosen_model='custom'
+        model_type=st.selectbox('Dataset kinetic model',['2TC','custom'],index=0 if chosen_model=='2TC' else 1,key=prefix+'_kinetics_'+schema)
         protocol_source=st.text_input('Forward-model protocol JSON (optional)',previous.get('simulation_protocol',str(protocol_default) if protocol_default.exists() else ''),key=prefix+'_protocol',help='Keeps the same forward model available for the NLS comparison.')
 
     def configuration():
         if report is None: raise ValueError('Select a valid dataset first')
         cfg=json.loads((root/'configs'/('train_custom.json' if is_lora else 'train_cm.json')).read_text(encoding='utf-8'))
+        cfg.update({k:v for k,v in defaults.items() if k not in ('pretrained','lora_r','lora_alpha','lora_dropout','train_norms','training_mode') or is_lora})
+        if not is_lora:
+            for k in ('pretrained','lora_r','lora_alpha','lora_dropout','train_norms'): cfg.pop(k,None)
         cfg.pop('simulation_protocol',None)
         cfg.update(dataset_dir=str(data_path),x_dim='auto',y_dim='auto',parameter_names='auto',training_mode=mode,
                    kinetic_model=model_type,epochs=epochs,batch_size=batch,lr=lr,device=device,exp_name=name,

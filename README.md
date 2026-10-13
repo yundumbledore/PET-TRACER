@@ -4,7 +4,7 @@
 
 Adapt a pretrained consistency model to your tracer, time sampling schedule, and acquisition protocol.
 
-[User manual](LoRACM/README.md) · [CM from scratch](LoRACM/docs/TRAIN_CM.md) · [Installation](LoRACM/docs/INSTALLATION.md) · [UC Davis demonstration](LoRACM/docs/UCDAVIS.md) · [Original framework](docs/legacy-framework.md)
+[User manual](LoRACM/README.md) · [Installation](LoRACM/docs/INSTALLATION.md) · [UC Davis steps 1–6](LoRACM/docs/UCDAVIS.md) · [Parametric imaging](LoRACM/docs/PARAMETRIC_IMAGING.md) · [Original framework](docs/legacy-framework.md)
 
 PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) estimates kinetic parameter posteriors from tissue time–activity curves (TACs) and input functions. **LoRACM** adds low-rank adaptation: fine-tune the pretrained consistency model with labelled examples from your application, then predict on your own curves. A separate **CM from scratch** module trains a random-initialization baseline for comparison on shared held-out data.
 
@@ -24,12 +24,15 @@ The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and 
 ## Start here
 
 1. **[Install the environment](LoRACM/docs/INSTALLATION.md)** and launch the GUI or open a terminal.
-2. **[Run the UC Davis demonstration](LoRACM/docs/UCDAVIS.md)** to learn the workflow with supplied data and foundation weights.
+2. **[Follow UC Davis steps 1–6](LoRACM/docs/UCDAVIS.md)** with the default template, supplied data and foundation weights. Choose **Small CPU walkthrough** for an installation check.
 3. Choose your data route:
    - **[Simulate labelled pairs](LoRACM/docs/MODELS_AND_PROTOCOLS.md)** using 2TC or your own kinetic model, measured AIFs or a fitted Feng cohort, and your frame schedule.
    - **[Prepare your own dataset](LoRACM/docs/PREPARE_DATA.md)** and validate its format before training.
 4. **[Fine-tune](LoRACM/docs/FINE_TUNING.md)** with defaults of **100,000 training pairs, LoRA rank 8, alpha 16**; track training and validation loss. For a baseline, **[train a CM from scratch](LoRACM/docs/TRAIN_CM.md)** on the same pairs.
 5. **[Predict on your own project](LoRACM/docs/PREDICTION.md)** in batches, or analyse one TAC with parameter posterior histograms and a nonlinear least-squares comparison.
+6. **[Make parametric images](LoRACM/docs/PARAMETRIC_IMAGING.md)** of Kᵢ, other kinetic parameters or 95% credible-interval widths. Click a voxel to view its TAC, input function and posterior KDE beside the map.
+
+UC Davis is the GUI's default template. It retains Scenario 1 priors and rank **4 / alpha 8** and uses the exact supplied patient's frame schedule for the complete imaging route. **My own project** retains the separate **100,000-pair / rank-8 / alpha-16** starting settings. Existing project files keep their saved settings.
 
 ```mermaid
 flowchart LR
@@ -47,6 +50,8 @@ flowchart LR
     H --> K[Nonlinear least squares]
     J --> L[Single-TAC comparison]
     K --> L
+    J --> N[Parameter and 95% interval-width images]
+    N --> O[Click voxel: TAC + AIF + posterior]
 ```
 
 ## What you can do
@@ -62,7 +67,7 @@ flowchart LR
 | Configure epochs, learning rate, embedding width, architecture and automatic data dimensions | [Shared training settings](LoRACM/docs/TRAIN_CM.md#defaults-and-settings) |
 | Follow losses and export an adapted model | [Training progress and outputs](LoRACM/docs/FINE_TUNING.md#progress-and-outputs) |
 | Predict batches or inspect one TAC, its posterior samples, and dashed NLS estimates | [Prediction manual](LoRACM/docs/PREDICTION.md) |
-| Display a parametric image with verified voxel geometry | [UC Davis imaging demonstration](LoRACM/docs/UCDAVIS.md#4-make-parametric-images) |
+| Display Kᵢ or any predicted parameter, with 95% credible-interval-width maps and clickable voxel inspection | [Parametric imaging](LoRACM/docs/PARAMETRIC_IMAGING.md) |
 | Reproduce the original first-paper examples | [Legacy page](docs/legacy-framework.md) · [Single TAC](Single_TAC_Demo.ipynb) · [Total-body imaging](Total_Body_Parametric_Imaging_Demo.ipynb) |
 
 ## Original framework and LoRACM
@@ -92,6 +97,8 @@ PET-TRACER/
     ├── train.py, train_cm.py        LoRACM adaptation and scratch CM training
     ├── infer.py, compare_models.py  Shared prediction and paired comparison
     ├── analyse_tac.py, plot_posteriors.py
+    ├── ucdavis.py                   Default numbered demonstration settings
+    ├── parametric_imaging.py, inspect_voxel.py
     ├── create_dataset.py            Preserved UC Davis research generator
     ├── data/, checkpoints/, notebooks/
     ├── docs/, tests/

@@ -1,8 +1,10 @@
 # Predict on your own project
 
-[Manual](../README.md) · [Prepare training data](PREPARE_DATA.md)
+[Manual](../README.md) · [Prepare training data](PREPARE_DATA.md) · [Parametric imaging](PARAMETRIC_IMAGING.md)
 
 Use your LoRACM or scratch-CM model to estimate **joint kinetic parameter samples**, then inspect marginal histograms, numerical summaries or maps. Prediction uses the selected run’s scaling and parameter order and selects its model architecture automatically. See [paired LoRACM/CM comparisons](TRAIN_CM.md#compare-the-two-models).
+
+In the default UC Davis walkthrough, step 4 selects the supplied patient-slice file and the model from step 3. Predict the complete foreground before opening step 6. New outputs include equal-tailed 95% credible intervals and widths for parameters and per-draw 2TC Kᵢ; whole-image draws do not need to be saved. The [imaging page](PARAMETRIC_IMAGING.md) displays maps and retrieves the clicked voxel's TAC/AIF and posterior KDE.
 
 ## Before predicting
 

@@ -1,9 +1,16 @@
 """Array contracts shared by generation, training, inference and plotting."""
 import json
+import hashlib
 from pathlib import Path
 import numpy as np
 
 PARAMETERS = ['K1', 'k2', 'k3', 'k4', 'Vb']
+
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for block in iter(lambda:stream.read(1024*1024), b''): digest.update(block)
+    return digest.hexdigest()
 
 def load_config(path):
     return json.loads(Path(path).read_text(encoding='utf-8'))
@@ -42,6 +49,8 @@ def summarize_samples(samples, parameter_names=None, calculate_ki=True):
         raise ValueError('Posterior samples contain non-finite values')
     result = {f'params_{name}': fun(samples, axis=1) for name, fun in
               [('mean',np.mean),('median',np.median),('std',np.std)]}
+    low, high = np.quantile(samples, [.025, .975], axis=1)
+    result.update(params_ci95_low=low, params_ci95_high=high, params_ci95_width=high-low)
     if calculate_ki:
         names = PARAMETERS if parameter_names is None else list(parameter_names)
         if names != PARAMETERS or samples.shape[-1] != 5:
@@ -53,6 +62,8 @@ def summarize_samples(samples, parameter_names=None, calculate_ki=True):
         result.update({f'Ki_{name}':fun(ki,axis=1) for name,fun in
                        [('mean',np.nanmean),('median',np.nanmedian),('std',np.nanstd)]})
         result['Ki_valid_fraction'] = valid.mean(axis=1)
+        ki_low, ki_high = np.nanquantile(ki, [.025, .975], axis=1)
+        result.update(Ki_ci95_low=ki_low, Ki_ci95_high=ki_high, Ki_ci95_width=ki_high-ki_low)
     result['params_negative_fraction'] = (samples < 0).mean(axis=1)
     return result
 

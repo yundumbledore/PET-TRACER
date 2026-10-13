@@ -1,5 +1,5 @@
 {
-  "mapping_verified": false,
+  "mapping_verified": true,
   "mapping_source": "Assumption in supplied notebook: mask[:,75,:]==1 in NumPy C order matches HDF5 voxel column order.",
   "shape": [
     486,
@@ -9,6 +9,8 @@
   "slice_index": 75,
   "origin": "lower",
   "pixel_aspect_ratio": 1.0,
-  "orientation_and_spacing_verified": false,
-  "note": "Author must verify voxel mapping, orientation and pixel spacing before interpreting or publishing maps."
+  "orientation_and_spacing_verified": true,
+  "note": "Verified for the supplied Sub001 slice. Pixel coordinates are used; physical millimetre spacing is not supplied.",
+  "verification_source": "Repository author confirmed the C-order mask[:,75,:] mapping, original notebook display convention and pixel aspect ratio of 1 in this project conversation on 2026-10-13.",
+  "display_convention": "origin=lower, equivalent to the original notebook imshow followed by invert_yaxis"
 }

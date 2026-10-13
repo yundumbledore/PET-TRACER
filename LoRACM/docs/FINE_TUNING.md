@@ -4,7 +4,9 @@
 
 ## Choose settings
 
-| Setting | New-project default | Practical meaning |
+The GUI starts with the **UC Davis Scenario 1** template: rank 4, alpha 8 and its research settings, or the two-epoch Small CPU walkthrough. Follow [UC Davis steps 1–6](UCDAVIS.md). The table below describes **My own project** defaults.
+
+| Setting | My own project default | Practical meaning |
 | :--- | :--- | :--- |
 | Training pairs | **100,000** | Number of labelled training examples; validation/test are additional |
 | Validation / test pairs | 10,000 / 1,000 | Evaluate consistency loss and independent predictive performance |

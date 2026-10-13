@@ -12,15 +12,15 @@ from protocol import read_prediction_input, validate_protocol, load_model, load_
 from plot_posteriors import posterior_figure
 
 
-def render(root, workspace, launch):
+def render(root, workspace, launch, default_run=None, default_input=None):
     st.title('5 · One TAC, full posterior, and an NLS comparison')
     st.write('Load a tissue time–activity curve and its input function. The trained consistency model returns joint posterior samples; nonlinear least squares supplies a bounded point estimate from the same kinetic model.')
-    default_run=workspace/'runs'/'adaptation'
+    default_run=default_run or workspace/'runs'/'adaptation'
     if st.session_state.get('active_run') and workspace in Path(st.session_state.active_run).parents:
         default_run=Path(st.session_state.active_run)
     run = Path(st.text_input('Model run folder',str(default_run))).expanduser()
     if not run.is_absolute(): run=root/run
-    source = st.text_input('Single-TAC CSV or prediction NPZ/HDF5',str(workspace/'single_tac.csv'))
+    source = st.text_input('Single-TAC CSV or prediction NPZ/HDF5',str(default_input or workspace/'single_tac.csv'),key='single_source_'+workspace.name)
     upload=st.file_uploader('Choose your curve file',type=['csv','npz','h5','hdf5'])
     st.caption('CSV columns: time_min, duration_min, tac, aif. Activity units and correction convention must match training. For an NPZ/HDF5 with multiple TACs, select one curve below.')
     st.download_button('Download CSV format example','time_min,duration_min,tac,aif\n0.5,1,120,400\n1.5,1,180,250\n2.5,1,200,150\n',file_name='single_tac_format.csv')
@@ -59,7 +59,7 @@ def render(root, workspace, launch):
     except Exception as e: st.info(f'Choose a compatible run and input: {e}')
     a,b,c=st.columns(3)
     samples=a.number_input('Posterior draws',min_value=2,max_value=100000,value=1000)
-    checkpoint=b.selectbox('Single-TAC checkpoint',['best.pth','last.pth'])
+    checkpoint=b.selectbox('Single-TAC checkpoint',['best.pth','last.pth'],index=1 if not (run/'best.pth').exists() and (run/'last.pth').exists() else 0)
     device=c.selectbox('Single-TAC device',['auto','cpu','cuda:0','mps'])
     protocol_default=run/'protocol.json' if (run/'protocol.json').exists() else workspace/'protocol.json'
     use_nls=st.checkbox('Compare with nonlinear least squares',value=protocol_default.exists())

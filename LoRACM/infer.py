@@ -8,7 +8,7 @@ import torch
 from torch import nn
 from tqdm import tqdm
 from model_factory import build_model
-from common import summarize_samples, PARAMETERS
+from common import summarize_samples, PARAMETERS, file_sha256
 from protocol import read_prediction_input, validate_names
 
 @torch.inference_mode()
@@ -84,6 +84,8 @@ def main(args):
     output.parent.mkdir(parents=True,exist_ok=True)
     if output.exists(): raise FileExistsError(f'Refusing to overwrite {output}')
     metadata={'config':cfg,'checkpoint':str(ckpt),'input':str(args.input),'samples':args.samples,
+        'checkpoint_sha256':file_sha256(ckpt),'input_sha256':file_sha256(args.input),
+        'credible_interval':'Equal-tailed 95% interval: 2.5th and 97.5th percentiles; width = upper - lower. Ki is transformed per joint draw.',
         'batch_size':args.batch_size,'sample_chunk':args.sample_chunk,'seed':args.seed,
         'sampling_times':times.tolist(),'time_mismatch_allowed':bool(args.allow_time_mismatch), 'time_mismatch_detected':bool(mismatch), 'observed_frame_durations_min':durations.tolist(),'torch_version':str(torch.__version__),
         'device':str(device),'multi_gpu':args.multi_gpu,

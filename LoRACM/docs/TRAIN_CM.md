@@ -29,6 +29,8 @@ The scratch settings are saved independently in `workspaces/<project>/train_cm.j
 
 ## Defaults and settings
 
+This table lists general training defaults. The UC Davis GUI preset follows Scenario 1 training settings for matched comparisons; its small walkthrough uses two epochs and batch size 8. Dimensions always follow the selected dataset. An imported labelled dataset can be used without a simulation protocol; a matched protocol is optional for later NLS.
+
 | JSON setting | Default | What it controls |
 | :--- | :--- | :--- |
 | `epochs` | **5,000** | Overall passes through the training loader |

@@ -95,7 +95,10 @@ def main(cfg):
         total = cfg['n_'+split]
         for start in range(0, total, cfg['chunk_size']):
             n = min(cfg['chunk_size'], total-start)
-            parameters = np.column_stack([rng.uniform(p['min'],p['max'],n) for p in cfg['kinetic_priors'].values()])
+            scale = cfg.get('test_prior_scale', 1.) if split == 'test' else 1.
+            ranges = [((p['min']+p['max'])/2-(p['max']-p['min'])*scale/2,
+                       (p['min']+p['max'])/2+(p['max']-p['min'])*scale/2) for p in cfg['kinetic_priors'].values()]
+            parameters = np.column_stack([rng.uniform(low,high,n) for low,high in ranges])
             selected = rng.integers(0, len(pool), n)
             if source == 'measured':
                 inputs = np.asarray([np.interp(grid, aif_t, curve) for curve in pool[selected]])

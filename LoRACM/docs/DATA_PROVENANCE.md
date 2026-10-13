@@ -4,4 +4,8 @@ This local review package copies the four-AIF CSV and Sub001 coronal HDF5 from t
 
 The adaptation dataset is newly generated from the supplied AIFs and configured Scenario 1 priors. Its JSON sidecar records generation settings and software versions. The full array set and hashes are listed in the package manifest. Smoke data and smoke weights are validation artifacts, not the paper's trained adaptation model.
 
+For the numbered UC Davis walkthrough, `UCDavis_Sub001_schedule.csv` is derived by linear interpolation of the four original AIFs to the exact Sub001 HDF5 frame midpoints, with zero at the origin and the last measured value held to 60 minutes. The new protocol records those midpoints and actual durations. Original AIF and historical simulation files are preserved. This alignment makes new training and patient prediction schedule-compatible; it does not assert scientific equivalence to the earlier simulation.
+
+The repository author confirmed the supplied slice's C-order foreground mapping and original notebook display convention/pixel aspect ratio. `Sub001_slice75_geometry.json` records that confirmation. Physical millimetre spacing is not supplied, so new imaging displays pixel coordinates.
+
 Before publication, fill in the original dataset source/attribution, applicable reuse terms, permission to distribute the clinical slice and mask, activity units and correction conventions, and the intended licence for model weights and derived simulation data. The repository's existing MIT licence is preserved for code; it is not being assigned automatically to clinical data or weights by this packaging step.

@@ -2,7 +2,7 @@
 
 **Adapt PET-TRACER to your own tracer and protocol, then estimate kinetic parameter posteriors.**
 
-[Project overview](../README.md) · [Install](docs/INSTALLATION.md) · [CM from scratch](docs/TRAIN_CM.md) · [UC Davis demonstration](docs/UCDAVIS.md) · [Legacy framework](../docs/legacy-framework.md)
+[Project overview](../README.md) · [Install](docs/INSTALLATION.md) · [UC Davis steps 1–6](docs/UCDAVIS.md) · [Parametric imaging](docs/PARAMETRIC_IMAGING.md) · [Legacy framework](../docs/legacy-framework.md)
 
 ## Choose a route
 
@@ -24,6 +24,8 @@ python launch_gui.py
 
 The browser interface runs on your computer. **Project name** selects a folder under `LoRACM/workspaces/`; configs, uploaded files, logs, runs and analyses stay there. Use a new project/run name for an independent experiment. A single active background job is allowed per browser session. Its status and log remain available while you switch pages; keep the application running while jobs execute.
 
+**UC Davis Scenario 1 is the default starting template.** Follow numbered steps 1–6 with its 2TC model, four AIFs and patient-aligned 35-frame schedule. Choose **Small CPU walkthrough** before saving step 1 for a quick check, or retain full research-sized settings. **My own project** supplies the general defaults below. Saved project settings take precedence; use a fresh project name to start the walkthrough unchanged.
+
 Terminal users run the following workflow commands from **`PET-TRACER/LoRACM`**. Relative config paths are interpreted from that directory. Absolute paths also work; quote paths containing spaces.
 
 ## 2. Define the model and protocol
@@ -36,13 +38,13 @@ Read [models, AIFs and protocols](docs/MODELS_AND_PROTOCOLS.md) before changing 
 
 GUI: **2 · Dataset**. Choose **Simulate my protocol** or **Use my own NPZ dataset**.
 
-New-project defaults: **100,000 training pairs**, plus **10,000 validation** and **1,000 test** pairs. Simulation uses rank-independent settings; rank and alpha are selected before training. Reduce counts for an installation check.
+My own project defaults: **100,000 training pairs**, plus **10,000 validation** and **1,000 test** pairs. UC Davis defaults to **50,000 / 100,000 / 100**, or **32 / 16 / 8** in the small walkthrough. Simulation uses rank-independent settings; rank and alpha are selected before training.
 
 Always choose **Validate and select dataset** before moving on. Validation checks shapes, time grids, parameter names/order, finite values, nonnegative noise scales and nonzero training normalization scales. It cannot establish whether units, labels, priors, cohort splits or the forward model are scientifically correct. Follow [dataset preparation](docs/PREPARE_DATA.md).
 
 ## 4. Fine-tune
 
-GUI: **3 · Fine-tune**. Select the dataset and foundation checkpoint, confirm the kinetic model, choose your run name and start training. Defaults are **rank 8**, **alpha 16**, dropout 0.05, batch size 512, learning rate 0.0001 and 5,000 epochs. Start with a short CPU check; reduce batch size for smaller datasets or limited memory.
+GUI: **3 · Fine-tune**. Select the dataset and foundation checkpoint, confirm the kinetic model, choose your run name and start training. My own project defaults are **rank 8**, **alpha 16**, dropout 0.05, batch size 512, learning rate 0.0001 and 5,000 epochs. UC Davis uses **rank 4 / alpha 8**; its small walkthrough uses two CPU epochs and batch size 8. Reduce batch size for limited memory.
 
 Dimensions and parameter names are derived from the dataset. **Advanced settings** includes embedding width, channels, optimizer, consistency intervals, EMA, scheduler, seed and loss weights; defaults are documented in [the shared settings table](docs/TRAIN_CM.md#defaults-and-settings). Training loss and validation self-consistency loss refresh in the job monitor. See [fine-tuning settings and transfer limits](docs/FINE_TUNING.md). Preserve the checkpoint, model configuration and scaling together.
 
@@ -55,6 +57,12 @@ Choose **CM from scratch** to train a new randomly initialized model without fou
 GUI: **4 · Predict** for batch NPZ/HDF5 data, or **5 · Single TAC & NLS** for a CSV or one selected curve. Prediction accepts either trained model type; inputs must match the model's schedule, units and observation convention. Models fitted to another schedule need adaptation or justified resampling.
 
 The single-TAC page displays parameter posterior histograms, exports joint samples and figures, and optionally overlays dashed nonlinear least-squares estimates. Read the [prediction manual](docs/PREDICTION.md) for an exact file example, terminal commands and interpretation.
+
+## 6. Make parametric images and inspect voxels
+
+GUI: **6 · Parametric imaging**. Kᵢ posterior mean is selected by default for the supplied UC Davis coronal slice. Choose another predicted parameter or its **95% credible-interval width**. The image appears on the left; clicking a foreground voxel displays its TAC plus input function and posterior KDE on the right. Export figures, map values and selected joint samples. Samples for inspected voxels are generated on demand and cached.
+
+Run step 4 on the complete patient-slice file to provide anatomical voxel predictions. Simulated test pairs have no image geometry. The module checks explicit voxel identities and verified geometry, and supports custom 2D slices or 3D masks. Read [parametric imaging](docs/PARAMETRIC_IMAGING.md) for exact formats and terminal equivalents.
 
 ## Terminal quick start
 
@@ -84,6 +92,6 @@ If using your own fine-tuning file, change `dataset_dir` in the training config 
 
 ## UC Davis example and original material
 
-The [UC Davis guide](docs/UCDAVIS.md) covers supplied assets, small and full runs, batch posterior inference and the geometry-aware imaging notebook. The preserved Scenario 1 settings are rank **4**, alpha **8**, and 50,000 / 100,000 / 100 pairs. GUI preparation can subset the distributed dataset without JAX; the optional research generator reproduces the earlier simulation conventions.
+The [UC Davis guide](docs/UCDAVIS.md) covers the complete numbered GUI/terminal route, supplied assets, small/full runs, posterior inference and interactive imaging. The portable walkthrough aligns AIFs to the measured patient schedule and uses explicit frame durations with RK4. The separate shortcut page and optional JAX generator preserve the earlier AIF-grid simulation conventions.
 
 [Original framework](../docs/legacy-framework.md) · [Detailed formats](docs/DATA_FORMATS.md) · [Provenance](docs/DATA_PROVENANCE.md) · [Scientific review](docs/RELEASE_REVIEW.md) · [Validation](docs/VALIDATION.md)

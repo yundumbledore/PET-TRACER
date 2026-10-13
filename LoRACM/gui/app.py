@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from protocol import validate_protocol, validate_file, read_prediction_input, load_model
 from gui.jobs import Jobs
+from ucdavis import defaults as workflow_defaults, PRESETS, testing_from_dataset
 
 st.set_page_config(page_title='PET-TRACER · LoRACM',page_icon='◈',layout='wide')
 st.markdown('''<style>
@@ -67,7 +68,11 @@ with st.sidebar:
     if not re.fullmatch(r'[A-Za-z0-9_-]+',project_name):
         st.error('Use letters, numbers, underscores or hyphens.'); st.stop()
     workspace = ROOT/'workspaces'/project_name
-    page = st.radio('Your workflow',['Welcome','1 · Model & protocol','2 · Dataset','3 · Fine-tune','CM from scratch','4 · Predict','5 · Single TAC & NLS','Compare models','UC Davis demonstration','User manual'])
+    preset = st.selectbox('Starting template',PRESETS,key='preset_'+project_name)
+    size = st.selectbox('UC Davis run size',['Full Scenario 1','Small CPU walkthrough'],disabled=preset!=PRESETS[0],key='size_'+project_name)
+    small = preset==PRESETS[0] and size=='Small CPU walkthrough'
+    profile=project_name+'_'+('uc_small' if small else 'uc_full' if preset==PRESETS[0] else 'custom')
+    page = st.radio('Your workflow',['Welcome','1 · Model & protocol','2 · Dataset','3 · Fine-tune','CM from scratch','4 · Predict','5 · Single TAC & NLS','6 · Parametric imaging','Compare models','UC Davis demonstration','User manual'])
     with st.expander('Project folder'):
         st.code(str(workspace),language='text')
     st.markdown('[User manual](https://github.com/yundumbledore/PET-TRACER/blob/main/LoRACM/README.md) · [Legacy framework](https://github.com/yundumbledore/PET-TRACER/blob/main/docs/legacy-framework.md)')
@@ -76,7 +81,11 @@ if 'jobs' not in st.session_state:
     st.session_state.jobs = Jobs(ROOT)
 protocol_path = workspace/'protocol.json'
 dataset_path = workspace/'dataset.npz'
-run_path = workspace/'runs'/'adaptation'
+default_protocol,default_training=workflow_defaults(workspace,preset,small)
+run_path = workspace/'runs'/default_training['exp_name']
+if (workspace/'train.json').exists():
+    run_path=workspace/'runs'/json.loads((workspace/'train.json').read_text(encoding='utf-8'))['exp_name']
+input_default=str(ROOT/'data/real/Sub001_slice75_adjusted.h5') if preset==PRESETS[0] else str(workspace/'testing.npz')
 if st.session_state.get('active_run'):
     active_run=Path(st.session_state.active_run)
     if workspace in active_run.parents: run_path=active_run
@@ -84,6 +93,7 @@ if st.session_state.get('active_run'):
 if page == 'Welcome':
     st.title('PET kinetic modelling for your study')
     st.write('Estimate kinetic parameter posteriors from tissue curves and input functions. Adapt the foundation model with LoRACM, or train a consistency model from scratch for comparison.')
+    st.info('**Start with the UC Davis walkthrough**\n\nFollow steps 1 → 6 with the supplied 2TC model, four AIFs, Sub001 frame schedule and coronal slice. Each step is editable when you are ready to use your own project. Choose Small CPU walkthrough for a quick installation check.')
     a,b = st.columns(2)
     a.info('**Simulate training pairs**\n\nDefine kinetics and timing → choose measured or Feng AIFs → generate labelled pairs → fine-tune → predict.')
     b.info('**Bring your own training pairs**\n\nOpen Dataset → validate your NPZ → fine-tune → predict. You can skip simulation.')
@@ -91,13 +101,19 @@ if page == 'Welcome':
         st.markdown('**Two training routes, one prediction workflow**')
         st.write('LoRACM transfers pretrained weights. CM from scratch learns from random initialization. Use the same dataset and held-out curves to compare them.')
     st.subheader('Start with a small check')
-    st.write('Use the UC Davis demonstration for an installation check before a full run. New-project defaults are 100,000 training pairs, rank 8 and alpha 16. Dataset size counts training pairs; validation and testing are additional.')
+    st.write('UC Davis uses Scenario 1 priors and rank 4 / alpha 8. My own project keeps defaults of 100,000 training pairs, rank 8 and alpha 16. Dataset size counts training pairs; validation and testing are additional.')
     st.caption('This application runs locally. Computation uses your Python environment and hardware. Stopping the application can interrupt jobs; retain project configs and run outputs.')
 
 elif page == '1 · Model & protocol':
     st.title('1 · Define kinetics, input functions and timing')
-    saved = json.loads(protocol_path.read_text(encoding='utf-8')) if protocol_path.exists() else json.loads((ROOT/'configs/dataset_custom.json').read_text(encoding='utf-8'))
-    model_choice = st.selectbox('Kinetic model',['2TC','custom'],index=0 if saved.get('model')=='2TC' else 1)
+    saved = json.loads(protocol_path.read_text(encoding='utf-8')) if protocol_path.exists() else default_protocol.copy()
+    if saved.get('workflow_preset')==PRESETS[0] and saved.get('walkthrough_size')!=default_protocol['walkthrough_size']:
+        saved.update({k:default_protocol[k] for k in ['n_train','n_val','n_test']})
+    if preset==PRESETS[0] and (not protocol_path.exists() or saved.get('workflow_preset')==PRESETS[0]):
+        st.caption('UC Davis defaults: FDG 2TC, four measured AIFs, 35 Sub001 frames over 60 minutes and half-life 109.8 minutes. The original AIFs are explicitly aligned to the patient schedule for steps 4–6.')
+    elif protocol_path.exists():
+        st.caption('Using this project’s saved protocol. Choose a fresh project name to start from an unchanged template.')
+    model_choice = st.selectbox('Kinetic model',['2TC','custom'],index=0 if saved.get('model')=='2TC' else 1,key='model_'+profile)
     model_file = st.text_input('Custom model Python file',saved.get('model_file','examples/custom_1tc.py'),disabled=model_choice=='2TC')
     st.caption('Custom models run your local Python code. Use only code you trust. The working 1TC template documents the batched rhs/observe interface; multiple input channels are outside this GUI contract.')
     if model_choice == 'custom' and st.button('Load the working 1TC template'):
@@ -111,7 +127,7 @@ elif page == '1 · Model & protocol':
     schedule_upload = st.file_uploader('Load a schedule CSV with time_min,duration_min',type=['csv'])
     if schedule_upload is not None:
         schedule_default = pd.read_csv(schedule_upload)
-    schedule = st.data_editor(schedule_default,num_rows='dynamic',hide_index=True,key='schedule_'+project_name)
+    schedule = st.data_editor(schedule_default,num_rows='dynamic',hide_index=True,key='schedule_'+profile)
     observation = st.selectbox('How are your measured curves sampled?',['midpoint','frame_average'],index=0 if saved.get('observation')=='midpoint' else 1,
                                help='Frame averages integrate both TAC and AIF over each frame. Midpoint samples evaluate at the supplied times.')
     c1,c2 = st.columns(2)
@@ -146,7 +162,8 @@ elif page == '1 · Model & protocol':
                        observation=observation,half_life_min=half_life,integration_step_min=step,aif_mode=aif_mode,
                        aif_csv=str(aif_source) if aif_mode=='measured' else saved.get('aif_csv'),
                        feng_parameters_csv=str(aif_source) if aif_mode=='feng_cohort' else saved.get('feng_parameters_csv'),
-                       feng_log_jitter=jitter,aif_before_first='zero_at_origin' if origin else 'require_zero',output=str(dataset_path))
+                       feng_log_jitter=jitter,aif_before_first='zero_at_origin' if origin else 'require_zero',output=str(dataset_path),
+                       workflow_preset=preset,walkthrough_size=default_protocol['walkthrough_size'])
             validate_protocol(cfg); load_model(cfg); write_json(protocol_path,cfg)
             st.success('Protocol saved. Continue to Dataset to choose size and create pairs.')
         except Exception as e:
@@ -160,10 +177,13 @@ elif page == '2 · Dataset':
             st.info('Save your model and protocol in step 1 first.')
         else:
             cfg = json.loads(protocol_path.read_text(encoding='utf-8'))
+            if cfg.get('workflow_preset')==PRESETS[0] and cfg.get('walkthrough_size')!=default_protocol['walkthrough_size']:
+                cfg.update({k:default_protocol[k] for k in ['n_train','n_val','n_test']})
+                cfg['walkthrough_size']=default_protocol['walkthrough_size']
             a,b,c = st.columns(3)
-            n_train = a.number_input('Training pairs',min_value=2,value=int(cfg['n_train']),step=1000)
-            n_val = b.number_input('Validation pairs',min_value=1,value=int(cfg['n_val']),step=1000)
-            n_test = c.number_input('Test pairs',min_value=1,value=int(cfg['n_test']),step=100)
+            n_train = a.number_input('Training pairs',min_value=2,value=int(cfg['n_train']),step=1000,key='n_train_'+profile)
+            n_val = b.number_input('Validation pairs',min_value=1,value=int(cfg['n_val']),step=1000,key='n_val_'+profile)
+            n_test = c.number_input('Test pairs',min_value=1,value=int(cfg['n_test']),step=100,key='n_test_'+profile)
             a,b,c = st.columns(3)
             low = a.number_input('Noise amplitude minimum',min_value=0.,value=float(cfg['noise_prior']['min']))
             high = b.number_input('Noise amplitude maximum',min_value=0.,value=float(cfg['noise_prior']['max']))
@@ -193,19 +213,33 @@ elif page == '2 · Dataset':
 
 elif page in ('3 · Fine-tune','CM from scratch'):
     from gui.training import render as render_training
-    run_path=render_training(ROOT,workspace,launch,upload_or_path,mode='lora' if page=='3 · Fine-tune' else 'cm')
+    run_path=render_training(ROOT,workspace,launch,upload_or_path,mode='lora' if page=='3 · Fine-tune' else 'cm',defaults=default_training)
 
 elif page == '4 · Predict':
     st.title('4 · Predict posteriors on your testing curves')
     run_path = path(st.text_input('Model run folder',str(run_path)))
-    input_path = upload_or_path('Testing dataset',str(workspace/'testing.npz'),['npz','h5','hdf5'],'testing')
+    route=st.selectbox('Prediction input',['UC Davis patient slice','Held-out simulated pairs','My own file'],index=0 if preset==PRESETS[0] else 2)
+    if route=='Held-out simulated pairs':
+        input_default=str(workspace/'testing.npz')
+        if st.button('Prepare held-out testing file'):
+            try:
+                selection=workspace/'dataset_selection.json'
+                source=json.loads(selection.read_text(encoding='utf-8'))['path'] if selection.exists() else dataset_path
+                testing_from_dataset(source,workspace/'testing.npz');st.success('Testing file prepared from the dataset’s held-out pairs.')
+            except Exception as e: st.error(str(e))
+        st.caption('These pairs can measure accuracy when truth is known; they do not have anatomical geometry for step 6.')
+    elif route=='UC Davis patient slice':
+        input_default=str(ROOT/'data/real/Sub001_slice75_adjusted.h5')
+        st.caption('Predict all 24,237 foreground voxel TACs to make the supplied coronal map in step 6.')
+    input_path = upload_or_path('Testing dataset',input_default,['npz','h5','hdf5'],'testing_'+route)
     st.markdown('NPZ: `tac [N,T]`, `aif [T]` or `[N,T]`, `t_meas [T]`, `frame_durations_min [T]`; optional `voxel_columns [N]` and `truth [N,P]`. Legacy pandas HDF5 is also accepted.')
     a,b,c = st.columns(3)
-    samples = a.number_input('Posterior samples per curve',min_value=2,value=1000)
-    batch = b.number_input('Curve batch size',min_value=1,value=16)
-    sample_chunk = c.number_input('Sample chunk',min_value=1,value=64)
+    samples = a.number_input('Posterior samples per curve',min_value=2,value=8 if small else 1000,key='prediction_samples_'+profile)
+    batch = b.number_input('Curve batch size',min_value=1,value=64 if small else 16,key='prediction_batch_'+profile)
+    sample_chunk = c.number_input('Sample chunk',min_value=1,value=8 if small else 64,key='prediction_chunk_'+profile)
+    if small: st.caption('Eight draws per voxel are sufficient for an installation check; use a much larger sample count for credible-interval assessment.')
     device = st.selectbox('Prediction device',['auto','cpu','cuda:0','mps'])
-    checkpoint_name = st.selectbox('Checkpoint',['best.pth','last.pth'])
+    checkpoint_name = st.selectbox('Checkpoint',['best.pth','last.pth'],index=1 if not (run_path/'best.pth').exists() and (run_path/'last.pth').exists() else 0)
     output = path(st.text_input('Prediction output',str(run_path/'predictions.npz')))
     if st.button('Validate input'):
         try:
@@ -219,6 +253,8 @@ elif page == '4 · Predict':
             if not (run_path/checkpoint_name).exists(): raise ValueError('Checkpoint missing; finish training or select last.pth')
             cfg = json.loads((run_path/'model_params.json').read_text(encoding='utf-8')); scale=json.loads((run_path/'scaling_params.json').read_text(encoding='utf-8'))
             read_prediction_input(input_path,cfg['x_dim'],scale['t_meas'],scale.get('frame_durations_min'))
+            st.session_state['prediction_'+str(workspace)]=str(output)
+            st.session_state['prediction_input_'+str(workspace)]=str(input_path)
             launch('Posterior prediction',['infer.py','--run',run_path,'--checkpoint',checkpoint_name,'--input',input_path,'--output',output,
                                           '--samples',samples,'--batch-size',batch,'--sample-chunk',sample_chunk,'--device',device])
         except Exception as e: st.error(str(e))
@@ -233,7 +269,11 @@ elif page == '4 · Predict':
 
 elif page == '5 · Single TAC & NLS':
     from gui.single_tac import render
-    run_path = render(ROOT,workspace,launch)
+    run_path = render(ROOT,workspace,launch,default_run=run_path,default_input=input_default)
+
+elif page == '6 · Parametric imaging':
+    from gui.imaging import render as render_imaging
+    render_imaging(ROOT,workspace,run_path,st.session_state.get('prediction_input_'+str(workspace),input_default),upload_or_path)
 
 elif page == 'Compare models':
     from gui.comparison import render as render_comparison
@@ -243,7 +283,7 @@ elif page == 'User manual':
     st.title('LoRACM user manual')
     sections={'Overview':'README.md','Installation':'docs/INSTALLATION.md','Models, inputs and protocols':'docs/MODELS_AND_PROTOCOLS.md',
               'Prepare your dataset':'docs/PREPARE_DATA.md','Fine-tuning':'docs/FINE_TUNING.md','CM from scratch and comparison':'docs/TRAIN_CM.md','Prediction and single-TAC NLS':'docs/PREDICTION.md',
-              'UC Davis demonstration':'docs/UCDAVIS.md'}
+              'Parametric imaging':'docs/PARAMETRIC_IMAGING.md','UC Davis demonstration':'docs/UCDAVIS.md'}
     section=st.selectbox('Manual section',list(sections))
     document = ROOT/sections[section]
     content = document.read_text(encoding='utf-8')
@@ -258,6 +298,7 @@ elif page == 'User manual':
 
 elif page == 'UC Davis demonstration':
     st.title('UC Davis · Learn the complete workflow')
+    st.info('The default UC Davis route is now available in numbered steps 1–6, including patient-slice prediction, parametric maps and voxel inspection. The shortcuts below retain the earlier AIF-grid example and matched simulated testing.')
     st.write('The supplied four measured AIFs adapt the FDG 2TC foundation model to the uEXPLORER protocol. Choose an installation check or the original Scenario 1 settings.')
     mode = st.radio('Demonstration',['Small CPU installation check','Original Scenario 1'])
     is_smoke = mode.startswith('Small')

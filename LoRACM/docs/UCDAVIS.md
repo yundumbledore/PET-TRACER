@@ -2,11 +2,51 @@
 
 [User manual](../README.md) · [Installation](INSTALLATION.md) · [Prediction guide](PREDICTION.md)
 
-## GUI demonstration (all three platforms)
+## Default six-step walkthrough (all three platforms)
 
-Launch the GUI, select **UC Davis demonstration**, and choose **Small CPU installation check**. Prepare the supplied pairs, fine-tune for two epochs, then predict the held-out simulated test set. The small demo selects 32 / 16 / 8 leading examples from the distributed dataset. It needs no JAX and does not produce scientifically useful adapted weights. The full demo uses the preserved Scenario 1 counts/settings. Jobs, loss charts and outputs are kept in your project folder.
+Launch the GUI and choose a fresh project name. **UC Davis Scenario 1** is the default starting template. Choose **Small CPU walkthrough** to learn quickly, or retain **Full Scenario 1** for the research-sized settings. Settings are editable at every numbered step; existing project files take precedence over new defaults.
 
-The supplied patient slice has a timing mismatch with the adaptation AIF CSV; the GUI deliberately tests matched simulated pairs. For patient data, adapt to the real schedule or provide scientifically validated resampling before inference. Geometry verification is still required for maps.
+| Step | Action | UC Davis default |
+| :--- | :--- | :--- |
+| **1 · Model & protocol** | Review and save the model, AIFs, priors and schedule | FDG 2TC, four AIFs, 35 Sub001 frames over 60 minutes, half-life 109.8 min |
+| **2 · Dataset** | Generate, then validate/select the labelled NPZ | Full: 50,000 / 100,000 / 100 pairs; small: 32 / 16 / 8 |
+| **3 · Fine-tune** | Review settings and train | Rank 4, alpha 8; full: 5,000 epochs; small: two CPU epochs |
+| **4 · Predict** | Predict the supplied patient slice | All 24,237 foreground TACs; full: 1,000 draws; small: eight draws per voxel |
+| **5 · Single TAC & NLS** | Choose one patient TAC, inspect its posterior and optional NLS fit | Same input data and saved forward-model protocol |
+| **6 · Parametric imaging** | Display Kᵢ or a parameter/interval-width map; click voxels for TAC and posterior KDE | Supplied author-confirmed coronal geometry, Kᵢ mean selected initially |
+
+The small model and low draw count check installation; they do not produce scientifically useful estimates. It is reasonable to inspect a few TACs before running whole-slice prediction. The [imaging guide](PARAMETRIC_IMAGING.md) explains voxel interaction and uncertainty.
+
+The original AIF CSV has slightly different midpoints from the patient HDF5. The new walkthrough explicitly uses the **patient's exact frame midpoints and durations**. `data/aif/UCDavis_Sub001_schedule.csv` linearly interpolates all four original AIFs to those midpoints, adds zero activity at the origin, and holds the last value to 60 minutes. `configs/protocol_ucdavis.json` records this alignment. This preserves Scenario 1 kinetics, priors and training settings while making prediction schedule-compatible. It uses the portable RK4 simulator, explicit durations and midpoint observations; it is not an exact numerical reproduction of the historical Euler simulation. The source CSV and historical configs remain unchanged.
+
+Training/validation share the four-AIF pool; test kinetic priors use the central 50% of each range. These are not subject-held-out splits. New custom projects retain the separate 100,000-pair / rank-8 / alpha-16 defaults.
+
+### Numbered terminal walkthrough
+
+Run from `PET-TRACER/LoRACM` after [installation](INSTALLATION.md). Choose a fresh workspace:
+
+```bash
+# 1. Export the default UC Davis model and training settings.
+python ucdavis.py --workspace workspaces/ucdavis_walkthrough --size small
+# 2. Simulate labelled pairs on the measured patient's schedule.
+python simulate_protocol.py --config workspaces/ucdavis_walkthrough/protocol.json
+python protocol.py workspaces/ucdavis_walkthrough/dataset.npz
+# 3. Fine-tune and follow the reported training/validation losses.
+python train.py --config workspaces/ucdavis_walkthrough/train.json
+# 4. Predict every foreground voxel, including 95% intervals.
+python infer.py --run workspaces/ucdavis_walkthrough/runs/scenario1_small --input data/real/Sub001_slice75_adjusted.h5 --output workspaces/ucdavis_walkthrough/runs/scenario1_small/predictions.npz --samples 8 --batch-size 64 --sample-chunk 8 --device cpu
+# 5. Save and inspect one voxel's joint posterior samples.
+python inspect_voxel.py --run workspaces/ucdavis_walkthrough/runs/scenario1_small --input data/real/Sub001_slice75_adjusted.h5 --voxel-id 33449 --output workspaces/ucdavis_walkthrough/voxel_33449.npz --samples 1000 --device cpu
+python analyse_tac.py --protocol workspaces/ucdavis_walkthrough/runs/scenario1_small/protocol.json --input workspaces/ucdavis_walkthrough/voxel_33449.input.npz --output workspaces/ucdavis_walkthrough/voxel_33449_nls.json
+python plot_posteriors.py --posterior workspaces/ucdavis_walkthrough/voxel_33449.npz --nls workspaces/ucdavis_walkthrough/voxel_33449_nls.json --output workspaces/ucdavis_walkthrough/voxel_33449_posteriors.png
+# 6. Export parameter and uncertainty images.
+python parametric_imaging.py --predictions workspaces/ucdavis_walkthrough/runs/scenario1_small/predictions.npz --parameter Ki --output workspaces/ucdavis_walkthrough/Ki_mean.png
+python parametric_imaging.py --predictions workspaces/ucdavis_walkthrough/runs/scenario1_small/predictions.npz --parameter Ki --statistic ci95_width --output workspaces/ucdavis_walkthrough/Ki_ci95_width.png
+```
+
+For a full run, omit `--size small`; the generated run name is `scenario1`. Use a larger posterior sample count and an appropriate compute device. The **UC Davis demonstration** shortcut page retains the earlier supplied-data/AIF-grid example; the numbered pages are the end-to-end patient-imaging route.
+
+## Historical Scenario 1 workflow
 
 The terminal instructions below retain the historical JAX generation conventions. Install the optional legacy requirements to regenerate pairs, or use the distributed `data/simulated/scenario1.npz` and skip generation.
 
@@ -111,7 +151,7 @@ The output `runs/scenario1/predictions.npz` contains correctly named parameter m
 jupyter lab notebooks/01_parametric_imaging.ipynb
 ```
 
-Set the prediction and geometry paths in the first configuration cell, then run the notebook. It maps predictions through explicit voxel indices, verifies voxel column identities, displays parameter/Kᵢ summaries and saves PNG images in the run's `figures/` folder. It stops until `mapping_verified` and `orientation_and_spacing_verified` in the geometry JSON have been confirmed by the data author. A matching voxel count alone does not establish spatial correspondence.
+The original notebook remains available. For identity-checked mapping, selectable parameters, 95% interval widths and interactive voxel inspection, use the new [GUI/terminal imaging module](PARAMETRIC_IMAGING.md). The author has confirmed the supplied mask mapping and display convention; a matching voxel count alone still does not establish correspondence for other datasets.
 
 ## Quick installation smoke test
 

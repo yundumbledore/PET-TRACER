@@ -62,6 +62,9 @@ def validate_protocol(cfg):
             raise ValueError(f'{key} must be a positive integer')
     if not isinstance(cfg['seed'], int) or cfg['seed'] < 0:
         raise ValueError('seed must be a nonnegative integer')
+    test_scale = cfg.get('test_prior_scale', 1.)
+    if not np.isfinite(test_scale) or not 0 < test_scale <= 1:
+        raise ValueError('test_prior_scale must be in (0,1]')
     if cfg.get('model', '2TC') == '2TC':
         if names != TwoTC.PARAMETER_NAMES:
             raise ValueError('2TC requires ordered K1,k2,k3,k4,Vb parameters')
