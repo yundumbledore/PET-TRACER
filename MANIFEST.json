@@ -1,5 +1,5 @@
 {
-  "description": "Complete merged PET-TRACER package. Scientific review status: LoRACM/docs/RELEASE_REVIEW.md.",
+  "description": "Historical file inventory for the earlier merged research archive; hashes do not describe the current workflow update. Current source is identified by Git revisions. Scientific review: LoRACM/docs/RELEASE_REVIEW.md.",
   "files": [
     {
       "path": ".gitignore",

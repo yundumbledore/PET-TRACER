@@ -1,15 +1,17 @@
 """Fine-tune the supplied consistency model using scenario configuration."""
 import argparse
 from pathlib import Path
-import os, json, time, copy
+import os, json, time, copy, csv, shutil, hashlib
 import numpy as np
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from prepare_dataset import myDataset
-from model_lora import build_lora_unet
-from common import load_config, validate_dataset
+from model_factory import build_model
+from training_config import resolve_training_config
+from common import load_config, validate_dataset, PARAMETERS
+from protocol import validate_file, validate_names
 
 def get_device():
     if torch.cuda.is_available():
@@ -18,15 +20,33 @@ def get_device():
         return torch.device("mps")
     return torch.device("cpu")
 
-def main(cfg):
+def main(cfg, training_mode="lora"):
+    if not cfg.get('dataset_dir'):
+        raise ValueError('Specify dataset_dir for your labelled NPZ file')
+    report = validate_file(cfg['dataset_dir'])
+    cfg = resolve_training_config(cfg, report, training_mode)
     if (Path(cfg["save_dir"]) / cfg["exp_name"]).exists():
         raise FileExistsError("Run directory already exists; choose a new exp_name or move the old run")
+    names = cfg['parameter_names']
+    protocol = None
+    if cfg.get('simulation_protocol'):
+        from protocol import validate_protocol, load_protocol
+        protocol = load_protocol(cfg['simulation_protocol'])
+        validate_protocol(protocol)
+        if protocol['parameter_names'] != names or not np.allclose(protocol['t_meas'],report['t_meas'],atol=1e-6,rtol=0):
+            raise ValueError('Simulation protocol names/times must match the training dataset')
+        if report['frame_durations_min'] is not None and not np.allclose(protocol['frame_durations_min'],report['frame_durations_min'],atol=1e-6,rtol=0):
+            raise ValueError('Simulation protocol durations must match the dataset')
+        if protocol['model'] != cfg.get('kinetic_model', '2TC'):
+            raise ValueError('Training kinetic_model must match the simulation protocol model')
+        if 'observation' in report and report['observation'] != protocol.get('observation', 'midpoint'):
+            raise ValueError('Simulation observation mode must match the dataset')
     # Repro
     torch.manual_seed(cfg["seed"])
     np.random.seed(cfg["seed"])
 
     device = get_device() if cfg["device"] == "auto" else torch.device(cfg["device"])
-    print("[train_lora_from_config] Device:", device)
+    print(f"[{training_mode}] Device: {device}; epochs: {cfg['epochs']}; embedding: {cfg['embed_dim']}; dimensions: {cfg['x_dim']} / {cfg['y_dim']}", flush=True)
 
     data = np.load(cfg['dataset_dir'], allow_pickle=False)
     validate_dataset(data, cfg['x_dim'], cfg['y_dim'])
@@ -51,7 +71,8 @@ def main(cfg):
                           y_mean=y_mean, 
                           y_std=y_std,
                           log_transform=False)
-    train_loader = DataLoader(train_set, batch_size=cfg["batch_size"], shuffle=True, drop_last=True)
+    train_loader = DataLoader(train_set, batch_size=cfg["batch_size"], shuffle=True, drop_last=cfg["drop_last"],
+                              generator=torch.Generator().manual_seed(cfg["seed"]))
 
     val_set = myDataset(data['x_val'][:,:cfg['x_dim']], 
                         data['y_val'],
@@ -63,32 +84,32 @@ def main(cfg):
     val_loader = DataLoader(val_set, batch_size=cfg["batch_size"], shuffle=False)
 
     save_dir = os.path.join(cfg["save_dir"], cfg["exp_name"])
-    os.makedirs(save_dir, exist_ok=True)
+    os.makedirs(save_dir, exist_ok=False)
+    if protocol is not None:
+        protocol = dict(protocol)
+        if protocol['model'] == 'custom':
+            shutil.copyfile(protocol['model_file'], Path(save_dir, 'kinetic_model.py'))
+            protocol['model_file'] = 'kinetic_model.py'
+        Path(save_dir, 'protocol.json').write_text(json.dumps(protocol,indent=2)+'\n', encoding='utf-8')
     writer = SummaryWriter(os.path.join(save_dir, "tb"))
 
-    with open(os.path.join(save_dir, "scaling_params.json"), "w") as f:
+    with open(os.path.join(save_dir, "scaling_params.json"), "w", encoding='utf-8') as f:
         json.dump({"x_mean": x_mean.tolist(), "x_std": x_std.tolist(),
-                   "y_mean": y_mean.tolist(), "y_std": y_std.tolist(), "t_meas": data["t_meas"].tolist()}, f)
+                   "y_mean": y_mean.tolist(), "y_std": y_std.tolist(), "t_meas": data["t_meas"].tolist(),
+                   "frame_durations_min": report['frame_durations_min'],
+                   "observation": str(data['observation']) if 'observation' in data else 'midpoint',
+                   "parameter_names": names}, f)
         
-    with open(os.path.join(save_dir, "model_params.json"), "w") as f:
+    with open(os.path.join(save_dir, "model_params.json"), "w", encoding='utf-8') as f:
         json.dump(cfg, f)
 
-    model = build_lora_unet(
-        x_dim=cfg['x_dim'],
-        y_dim=cfg['y_dim'],
-        embed_dim=cfg["embed_dim"],
-        channels=cfg["channels"],
-        embedy=cfg["embedy"],
-        sigma_data=cfg["sigma_data"],
-        r=cfg["lora_r"],
-        alpha=cfg["lora_alpha"],
-        dropout=cfg["lora_dropout"],
-        include_names=None,
-        exclude_names=("decodex",),
-        train_norms=cfg["train_norms"],
-        pretrained_ckpt=cfg["pretrained"],
-        device=device,
-    )
+    model = build_model(cfg, device, training=True)
+    total_parameters=sum(p.numel() for p in model.parameters())
+    trainable_parameters=sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f'Trainable parameters: {trainable_parameters:,} / {total_parameters:,}', flush=True)
+    Path(save_dir, 'transfer_report.json').write_text(json.dumps(model.transfer_report, indent=2)+'\n', encoding='utf-8')
+    metrics_path = Path(save_dir, 'metrics.csv')
+    metrics_path.write_text('epoch,train_loss,val_loss,learning_rate,elapsed_seconds\n', encoding='utf-8')
     # Create EMA target model
     target_model = copy.deepcopy(model)
     target_model.eval()
@@ -103,19 +124,19 @@ def main(cfg):
                 if s_param.requires_grad:
                     t_param.data.mul_(mu).add_(s_param.data, alpha=1 - mu)
 
-    optimizer = optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=cfg["lr"])
+    optimizer = optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=cfg["lr"], weight_decay=cfg["weight_decay"])
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, 
         mode='min',      # We want the metric (validation loss) to minimize
         factor=cfg['lr_factor'],      # Multiply the learning rate by 
         patience=cfg['lr_scheduler_patience'],     # Wait for X epochs of no improvement before dropping LR
-        min_lr=1e-8      # Don't let the learning rate drop below this
+        min_lr=cfg["min_lr"]      # Don't let the learning rate drop below this
     )
 
     loss_weights = torch.tensor(cfg["loss_weights"], dtype=torch.float32, device=device)
     loss_weights = loss_weights.view(1, 1, -1)
 
-    Nk = 15
+    Nk = cfg["noise_levels"]
     best = float("inf")
     start_time = time.time()
 
@@ -142,12 +163,14 @@ def main(cfg):
             loss = torch.mean(loss_weights * (pred_n_plus_1 - target_n) ** 2)
             # loss = torch.mean((pred_n_plus_1 - target_n) ** 2)
 
+            if not torch.isfinite(loss):
+                raise ValueError('Non-finite training loss; check data/scaling and learning rate')
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             # Update the EMA model weights
-            update_ema(model, target_model, mu=0.99)
+            update_ema(model, target_model, mu=cfg["ema_decay"])
             run_loss += loss.item()
 
         avg_loss = run_loss / (i + 1)
@@ -179,6 +202,8 @@ def main(cfg):
             avg_v = v_run / (j + 1)
             writer.add_scalar("Loss/val", avg_v, epoch)
 
+            if not np.isfinite(avg_v):
+                raise ValueError('Non-finite validation loss')
             scheduler.step(avg_v)
             current_lr = optimizer.param_groups[0]['lr']
             writer.add_scalar("LR", current_lr, epoch)
@@ -187,52 +212,52 @@ def main(cfg):
         else:
             print(f"Epoch {epoch:04d} | train {avg_loss:.6f}")
 
+        with metrics_path.open('a', newline='', encoding='utf-8') as f:
+            csv.writer(f).writerow([epoch, avg_loss, avg_v, optimizer.param_groups[0]['lr'], time.time()-start_time])
+        writer.flush()
         if avg_v < best and epoch >= cfg["checkpoint_start_epoch"]:
             best = avg_v
-            torch.save(
-                {
-                    "model_state_dict": target_model.state_dict(),
-                    "lr": cfg["lr"],
-                    "lora_r": cfg["lora_r"],
-                    "lora_alpha": cfg["lora_alpha"],
-                    "lora_dropout": cfg["lora_dropout"],
-                    "channels": cfg["channels"],
-                    "embed_dim": cfg["embed_dim"],
-                    "embedy": cfg["embedy"],
-                    "x_dim": cfg["x_dim"],
-                    "y_dim": cfg["y_dim"]
-                },
-                os.path.join(save_dir, "best.pth"),
-            )
-        
+            save_checkpoint(target_model, cfg, Path(save_dir, 'best.pth'), epoch)
 
-    torch.save(
-                    {
-                        "model_state_dict": target_model.state_dict(),
-                        "lr": cfg["lr"],
-                        "lora_r": cfg["lora_r"],
-                        "lora_alpha": cfg["lora_alpha"],
-                        "lora_dropout": cfg["lora_dropout"],
-                        "channels": cfg["channels"],
-                        "embed_dim": cfg["embed_dim"],
-                        "embedy": cfg["embedy"],
-                        "x_dim": cfg["x_dim"],
-                        "y_dim": cfg["y_dim"]
-                    },
-                    os.path.join(save_dir, "last.pth"),
-                )
-    
+    save_checkpoint(target_model, cfg, Path(save_dir, 'last.pth'), cfg['epochs'])
     writer.close()
     end_time = time.time()
     elapsed = end_time - start_time
-    print(f"Execution time: {elapsed:.3f} seconds...")
+    digest=hashlib.sha256()
+    with Path(cfg['dataset_dir']).open('rb') as stream:
+        for block in iter(lambda:stream.read(1024*1024),b''): digest.update(block)
+    summary={'training_mode':training_mode,'dataset_sha256':digest.hexdigest(),
+             'parameter_names':names,'split_counts':report['counts'],'seed':cfg['seed'],
+             'trainable_parameters':trainable_parameters,'total_parameters':total_parameters,
+             'training_seconds':elapsed,'epochs':cfg['epochs'],'device':str(device),
+             'best_validation_loss':best if np.isfinite(best) else None,
+             'checkpoint_policy':'Best eligible and final EMA inference model',
+             'fixed_features':'Gaussian Fourier projection is held fixed; transferred when compatible, random for scratch or resized embeddings'}
+    Path(save_dir,'training_summary.json').write_text(json.dumps(summary,indent=2)+'\n', encoding='utf-8')
+    print(f"Training completed in {elapsed:.3f} seconds. Run: {save_dir}",flush=True)
+    return Path(save_dir)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", default="configs/train_scenario1.json")
-    args = parser.parse_args()
-    cfg = load_config(args.config)
-    for key in ("pretrained", "dataset_dir", "save_dir"):
-        cfg[key] = str(Path(cfg[key]).resolve())
-    main(cfg)
+def save_checkpoint(model, cfg, path, epoch):
+    checkpoint={'model_state_dict':model.state_dict(),'training_mode':cfg['training_mode'],'epoch':epoch}
+    for key in ('lr','lora_r','lora_alpha','lora_dropout','channels','embed_dim','embedy','x_dim','y_dim'):
+        if key in cfg: checkpoint[key]=cfg[key]
+    torch.save(checkpoint,path)
+
+
+def run_cli(mode='lora'):
+    parser=argparse.ArgumentParser(description=__doc__ if mode=='lora' else 'Train a consistency model from scratch')
+    parser.add_argument('--config',default='configs/train_scenario1.json' if mode=='lora' else 'configs/train_cm.json')
+    for flag,kind in [('epochs',int),('lr',float),('batch-size',int),('embed-dim',int),('x-dim',int),('y-dim',int),('seed',int)]:
+        parser.add_argument('--'+flag,type=kind,help='Override the corresponding JSON setting')
+    parser.add_argument('--device',choices=['auto','cpu','cuda:0','mps'])
+    args=parser.parse_args();cfg=load_config(args.config)
+    for key,value in vars(args).items():
+        if key!='config' and value is not None: cfg[key]=value
+    for key in ('pretrained','dataset_dir','save_dir'):
+        if cfg.get(key): cfg[key]=str(Path(cfg[key]).resolve())
+    main(cfg,training_mode=mode)
+
+
+if __name__ == '__main__':
+    run_cli('lora')

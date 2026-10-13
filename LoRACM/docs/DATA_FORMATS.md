@@ -1,5 +1,9 @@
 # Data and model contracts
 
+[Portable training-data format](PREPARE_DATA.md) · [Portable prediction inputs and posterior samples](PREDICTION.md) · [Explicit simulation protocols](MODELS_AND_PROTOCOLS.md)
+
+The tables below document the **preserved Scenario 1 assets**. New-project datasets may have another parameter count/frame schedule and include parameter names, actual frame durations and an observation mode. The portable RK4 generator uses explicit durations, while the historical generator retains its original timing convention.
+
 ## AIF CSV
 
 The first column contains positive, increasing time points in **minutes**. Each remaining column is one measured input function, with one activity value per time point. The supplied file contains **35 rows and four AIFs**: Sub001, Sub011, Sub080 and Sub087. The HDF5 file labels activity as Bq/mL; confirm the same units and correction convention for all AIFs before public release.

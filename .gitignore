@@ -1,0 +1,8 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+.ipynb_checkpoints/
+LoRACM/workspaces/
+LoRACM/runs/
+LoRACM/data/simulated/smoke.*

@@ -17,6 +17,7 @@ def build_lora_unet(
     train_norms: bool = True,
     pretrained_ckpt: str = None,
     device: torch.device = torch.device("cpu"),
+    reset_parameter_heads: bool = False,
 ):
     # 1. Initialize model with the NEW dimensions
     model = OneDUnet(x_dim, y_dim, embed_dim, channels, embedy, sigma_data).to(device)
@@ -26,7 +27,7 @@ def build_lora_unet(
 
     if pretrained_ckpt is not None:
         # Load checkpoint (suppressing the warning if possible, but reading purely)
-        ckpt = torch.load(pretrained_ckpt, map_location=device)
+        ckpt = torch.load(pretrained_ckpt, map_location=device, weights_only=True)
         state = ckpt.get("model_state_dict", None)
         if state is None:
             state = ckpt.get("ema_state_dict", ckpt)
@@ -37,6 +38,9 @@ def build_lora_unet(
         
         print(f"[LoRA] Checking parameter compatibility...")
         for k, v in state.items():
+            if reset_parameter_heads and k.startswith(('encodex.', 'decodex.')):
+                mismatched_keys.add(k)
+                continue
             if k in model_state:
                 # Check if the shape in checkpoint matches the new model's shape
                 # e.g. Checkpoint [1024, 70] vs New Model [1024, 60] -> Mismatch!
@@ -81,12 +85,14 @@ def build_lora_unet(
             clean_name = n.replace(".wrapped", "")
             
             # If this parameter belongs to a layer we skipped loading...
-            if clean_name in mismatched_keys:
+            if clean_name in mismatched_keys and clean_name != 'embedt.0.W':
                 p.requires_grad = True
                 unfrozen_count += 1
         
         print(f"[LoRA] Re-enabled training for {unfrozen_count} parameters in resized heads/tails.")
 
+    model.transfer_report = {'reset_parameter_heads': reset_parameter_heads,
+                             'new_or_resized_parameters': sorted(mismatched_keys)}
     tr, tot = lora_parameter_count(model)
     print(f"[LoRA] Trainable params: {tr:,} / {tot:,} ({100.0 * tr / tot:.2f}%)")
     return model

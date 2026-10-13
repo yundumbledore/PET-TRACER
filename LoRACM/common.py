@@ -6,9 +6,12 @@ import numpy as np
 PARAMETERS = ['K1', 'k2', 'k3', 'k4', 'Vb']
 
 def load_config(path):
-    return json.loads(Path(path).read_text())
+    return json.loads(Path(path).read_text(encoding='utf-8'))
 
 def validate_dataset(data, x_dim=5, y_dim=70):
+    required = ['t_meas'] + [f'{a}_{s}' for a in ('x','y') for s in ('train','val','test')]
+    if any(k not in data for k in required):
+        raise ValueError('Missing dataset arrays: ' + ', '.join(k for k in required if k not in data))
     for split in ('train', 'val', 'test'):
         x, y = data[f'x_{split}'], data[f'y_{split}']
         if x.ndim != 2 or x.shape[1] != x_dim + 1:
@@ -17,26 +20,39 @@ def validate_dataset(data, x_dim=5, y_dim=70):
             raise ValueError(f'y_{split} must be nonempty [N, {y_dim}]')
         if not np.isfinite(x).all() or not np.isfinite(y).all():
             raise ValueError(f'Non-finite values in {split}')
+        if np.any(x[:, -1] < 0):
+            raise ValueError(f'Negative noise scale in {split}')
     t = data['t_meas']
-    if t.ndim != 1 or len(t)*2 != y_dim or t[0] <= 0 or not np.all(np.diff(t)>0):
+    if t.ndim != 1 or len(t) < 2 or len(t)*2 != y_dim or not np.isfinite(t).all() or t[0] <= 0 or not np.all(np.diff(t)>0):
         raise ValueError('Invalid positive, increasing time grid')
+    for split in ('train', 'val', 'test'):
+        if np.any(data['y_'+split][:, len(t):] < 0):
+            raise ValueError(f'Input functions must be nonnegative in {split}')
+    if 'frame_durations_min' in data:
+        duration = data['frame_durations_min']
+        if duration.shape != t.shape or not np.isfinite(duration).all() or np.any(duration <= 0):
+            raise ValueError('frame_durations_min must be finite positive [T]')
 
-def summarize_samples(samples):
+def summarize_samples(samples, parameter_names=None, calculate_ki=True):
     """Summarize joint samples before discarding them; never derive Ki from medians."""
     samples = np.asarray(samples)
-    if samples.ndim != 3 or samples.shape[-1] != 5 or samples.shape[1] < 2:
-        raise ValueError('Expected [voxels, at least 2 samples, 5 parameters]')
+    if samples.ndim != 3 or samples.shape[-1] < 1 or samples.shape[1] < 2:
+        raise ValueError('Expected [curves, at least 2 samples, parameters]')
     if not np.isfinite(samples).all():
         raise ValueError('Posterior samples contain non-finite values')
-    denom = samples[..., 1] + samples[..., 2]
-    valid = np.abs(denom) > 1e-12
-    ki = np.full_like(denom, np.nan)
-    np.divide(samples[..., 0] * samples[..., 2], denom, out=ki, where=valid)
     result = {f'params_{name}': fun(samples, axis=1) for name, fun in
               [('mean',np.mean),('median',np.median),('std',np.std)]}
-    result.update({f'Ki_{name}':fun(ki,axis=1) for name,fun in
-                   [('mean',np.nanmean),('median',np.nanmedian),('std',np.nanstd)]})
-    result['Ki_valid_fraction'] = valid.mean(axis=1)
+    if calculate_ki:
+        names = PARAMETERS if parameter_names is None else list(parameter_names)
+        if names != PARAMETERS or samples.shape[-1] != 5:
+            raise ValueError('Ki is only defined here for the ordered 2TC parameter set')
+        denom = samples[..., 1] + samples[..., 2]
+        valid = np.abs(denom) > 1e-12
+        ki = np.full_like(denom, np.nan)
+        np.divide(samples[..., 0]*samples[..., 2], denom, out=ki, where=valid)
+        result.update({f'Ki_{name}':fun(ki,axis=1) for name,fun in
+                       [('mean',np.nanmean),('median',np.nanmedian),('std',np.nanstd)]})
+        result['Ki_valid_fraction'] = valid.mean(axis=1)
     result['params_negative_fraction'] = (samples < 0).mean(axis=1)
     return result
 

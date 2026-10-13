@@ -1,0 +1,31 @@
+name: Portable workflow
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cpu-workflow:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      MPLBACKEND: Agg
+      OMP_NUM_THREADS: '2'
+      MKL_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: LoRACM/requirements*.txt
+      - run: python -m pip install -r LoRACM/requirements-gui.txt
+      - run: python -m unittest discover -s LoRACM/tests -v
+      - run: python LoRACM/smoke_workflow.py --output LoRACM/workspaces/ci_2tc
+      - run: python LoRACM/smoke_workflow.py --output LoRACM/workspaces/ci_custom --custom-model
+      - run: python LoRACM/smoke_workflow.py --output LoRACM/workspaces/ci_cm --from-scratch

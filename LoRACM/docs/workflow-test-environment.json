@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-13",
+  "platform": "macOS Apple Silicon, CPU",
+  "machine": "arm64",
+  "macOS": "27.0.1",
+  "python": "3.11.5",
+  "packages": {
+    "torch": "2.6.0",
+    "numpy": "2.4.6",
+    "pandas": "3.0.5",
+    "scipy": "1.17.1",
+    "streamlit": "1.65.0",
+    "matplotlib": "3.11.1",
+    "tables": "3.11.1"
+  },
+  "mps_available_in_test_session": false,
+  "environment": "Isolated GUI virtual environment using existing scientific packages; not a fresh complete dependency install"
+}

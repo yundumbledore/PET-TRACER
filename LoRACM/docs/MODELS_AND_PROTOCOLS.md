@@ -1,0 +1,79 @@
+# Kinetic models, AIFs and acquisition protocols
+
+[Manual](../README.md) · [Dataset preparation](PREPARE_DATA.md)
+
+## Kinetic models
+
+Built-in **2TC** predicts `K1, k2, k3, k4, Vb`, in that order. Rate constants use minutes; `Vb` is a blood-volume fraction. The same input function is used for plasma forcing and the blood-volume term. Add a custom model if your application needs different input handling or kinetics.
+
+The new simulator accepts a local Python plugin implementing:
+
+```python
+PARAMETER_NAMES = ["K1", "k2", "Vb"]
+STATE_SIZE = 1
+
+def rhs(t, state, parameters, input_value):
+    # state [N,S], parameters [N,P], input_value [N]; return [N,S].
+    ...
+
+def observe(state, parameters, input_value):
+    # Return the predicted tissue activity [N].
+    ...
+```
+
+A complete working 1TC example is in [`examples/custom_1tc.py`](../examples/custom_1tc.py). Copy it, edit the equations, then set `model="custom"`, `model_file`, `parameter_names`, and the ordered priors in your protocol. The GUI permits different parameter counts. Plugins execute local Python; inspect their source before use.
+
+Validate the configuration before generation with `python protocol.py --config configs/dataset_custom.json`.
+
+The simulation uses zero initial states, one input channel, fixed-grid RK4 and linear input interpolation. Test a custom model against analytical solutions or a validated independent implementation, and check convergence at smaller step sizes. Delay equations, multiple independent inputs and state-dependent discontinuities need an extension of this contract; the old dual-input/SRTM research classes are not automatically exposed as GUI plugins. No AATH scenario is claimed as validated by this update.
+
+**Transfer limits.** Compatible foundation backbone weights transfer. Changed parameter names/order or any custom model resets and trains the parameter encoder/decoder, even if the number of parameters remains five. Changed frame counts train resized conditioning weights. LoRA and optional normalization weights train alongside these layers. The original pretrained model represents FDG–2TC; using a new tracer or model does not establish posterior accuracy or calibration. Review `transfer_report.json` and validate on held-out labels or an independent estimator.
+
+## Input functions
+
+### Use measured inputs
+
+Use a CSV whose first column is time in minutes, with one AIF per subsequent column:
+
+```csv
+time_min,subject_01,subject_02
+0,0,0
+0.25,12000,10000
+0.5,9000,8500
+1,4000,4200
+```
+
+Provide the full observation-window coverage and finite nonnegative activity. The AIF grid can be denser than the output frame schedule. The simulator interpolates each measured curve and randomly selects one curve for each pair. If the first AIF measurement is after zero, explicitly select `aif_before_first="zero_at_origin"` to insert a zero origin; otherwise include time zero yourself.
+
+A small AIF pool is acceptable, but repeated use does not create new independent subjects. Input units, tracer metabolite correction, plasma/blood treatment and delay/dispersion conventions must agree between simulation and testing.
+
+### Fit and sample a Feng cohort
+
+With multiple input functions, fit each to the repository's Feng equation:
+
+```bash
+python fit_feng.py --input data/aif/UCDavis_1H35.csv --output workspaces/my_project/feng.csv
+```
+
+The fit needs at least two curves and eight samples. It exports the seven columns `beta1,beta2,beta3,kappa1,kappa2,kappa3,t0`, AIF identifiers and RMSE diagnostics, plus a `.fits.csv` containing measured and fitted curves. Review the errors and curves. A successful numerical fit alone does not establish a suitable input model for your tracer.
+
+Set `aif_mode="feng_cohort"` and `feng_parameters_csv` in the protocol. Whole parameter rows are resampled together; `feng_log_jitter=0.05` adds small multiplicative variation. This preserves within-row dependence before perturbation, and is not an estimated multivariate population model. Start with `0` for pure row resampling; the simulator rejects negative generated activity and asks you to review/reduce perturbations. Physiological plausibility and cohort coverage remain study-specific.
+
+## Acquisition protocol
+
+| Setting | Meaning |
+| :--- | :--- |
+| `t_meas` | Positive increasing **frame midpoints**, minutes |
+| `frame_durations_min` | One positive actual acquisition duration per frame, minutes |
+| `observation` | `midpoint` or `frame_average` for both TAC and input |
+| `half_life_min` | Isotope half-life; noise decay constant is `ln(2)/half_life_min` |
+| `integration_step_min` | RK4 step limit (default 0.01 min); check convergence |
+| `kinetic_priors` | Ordered uniform ranges, one per predicted parameter |
+| `noise_prior` | Uniform nonnegative noise-amplitude range |
+| `seed`, `chunk_size` | Reproducibility and bounded simulation working memory |
+
+Midpoints/durations define nonoverlapping frames starting at or after zero; gaps are allowed. `frame_average` numerically integrates activity over each frame. In `midpoint` mode the model samples the curve at its midpoint. Noise uses **actual durations**, not distances between midpoints. Activity is treated as decay-corrected by this noise equation; use consistent correction conventions throughout your project.
+
+The portable simulator uses new RK4/random-stream conventions and does **not** reproduce the earlier forward-Euler research samples. The original generator and configs retain their old behaviour for access to the earlier example. Both generators share the training array contract.
+
+Use [the schedule CSV](../examples/schedule.csv) as a format example. Its five-minute schedule and the default FDG half-life of 109.8 min are illustrative; replace them for your tracer and scan. Config units are minutes, including Feng rates/delay and kinetic rates.

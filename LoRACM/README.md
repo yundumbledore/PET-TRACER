@@ -1,119 +1,89 @@
-# LoRACM · Scenario 1
+# LoRACM user manual
 
-Adapt a pretrained PET-TRACER consistency model to **FDG–2TCM on the UC Davis uEXPLORER protocol**, then estimate voxel posteriors and display a coronal parametric image.
+**Adapt PET-TRACER to your own tracer and protocol, then estimate kinetic parameter posteriors.**
 
-## 0. Set up
+[Project overview](../README.md) · [Install](docs/INSTALLATION.md) · [CM from scratch](docs/TRAIN_CM.md) · [UC Davis demonstration](docs/UCDAVIS.md) · [Legacy framework](../docs/legacy-framework.md)
 
-Run all commands below from **`PET-TRACER/LoRACM`**. Paths in configuration files are relative to that working directory.
+## Choose a route
 
-```bash
-cd PET-TRACER/LoRACM
-python -m venv .venv
-```
-
-Activate the environment with `source .venv/bin/activate` on macOS/Linux, or `.venv\Scripts\Activate.ps1` in Windows PowerShell. Then install the supporting packages:
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-Install a PyTorch build suitable for your hardware using the [official installation selector](https://pytorch.org/get-started/locally/). The generator uses JAX with 64-bit precision; CPU generation is sufficient for the included dataset. Training supports CPU, CUDA and an optional MPS path. CUDA is recommended for full training; multi-GPU inference uses PyTorch DataParallel on a **single node**, not distributed multi-node execution. Hardware memory requirements depend on batch size and sample count.
-
-Files needed for the complete demo:
-
-| Asset | Location |
+| Your starting point | What to do |
 | :--- | :--- |
-| Four measured AIFs | `data/aif/UCDavis_1H35.csv` |
-| Foundation checkpoint | `checkpoints/foundation.pth` |
-| Pre-generated adaptation pairs | `data/simulated/scenario1.npz` |
-| Real coronal-slice TACs | `data/real/Sub001_slice75_adjusted.h5` |
-| Mask, column mapping and display metadata | `data/real/Sub001_slice75_geometry.npz` and `.json` |
+| You need labelled fine-tuning data | Define your kinetic model, input functions and acquisition protocol; simulate parameter–curve pairs. |
+| You already have labelled fine-tuning data | Convert it to the NPZ format, validate it, and skip simulation. |
+| You have only measured TACs and input functions | These are prediction inputs. Obtain or simulate labelled pairs to adapt the model first. |
+| You want a scratch-CM baseline | Train the same labelled data with [CM from scratch](docs/TRAIN_CM.md), then evaluate both models on shared held-out curves. |
+| You want to learn with supplied assets | Follow the [UC Davis demonstration](docs/UCDAVIS.md), starting with the small CPU check. |
 
-This repository archive includes all five asset groups above, including the generated Scenario 1 dataset and foundation weights. File checksums are recorded in the root `MANIFEST.json`. For a separately archived research release, retain the same assets and record their permanent identifiers.
+## 1. Install and start
 
-## 1. Generate adaptation pairs
-
-Either use the supplied pre-generated NPZ or generate a new one:
+Follow the [Windows/Apple Silicon macOS/Linux installation guide](docs/INSTALLATION.md). Start the GUI from the repository root:
 
 ```bash
-python create_dataset.py --config configs/dataset_scenario1.json
+python launch_gui.py
 ```
 
-If the NPZ already exists, move it aside or change `output` in the configuration; the generator refuses to overwrite it. Each sample combines a simulated tissue curve with one measured AIF. Training and validation use broad parameter priors; the supplied research script narrows test priors to the central 50% of each range. Train/validation/test pairs share the same four-AIF pool and are **not subject-held-out splits**.
+The browser interface runs on your computer. **Project name** selects a folder under `LoRACM/workspaces/`; configs, uploaded files, logs, runs and analyses stay there. Use a new project/run name for an independent experiment. A single active background job is allowed per browser session. Its status and log remain available while you switch pages; keep the application running while jobs execute.
 
-| Setting | Scenario 1 |
-| :--- | :--- |
-| Training / validation / test pairs | 50,000 / 100,000 / 100 |
-| Kinetic parameters | K₁, k₂, k₃, k₄, Vᵦ |
-| Conditioning | 35 TAC values followed by 35 AIF values |
-| Noise amplitude | Uniform [0.1, 7] |
-| Half-life | 109.8 minutes |
-| Seed | 42 |
-| Simulation chunk size | 256 |
+Terminal users run the following workflow commands from **`PET-TRACER/LoRACM`**. Relative config paths are interpreted from that directory. Absolute paths also work; quote paths containing spaces.
 
-The generator writes `scenario1.npz` and a provenance JSON. It preserves the supplied forward-model and noise equations. Chunked generation uses new, explicitly recorded random streams, so its samples are **not byte-identical to the original research run**.
+## 2. Define the model and protocol
 
-## 2. Fine-tune
+GUI: **1 · Model & protocol**. Select built-in 2TC or a custom ODE, edit priors, load/edit the frame schedule, choose half-life and observation mode, and supply measured or fitted Feng input functions. Save the validated protocol.
+
+Read [models, AIFs and protocols](docs/MODELS_AND_PROTOCOLS.md) before changing tracers. `configs/dataset_custom.json` is an editable starting point with a **five-minute illustrative schedule**, not a recommended clinical protocol. Replace its timings, durations, units assumptions, priors and input functions for your study.
+
+## 3. Simulate or import a dataset
+
+GUI: **2 · Dataset**. Choose **Simulate my protocol** or **Use my own NPZ dataset**.
+
+New-project defaults: **100,000 training pairs**, plus **10,000 validation** and **1,000 test** pairs. Simulation uses rank-independent settings; rank and alpha are selected before training. Reduce counts for an installation check.
+
+Always choose **Validate and select dataset** before moving on. Validation checks shapes, time grids, parameter names/order, finite values, nonnegative noise scales and nonzero training normalization scales. It cannot establish whether units, labels, priors, cohort splits or the forward model are scientifically correct. Follow [dataset preparation](docs/PREPARE_DATA.md).
+
+## 4. Fine-tune
+
+GUI: **3 · Fine-tune**. Select the dataset and foundation checkpoint, confirm the kinetic model, choose your run name and start training. Defaults are **rank 8**, **alpha 16**, dropout 0.05, batch size 512, learning rate 0.0001 and 5,000 epochs. Start with a short CPU check; reduce batch size for smaller datasets or limited memory.
+
+Dimensions and parameter names are derived from the dataset. **Advanced settings** includes embedding width, channels, optimizer, consistency intervals, EMA, scheduler, seed and loss weights; defaults are documented in [the shared settings table](docs/TRAIN_CM.md#defaults-and-settings). Training loss and validation self-consistency loss refresh in the job monitor. See [fine-tuning settings and transfer limits](docs/FINE_TUNING.md). Preserve the checkpoint, model configuration and scaling together.
+
+### Train a scratch CM for comparison
+
+Choose **CM from scratch** to train a new randomly initialized model without foundation weights. It shares the configuration controls and output format with LoRACM. **Compare models** evaluates both runs on the same testing file and can overlay their posterior samples. Follow the [CM training and comparison manual](docs/TRAIN_CM.md).
+
+## 5. Predict on your project
+
+GUI: **4 · Predict** for batch NPZ/HDF5 data, or **5 · Single TAC & NLS** for a CSV or one selected curve. Prediction accepts either trained model type; inputs must match the model's schedule, units and observation convention. Models fitted to another schedule need adaptation or justified resampling.
+
+The single-TAC page displays parameter posterior histograms, exports joint samples and figures, and optionally overlays dashed nonlinear least-squares estimates. Read the [prediction manual](docs/PREDICTION.md) for an exact file example, terminal commands and interpretation.
+
+## Terminal quick start
+
+After installing and activating the environment, change to `LoRACM/`. Edit the custom configs first. The GUI exports compatible configs under `workspaces/<project>/`, so you can move a GUI project to a terminal/server.
 
 ```bash
-python train.py --config configs/train_scenario1.json
+# Optional: fit a cohort of measured AIFs, then configure aif_mode=feng_cohort.
+python fit_feng.py --input data/aif/UCDavis_1H35.csv --output workspaces/my_project/feng.csv
+
+# Simulate your explicitly configured protocol, or skip this for your own NPZ.
+python simulate_protocol.py --config configs/dataset_custom.json
+
+# Check the labelled dataset before spending time training.
+python protocol.py workspaces/my_project/dataset.npz
+
+# Set data paths; dimensions, parameter names and equal weights resolve automatically.
+python train.py --config configs/train_custom.json
+
+# Optional baseline on the same labelled data, initialized randomly.
+python train_cm.py --config configs/train_cm.json
+
+# Predict your own TACs. Supply a testing file in the documented format.
+python infer.py --run workspaces/my_project/runs/adaptation --input workspaces/my_project/testing.npz --output workspaces/my_project/predictions.npz --samples 1000
 ```
 
-The configuration retains rank **4**, alpha **8**, dropout **0.05**, batch size **512**, initial learning rate **0.0001**, and **5,000 epochs**. Normalization parameters and LoRA weights are trainable. The model builder transfers compatible foundation weights and trains missing or resized parameters.
+If using your own fine-tuning file, change `dataset_dir` in the training config to its path; no simulation is required. See [preparation](docs/PREPARE_DATA.md) for conversion examples and [single-TAC terminal analysis](docs/PREDICTION.md#terminal-single-tac-analysis) for posterior samples plus NLS figures. Outputs are protected against accidental overwriting; choose a new name or deliberately move earlier results aside.
 
-Outputs appear under `runs/scenario1/`:
+## UC Davis example and original material
 
-- `model_params.json`: resolved model and training configuration.
-- `scaling_params.json`: training-set normalization and time grid.
-- `best.pth`: best EMA checkpoint from epoch 151 onward, matching the supplied script's eligibility rule.
-- `last.pth`: final EMA checkpoint, including for short runs.
-- `tb/`: TensorBoard logs.
+The [UC Davis guide](docs/UCDAVIS.md) covers supplied assets, small and full runs, batch posterior inference and the geometry-aware imaging notebook. The preserved Scenario 1 settings are rank **4**, alpha **8**, and 50,000 / 100,000 / 100 pairs. GUI preparation can subset the distributed dataset without JAX; the optional research generator reproduces the earlier simulation conventions.
 
-Keep the checkpoint, model configuration and scaling file together. Checkpoints contain the **full adapted model**, not just LoRA matrices. They are inference checkpoints, not complete optimizer/RNG snapshots for exact training resumption. Change `exp_name` for independent runs; training refuses to overwrite an existing run directory.
-
-## 3. Predict voxel posteriors
-
-After the training, run
-
-```bash
-python infer.py --run runs/scenario1 --samples 1000 --batch-size 16 --sample-chunk 64
-```
-
-Posterior draws are generated in small GPU chunks. A voxel batch's samples are retained on CPU to calculate exact medians. Reduce `--batch-size` or `--sample-chunk` if memory is limited. To enable specific GPUs, for example Mac mps, use the command
-
-```bash
-python infer.py --run runs/scenario1 --device mps --samples 100 --batch-size 16 --sample-chunk 64
-```
-
-For multiple GPUs on one node, expose the allocated GPUs with your cluster's scheduler and add:
-
-```bash
-python infer.py --run runs/scenario1 --multi-gpu --samples 1000 --batch-size 32 --sample-chunk 128
-```
-
-The output `runs/scenario1/predictions.npz` contains correctly named parameter means, medians and standard deviations, and the corresponding Kᵢ statistics. Kᵢ is calculated **for every joint posterior draw**, then summarised. No silent positivity clipping is applied. Nearly zero denominators are excluded and `Ki_valid_fraction` records their effect. Check the negative-draw fractions and Kᵢ tails before interpreting maps.
-
-## 4. Make parametric images
-
-```bash
-jupyter lab notebooks/01_parametric_imaging.ipynb
-```
-
-Set the prediction and geometry paths in the first configuration cell, then run the notebook. It maps predictions through explicit voxel indices, verifies voxel column identities, displays parameter/Kᵢ summaries and saves PNG images in the run's `figures/` folder. It stops until `mapping_verified` and `orientation_and_spacing_verified` in the geometry JSON have been confirmed by the data author. A matching voxel count alone does not establish spatial correspondence.
-
-## Quick installation smoke test
-
-This tiny run checks the plumbing. It does not produce scientifically useful adapted weights.
-
-```bash
-python create_dataset.py --config configs/dataset_smoke.json
-python train.py --config configs/train_smoke.json
-python infer.py --run runs/smoke --checkpoint last.pth --output runs/smoke/predictions.npz --samples 8 --batch-size 2 --sample-chunk 4 --max-voxels 4 --allow-time-mismatch --device cpu
-python -m unittest discover -s tests -v
-```
-
-If a generated smoke dataset, run directory or prediction file already exists, move it aside before repeating the command. The viewer's partial-voxel support is for debugging only; a four-voxel smoke output is not a total-body map.
-
-## Further reading
-
-[Custom input functions](docs/CUSTOM_DATA.md) · [Data formats](docs/DATA_FORMATS.md) · [Scientific/release review](docs/RELEASE_REVIEW.md) · [Provenance](docs/DATA_PROVENANCE.md) · [Validation report](docs/VALIDATION.md)
+[Original framework](../docs/legacy-framework.md) · [Detailed formats](docs/DATA_FORMATS.md) · [Provenance](docs/DATA_PROVENANCE.md) · [Scientific review](docs/RELEASE_REVIEW.md) · [Validation](docs/VALIDATION.md)

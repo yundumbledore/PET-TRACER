@@ -1,13 +1,11 @@
-# Supporting dependencies; install PyTorch separately for your hardware.
-# This is a dependency list, not a locked cross-platform environment.
-torch
-numpy
-pandas
-jax
-scipy
-matplotlib
-tables
-tqdm
-tensorboard
-jupyterlab
-ipykernel
+# Portable workflow. Install the appropriate PyTorch build first.
+torch>=2.6
+numpy>=1.26
+pandas>=2.0
+scipy>=1.10
+matplotlib>=3.7
+tables>=3.8
+tqdm>=4.65
+tensorboard>=2.14
+jupyterlab>=4
+ipykernel>=6

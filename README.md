@@ -1,74 +1,108 @@
 # PET-TRACER
 
-### Bayesian kinetic modelling for dynamic total-body PET
-> Yun Zhao (The University of Sydney, Australia), Steven Meikle (The University of Sydney, Australia)
->
-> Contact Email: yun.zhao@sydney.edu.au, steven.meikle@sydney.edu.au
+**Bayesian kinetic modelling for dynamic total-body PET**
 
-PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) uses generative consistency models for rapid posterior estimation from tissue time–activity curves (TACs) and input functions.
+Adapt a pretrained consistency model to your tracer, time sampling schedule, and acquisition protocol.
 
-**LoRACM** extends PET-TRACER with low-rank adaptation of a pretrained consistency model. This release focuses on **Scenario 1: adapting FDG two-tissue compartment modelling from the Siemens Biograph Vision Quadra protocol to the UC Davis uEXPLORER protocol**.
+[User manual](LoRACM/README.md) · [CM from scratch](LoRACM/docs/TRAIN_CM.md) · [Installation](LoRACM/docs/INSTALLATION.md) · [UC Davis demonstration](LoRACM/docs/UCDAVIS.md) · [Original framework](docs/legacy-framework.md)
 
-[Start the LoRACM tutorial](LoRACM/README.md) · [Data formats](LoRACM/docs/DATA_FORMATS.md) · [Original framework](docs/legacy-framework.md) · [Release review](LoRACM/docs/RELEASE_REVIEW.md)
+PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) estimates kinetic parameter posteriors from tissue time–activity curves (TACs) and input functions. **LoRACM** adds low-rank adaptation: fine-tune the pretrained consistency model with labelled examples from your application, then predict on your own curves. A separate **CM from scratch** module trains a random-initialization baseline for comparison on shared held-out data.
 
-## Choose your workflow
+Team: **Yun Zhao and Steven Meikle** (The University of Sydney, Australia), **Andrew Reader** (King’s College London, UK), and **Yanan Fan** (CSIRO’s Data61, Australia). The [original framework page](docs/legacy-framework.md) contains the method introduction, figures, team information, and first-paper demonstrations.
 
-| I want to… | Start here |
+## Two ways to work
+
+| Local graphical interface | Terminal workflow |
 | :--- | :--- |
-| Explore the original pretrained model on one TAC | [Single TAC demo](Single_TAC_Demo.ipynb) |
-| Use the original total-body imaging demo | [Total-body demo](Total_Body_Parametric_Imaging_Demo.ipynb) |
-| Create an adaptation dataset and fine-tune LoRACM | [Scenario 1 tutorial](LoRACM/README.md) |
-| Predict voxel posteriors and display a coronal slice | [Inference and mapping](LoRACM/README.md#3-predict-voxel-posteriors) |
-| Adapt to my own measured input functions | [Custom data guide](LoRACM/docs/CUSTOM_DATA.md) |
+| Guided pages for protocol setup, data validation, training, and prediction. Runs locally in your browser. | The same workflow through Python commands and editable configuration files. Suitable for servers and batch jobs. |
+| [Launch the GUI](LoRACM/docs/INSTALLATION.md#launch-the-gui) | [Terminal quick start](LoRACM/README.md#terminal-quick-start) |
 
-## From input functions to parametric maps
+The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and Linux** with Python 3.11. CPU is the common baseline; PyTorch can use a supported CUDA GPU or Apple MPS device. The preserved research generator has separate [JAX installation requirements](LoRACM/docs/INSTALLATION.md#optional-legacy-research-generator).
+
+![PET-TRACER local workbench with LoRACM, scratch CM and shared prediction workflows](Assets/LoRACM_Workbench.jpg)
+
+## Start here
+
+1. **[Install the environment](LoRACM/docs/INSTALLATION.md)** and launch the GUI or open a terminal.
+2. **[Run the UC Davis demonstration](LoRACM/docs/UCDAVIS.md)** to learn the workflow with supplied data and foundation weights.
+3. Choose your data route:
+   - **[Simulate labelled pairs](LoRACM/docs/MODELS_AND_PROTOCOLS.md)** using 2TC or your own kinetic model, measured AIFs or a fitted Feng cohort, and your frame schedule.
+   - **[Prepare your own dataset](LoRACM/docs/PREPARE_DATA.md)** and validate its format before training.
+4. **[Fine-tune](LoRACM/docs/FINE_TUNING.md)** with defaults of **100,000 training pairs, LoRA rank 8, alpha 16**; track training and validation loss. For a baseline, **[train a CM from scratch](LoRACM/docs/TRAIN_CM.md)** on the same pairs.
+5. **[Predict on your own project](LoRACM/docs/PREDICTION.md)** in batches, or analyse one TAC with parameter posterior histograms and a nonlinear least-squares comparison.
 
 ```mermaid
 flowchart LR
-    A[Measured AIFs + parameter priors] --> B[Simulated TAC–AIF pairs]
-    B --> C[LoRA fine-tuning]
-    P[Pretrained consistency model] --> C
-    C --> D[Adapted model + scaling]
-    R[Dynamic PET voxel TACs + AIF] --> E[Posterior inference]
-    D --> E
-    E --> F[Parameter and Ki summaries]
-    F --> G[Coronal parametric maps]
-    M[Verified spatial mapping] --> G
+    A[Your kinetic model + input functions + protocol] --> B[Simulated labelled pairs]
+    C[Your own labelled dataset] --> D[Validate data]
+    B --> D
+    D --> E[LoRACM fine-tuning]
+    D --> M[CM training from scratch]
+    F[Pretrained consistency model] --> E
+    E --> G[Adapted model]
+    H[Your testing TACs + input functions] --> I[Posterior prediction]
+    G --> I
+    M --> I
+    I --> J[Parameter samples + summaries]
+    H --> K[Nonlinear least squares]
+    J --> L[Single-TAC comparison]
+    K --> L
 ```
 
-The demo estimates **K₁, k₂, k₃, k₄ and Vᵦ**, and derives **Kᵢ** from joint posterior draws. It provides a single coronal slice spanning the body; it does not distribute a complete 3D patient volume. The new manuscript also studies SRTM and AATH adaptation; those scenarios are outside this demo release.
+## What you can do
 
-## Repository layout
+| Feature | Guide |
+| :--- | :--- |
+| Choose 2TC or define a custom single-input ODE with a different parameter set | [Kinetic models and transfer limits](LoRACM/docs/MODELS_AND_PROTOCOLS.md#kinetic-models) |
+| Use measured AIFs, fit a cohort with Feng, and simulate new inputs | [Input functions](LoRACM/docs/MODELS_AND_PROTOCOLS.md#input-functions) |
+| Set isotope half-life/decay, frame midpoints, durations, noise, and observation convention | [Acquisition protocol](LoRACM/docs/MODELS_AND_PROTOCOLS.md#acquisition-protocol) |
+| Check your labelled training/validation/test file | [Dataset preparation](LoRACM/docs/PREPARE_DATA.md) |
+| Select dataset size, LoRA rank/alpha, and training settings | [Fine-tuning](LoRACM/docs/FINE_TUNING.md) |
+| Train a new CM without foundation weights and compare it with LoRACM | [Scratch training and paired evaluation](LoRACM/docs/TRAIN_CM.md) |
+| Configure epochs, learning rate, embedding width, architecture and automatic data dimensions | [Shared training settings](LoRACM/docs/TRAIN_CM.md#defaults-and-settings) |
+| Follow losses and export an adapted model | [Training progress and outputs](LoRACM/docs/FINE_TUNING.md#progress-and-outputs) |
+| Predict batches or inspect one TAC, its posterior samples, and dashed NLS estimates | [Prediction manual](LoRACM/docs/PREDICTION.md) |
+| Display a parametric image with verified voxel geometry | [UC Davis imaging demonstration](LoRACM/docs/UCDAVIS.md#4-make-parametric-images) |
+| Reproduce the original first-paper examples | [Legacy page](docs/legacy-framework.md) · [Single TAC](Single_TAC_Demo.ipynb) · [Total-body imaging](Total_Body_Parametric_Imaging_Demo.ipynb) |
+
+## Original framework and LoRACM
+
+The first-paper framework remains accessible at **[docs/legacy-framework.md](docs/legacy-framework.md)**. Original source, notebooks, sample data, and pretrained assets retain their paths, so a paper link to this repository still leads to the original material. Existing published GitHub release archives are unchanged by this update.
+
+LoRACM's included research example adapts **FDG–2TCM from the Siemens Biograph Vision Quadra protocol to the UC Davis uEXPLORER protocol**. Its preserved settings (rank 4, alpha 8) are distinct from new-project defaults. Custom models are supported through a documented plugin contract; transferring compatible weights to a new model or tracer still requires application-specific validation.
+
+## Repository map
 
 ```text
 PET-TRACER/
-├── README.md                              # Project entry point
-├── Source/                                # Original framework (preserved)
-├── Pretrained/                            # Original model assets (preserved)
-├── Sample_data/                           # Original examples (preserved)
-├── Single_TAC_Demo.ipynb                   # Original demo (preserved)
-├── Total_Body_Parametric_Imaging_Demo.ipynb # Original demo (preserved)
-├── Assets/                                # Existing figures (preserved)
-├── docs/legacy-framework.md                # Archived original README
-└── LoRACM/                                # Adaptation workflow
-    ├── configs/                           # Manuscript settings and smoke test
-    ├── create_dataset.py                  # Measured AIF → simulated pairs
-    ├── train.py                           # Foundation → adapted checkpoint
-    ├── infer.py                           # TACs → posterior summaries
-    ├── notebooks/                         # Parametric imaging viewer
-    ├── data/                              # AIFs, simulation pairs, real slice
-    ├── checkpoints/                       # Foundation weights
-    ├── docs/                              # Formats, provenance, release notes
-    └── tests/                             # Interface and mapping checks
+├── README.md                       Project overview and manual index
+├── launch_gui.py                   Cross-platform local GUI launcher
+├── Launch PET-TRACER.command        macOS launcher
+├── Launch PET-TRACER.cmd            Windows launcher
+├── launch_gui.sh                    Linux/macOS launcher
+├── docs/legacy-framework.md        Original framework page
+├── Source/, Pretrained/, Sample_data/, Assets/
+├── Single_TAC_Demo.ipynb, Total_Body_Parametric_Imaging_Demo.ipynb
+└── LoRACM/
+    ├── README.md                   Step-by-step user manual
+    ├── gui/                        Guided local interface
+    ├── configs/, examples/         Editable configs, schedule and custom model
+    ├── protocol.py                 Dataset/protocol validation
+    ├── fit_feng.py, simulate_protocol.py
+    ├── train.py, train_cm.py        LoRACM adaptation and scratch CM training
+    ├── infer.py, compare_models.py  Shared prediction and paired comparison
+    ├── analyse_tac.py, plot_posteriors.py
+    ├── create_dataset.py            Preserved UC Davis research generator
+    ├── data/, checkpoints/, notebooks/
+    ├── docs/, tests/
+    └── workspaces/                 Your projects and outputs (Git-ignored)
 ```
 
-## Research
+## Research, support, and licence
 
-- **Original framework:** *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET* has been published on [IEEE Transactions on Medical Imaging]([https://arxiv.org/abs/2509.13614](https://ieeexplore.ieee.org/abstract/document/11517565)).
-- **LoRACM extension:** *A General-Purpose Adaptable Foundation Model for Total-Body PET Kinetic Modelling*. Manuscript in preparation for submission to IEEE Transactions on Medical Imaging. Citation metadata will be added when available.
+- **Original paper:** *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET*. [IEEE Transactions on Medical Imaging](https://ieeexplore.ieee.org/abstract/document/11517565).
+- **LoRACM:** *A General-Purpose Adaptable Foundation Model for Total-Body PET Kinetic Modelling*. The repository describes the manuscript as in preparation; public citation metadata will be added when available.
 
-When using LoRACM, please cite both the original framework and the adaptation paper once its public reference is available. Model performance and runtime statements belong to their reported experiments; the smoke test is an installation check.
+Please cite the original framework and the adaptation paper when its public reference is available. For help, [open an issue](https://github.com/yundumbledore/PET-TRACER/issues) or contact **yun.zhao@sydney.edu.au** / **steven.meikle@sydney.edu.au**.
 
-## Support and licensing
-
-For questions, open a GitHub issue or contact Yun Zhao at **yun.zhao@sydney.edu.au**. The existing [MIT licence](LICENSE) covers the software. Dataset and model redistribution terms are recorded separately in [data provenance](LoRACM/docs/DATA_PROVENANCE.md); a software licence does not establish permission to redistribute clinical data.
+Software: [MIT licence](LICENSE). Assets: [data and model provenance](LoRACM/docs/DATA_PROVENANCE.md). Checks performed and their limits: [validation report](LoRACM/docs/VALIDATION.md). Historical file inventory: [release manifest](MANIFEST.json), whose original hashes describe the earlier archive rather than this working-tree update.

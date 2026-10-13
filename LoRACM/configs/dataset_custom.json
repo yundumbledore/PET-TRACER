@@ -1,0 +1,69 @@
+{
+  "aif_csv": "data/aif/UCDavis_1H35.csv",
+  "output": "workspaces/my_project/dataset.npz",
+  "n_train": 100000,
+  "n_val": 10000,
+  "n_test": 1000,
+  "seed": 42,
+  "chunk_size": 256,
+  "half_life_min": 109.8,
+  "noise_prior": {
+    "type": "uniform",
+    "min": 0.1,
+    "max": 7
+  },
+  "kinetic_priors": {
+    "K1": {
+      "type": "uniform",
+      "min": 0.0001,
+      "max": 2.0
+    },
+    "k2": {
+      "type": "uniform",
+      "min": 0.0001,
+      "max": 2.0
+    },
+    "k3": {
+      "type": "uniform",
+      "min": 0.0001,
+      "max": 0.5
+    },
+    "k4": {
+      "type": "uniform",
+      "min": 0.0001,
+      "max": 0.2
+    },
+    "Vb": {
+      "type": "uniform",
+      "min": 0.001,
+      "max": 1.0
+    }
+  },
+  "test_prior_scale": 1.0,
+  "model": "2TC",
+  "parameter_names": [
+    "K1",
+    "k2",
+    "k3",
+    "k4",
+    "Vb"
+  ],
+  "aif_mode": "measured",
+  "aif_before_first": "zero_at_origin",
+  "t_meas": [
+    0.5,
+    1.5,
+    2.5,
+    3.5,
+    4.5
+  ],
+  "frame_durations_min": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "observation": "midpoint",
+  "integration_step_min": 0.01
+}

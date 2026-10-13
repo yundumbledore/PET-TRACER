@@ -1,4 +1,8 @@
-# PET-TRACER
+# PET-TRACER · Original framework
+
+[Current project overview](../README.md) · [LoRACM user manual](../LoRACM/README.md) · [Current cross-platform installation](../LoRACM/docs/INSTALLATION.md)
+
+> Archived first-paper introduction and workflow. The installation notes and performance statements below describe the original release; use the linked current installation guide for the new GUI/terminal workflow.
 PET-TRACER (PET **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) 
 #### Yun Zhao (The University of Sydney, Australia), Steven Meikle (The University of Sydney, Australia), Andrew Reader (King's College London, UK), Yanan Fan (CSIRO's Data61, Australia)
 
@@ -68,8 +72,8 @@ To ensure everything is configured correctly:
 ## Getting Started
 Two examples are provided to show the usage of **PET-TRACER**.
    
-1. Single_TAC_demo.ipynb demonstrates posterior estimation from single TAC and AIF pair.
-2. Total_body_parametric_imaging_demo.ipynb demonstrates generating parametric imaging of $K_i$ from total body dynamic PET.
+1. [Single_TAC_Demo.ipynb](../Single_TAC_Demo.ipynb) demonstrates posterior estimation from single TAC and AIF pair.
+2. [Total_Body_Parametric_Imaging_Demo.ipynb](../Total_Body_Parametric_Imaging_Demo.ipynb) demonstrates generating parametric imaging of $K_i$ from total body dynamic PET.
 
 ## Adaptation to your data
 The consistency model in PET-TRACER was trained and validated on dynamic PET curves discretized into 35 frames, as shown below. Because the posterior inference network expects input TACs and AIFs sampled at these exact time points, you should resample your real dynamic PET data to this same 35-frame schedule before running inference. Likewise, if you’re generating synthetic data for training or testing, be sure to simulate both the tissue time–activity curve and arterial input function at these 35 time points. This alignment ensures that the model’s learned temporal features correctly match your input, enabling accurate, uncertainty-aware kinetic parameter estimation.

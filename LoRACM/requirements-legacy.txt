@@ -1,0 +1,3 @@
+-r requirements.txt
+# Optional preserved research simulation engine. See platform notes.
+jax
