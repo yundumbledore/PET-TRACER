@@ -2,7 +2,7 @@
 
 **Bayesian kinetic modelling for dynamic total-body PET**
 
-Adapt a pretrained consistency model to your tracer, time sampling schedule, and acquisition protocol.
+Latest Release: Adapt a pretrained consistency model to your tracer, time sampling schedule, and acquisition protocol.
 
 [User manual](LoRACM/README.md) · [Installation](LoRACM/docs/INSTALLATION.md) · [UC Davis steps 1–6](LoRACM/docs/UCDAVIS.md) · [Parametric imaging](LoRACM/docs/PARAMETRIC_IMAGING.md) · [Original framework](docs/legacy-framework.md)
 
