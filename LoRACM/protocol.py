@@ -73,6 +73,42 @@ def validate_protocol(cfg):
     return t, duration
 
 
+def load_measured_inputs(cfg, end=None):
+    """Read original AIF samples, applying only explicit endpoint assumptions."""
+    import pandas as pd
+    if end is None:
+        times, durations = validate_protocol(cfg)
+        end = times[-1]+durations[-1]/2 if cfg.get('observation', 'midpoint') == 'frame_average' else times[-1]
+    frame = pd.read_csv(cfg['aif_csv'])
+    t = validate_times(frame.iloc[:, 0].to_numpy(), 'AIF times', allow_zero=True)
+    aifs = frame.iloc[:, 1:].to_numpy(dtype=float).T
+    if aifs.shape[0] < 1 or not np.isfinite(aifs).all() or np.any(aifs < 0):
+        raise ValueError('AIF CSV requires at least one finite nonnegative activity column')
+    origin = cfg.get('aif_before_first', 'require_zero')
+    tail = cfg.get('aif_after_last', 'require_coverage')
+    if origin not in ('require_zero', 'zero_at_origin'):
+        raise ValueError('aif_before_first must be require_zero or zero_at_origin')
+    if tail not in ('require_coverage', 'hold_last'):
+        raise ValueError('aif_after_last must be require_coverage or hold_last')
+    problems = []
+    if t[0] > 0 and origin != 'zero_at_origin':
+        problems.append(f'first sample is at {t[0]:.9g} min; include time zero or select '
+                        'aif_before_first="zero_at_origin" (assume zero activity at time zero)')
+    if t[-1] < end-1e-8 and tail != 'hold_last':
+        boundary = 'end of the last frame' if cfg.get('observation', 'midpoint') == 'frame_average' else 'last measurement midpoint'
+        problems.append(f'last sample is at {t[-1]:.9g} min, but the {boundary} is at {end:.9g} min; '
+                        'provide later samples or select aif_after_last="hold_last" (hold the final measured value)')
+    if problems:
+        raise ValueError('Measured AIF coverage needs attention: '+'; '.join(problems)+'.')
+    if t[0] > 0:
+        t = np.r_[0., t]
+        aifs = np.column_stack([np.zeros(len(aifs)), aifs])
+    if t[-1] < end and tail == 'hold_last':
+        t = np.r_[t, end]
+        aifs = np.column_stack([aifs, aifs[:, -1]])
+    return t, aifs
+
+
 class TwoTC:
     PARAMETER_NAMES = ['K1', 'k2', 'k3', 'k4', 'Vb']
     STATE_SIZE = 2
@@ -188,6 +224,8 @@ if __name__ == '__main__':
     if args.config:
         cfg = load_protocol(args.config)
         validate_protocol(cfg); load_model(cfg)
+        if cfg.get('aif_mode', 'measured') == 'measured':
+            load_measured_inputs(cfg)
         print(json.dumps({'protocol_valid': True, 'parameter_names': cfg['parameter_names'],
                           'frames':len(cfg['t_meas'])}, indent=2))
     elif args.dataset:

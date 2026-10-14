@@ -1,5 +1,11 @@
 # Workflow validation
 
+## Original UC Davis measured AIFs — 14 October 2026
+
+**42/42 automated checks passed** on the same Python 3.11 / PyTorch 2.6.0 Apple Silicon CPU environment. UC Davis now defaults to the unchanged original `data/aif/UCDavis_1H35.csv`; the intermediate resampled CSV has been removed. The simulator interpolates directly from original samples, with explicitly saved zero-origin and final-value-hold policies.
+
+New regression checks verify original AIF samples remain unchanged; midpoint coverage ends at 57.5 minutes while frame-average coverage ends at 60 minutes; strict coverage and invalid policies are rejected; small 32 / 16 / 8 datasets generate and validate in both observation modes; source checksums and boundary policies are saved; and GUI coverage checks prevent an invalid protocol or dataset job from being launched. The GUI's endpoint choice survives page navigation. Existing projects keep their saved settings and need to select the endpoint policies explicitly in step 1. This change does not alter the acceleration code or establish scientific posterior accuracy.
+
 ## Project persistence, inference and early stopping — 14 October 2026
 
 **36/36 automated checks passed** on the existing Python 3.11 / PyTorch 2.6.0 Apple Silicon CPU environment. Added checks cover arbitrary page navigation, project switching and browser-session restoration of unfinished edits; pending voxel analyses clearing old results; lowest-validation checkpoint selection after an early stop before the historical epoch-151 threshold; per-epoch snapshot selection; LoRA weight folding for linear/convolution/transposed-convolution layers; automatic device routing; MPS expanded-batch limits; cooperative cancellation and structured progress; and forward simulation at the posterior medians of both LoRACM and scratch CM.
@@ -18,7 +24,7 @@ The small UC Davis protocol generated 32 / 16 / 8 labelled pairs on the patient'
 
 Browser review confirmed a foreground image click selects the matching voxel ID and displays the TAC plus input function and posterior KDE beside the map. Switching from Kᵢ to K₁ and selecting 95% interval-width maps updates the image and corresponding posterior. Voxel samples are cached; whole-image draws are not stored. The author confirmed the supplied geometry's mapping and display convention.
 
-The walkthrough uses an explicitly aligned AIF CSV, actual frame durations and RK4; historical Euler-generated Scenario 1 files remain separate. The two-epoch weights and eight-draw maps are installation artifacts, not scientific results. Windows/Linux hosted CI, acceleration and full research training remain unverified on these local changes.
+That earlier walkthrough validation used an intermediate resampled input file, actual frame durations and RK4. Current defaults read the original AIF CSV directly, as checked above; historical Euler-generated Scenario 1 files remain separate. The two-epoch weights and eight-draw maps are installation artifacts, not scientific results. Windows/Linux hosted CI, acceleration and full research training remain unverified on these local changes.
 
 ## Local browser and terminal workflows — 13 October 2026
 

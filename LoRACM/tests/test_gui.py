@@ -110,6 +110,44 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(next(w for w in app.number_input if w.label=='Rank').value,4)
         self.assertEqual(next(w for w in app.number_input if w.label=='Alpha').value,8.)
 
+    def test_original_aif_defaults_and_coverage_checked_before_saving(self):
+        from streamlit.testing.v1 import AppTest
+        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app.sidebar.radio[0].set_value('1 · Model & protocol').run()
+        self.assertEqual(Path(next(w for w in app.text_input if w.label=='Measured AIF CSV').value).name,'UCDavis_1H35.csv')
+        self.assertTrue(next(w for w in app.checkbox if w.label.startswith('If the first AIF')).value)
+        tail=next(w for w in app.selectbox if w.label=='After the final AIF sample')
+        self.assertEqual(tail.value,'hold_last')
+        tail.set_value('require_coverage').run()
+        self.assertTrue(any('last measurement midpoint' in w.value for w in app.warning))
+        next(w for w in app.button if w.label=='Save and validate protocol').click().run()
+        workspace=Path(self.workspace.name)/'my_project'
+        self.assertFalse((workspace/'protocol.json').exists())
+        self.assertTrue(any('57.5 min' in w.value for w in app.error))
+        next(w for w in app.selectbox if w.label=='After the final AIF sample').set_value('hold_last').run()
+        next(w for w in app.button if w.label=='Save and validate protocol').click().run()
+        self.assertFalse(list(app.exception))
+        cfg=json.loads((workspace/'protocol.json').read_text())
+        self.assertEqual((cfg['aif_before_first'],cfg['aif_after_last']),('zero_at_origin','hold_last'))
+        app.sidebar.radio[0].set_value('2 · Dataset').run()
+        app.sidebar.radio[0].set_value('1 · Model & protocol').run()
+        self.assertEqual(next(w for w in app.selectbox if w.label=='After the final AIF sample').value,'hold_last')
+
+    def test_dataset_preflight_rejects_incomplete_saved_aif_before_launch(self):
+        from streamlit.testing.v1 import AppTest
+        from ucdavis import defaults
+        workspace=Path(self.workspace.name)/'my_project';workspace.mkdir()
+        cfg,_=defaults(workspace,small=True)
+        cfg['aif_after_last']='require_coverage'
+        (workspace/'protocol.json').write_text(json.dumps(cfg))
+        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app.sidebar.radio[0].set_value('2 · Dataset').run()
+        with patch('gui.jobs.Jobs.start') as start:
+            next(w for w in app.button if w.label=='Generate dataset').click().run()
+            start.assert_not_called()
+        self.assertFalse(list(app.exception))
+        self.assertTrue(any('last measurement midpoint' in w.value for w in app.error))
+
     def test_all_pages_render(self):
         from streamlit.testing.v1 import AppTest
         app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()

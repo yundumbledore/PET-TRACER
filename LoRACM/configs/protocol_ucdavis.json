@@ -1,5 +1,5 @@
 {
-  "aif_csv": "data/aif/UCDavis_Sub001_schedule.csv",
+  "aif_csv": "data/aif/UCDavis_1H35.csv",
   "output": "workspaces/ucdavis_walkthrough/dataset.npz",
   "n_train": 50000,
   "n_val": 100000,
@@ -49,7 +49,8 @@
     "Vb"
   ],
   "aif_mode": "measured",
-  "aif_before_first": "require_zero",
+  "aif_before_first": "zero_at_origin",
+  "aif_after_last": "hold_last",
   "t_meas": [
     0.041666666666666664,
     0.125,
@@ -127,5 +128,5 @@
   "observation": "midpoint",
   "integration_step_min": 0.01,
   "source_preset": "UC Davis Scenario 1: Sub001 imaging schedule",
-  "input_alignment": "Four released AIFs linearly interpolated onto the Sub001 midpoints; zero at origin and final value held to 60 min. Original source CSV is unchanged."
+  "input_interpolation": "Use the four original AIFs and times directly from UCDavis_1H35.csv. Linear interpolation on the integration grid, zero at origin and final value held to the required simulation end. Source CSV is unchanged."
 }

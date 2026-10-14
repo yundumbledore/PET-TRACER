@@ -5,25 +5,9 @@ import json
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from protocol import validate_protocol, validate_times, load_model, feng_curve, FENG_NAMES, load_protocol
+from protocol import validate_protocol, load_model, feng_curve, FENG_NAMES, load_protocol, load_measured_inputs as load_inputs
 from common import validate_dataset
 from runtime import Progress, check_cancelled
-
-
-def load_inputs(cfg, end):
-    frame = pd.read_csv(cfg['aif_csv'])
-    t = validate_times(frame.iloc[:, 0].to_numpy(), 'AIF times', allow_zero=True)
-    aifs = frame.iloc[:, 1:].to_numpy(dtype=float).T
-    if aifs.shape[0] < 1 or not np.isfinite(aifs).all() or np.any(aifs < 0):
-        raise ValueError('AIF CSV requires at least one finite nonnegative activity column')
-    if t[-1] < end-1e-8:
-        raise ValueError('Measured AIF must cover the full last frame; extend it explicitly or use midpoint observations')
-    if t[0] > 0:
-        if cfg.get('aif_before_first') != 'zero_at_origin':
-            raise ValueError('AIF must include time zero or explicitly select aif_before_first=zero_at_origin')
-        t = np.r_[0., t]
-        aifs = np.column_stack([np.zeros(len(aifs)), aifs])
-    return t, aifs
 
 
 def integrate(model, parameters, inputs, grid):
@@ -141,6 +125,10 @@ def main(cfg):
                 'split_policy':'Independent parameter/noise draws, shared measured/fitted AIF pool; not subject-held-out'}
     if cfg.get('model') == 'custom':
         metadata['model_sha256'] = hashlib.sha256(Path(cfg['model_file']).read_bytes()).hexdigest()
+    if source == 'measured':
+        metadata['input_boundary_policy'] = {'before_first':cfg.get('aif_before_first', 'require_zero'),
+                                             'after_last':cfg.get('aif_after_last', 'require_coverage'),
+                                             'required_end_min':float(end), 'interpolation':'linear on original CSV times'}
     path.with_suffix('.json').write_text(json.dumps(metadata,indent=2)+'\n', encoding='utf-8')
     progress.update(total_pairs,state='complete',output=str(path))
     print(f'Saved {path}',flush=True)

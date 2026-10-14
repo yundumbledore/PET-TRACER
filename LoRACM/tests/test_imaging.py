@@ -10,7 +10,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from common import summarize_samples
 from parametric_imaging import load_image,plane,parameter_samples
 from ucdavis import defaults
-from protocol import validate_protocol
+from protocol import validate_protocol, load_measured_inputs
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -59,7 +59,12 @@ class ImagingTests(unittest.TestCase):
         np.testing.assert_allclose(t,patient.iloc[:,1],atol=1e-12)
         np.testing.assert_allclose(d,patient.iloc[:,0],atol=1e-12)
         aif=pd.read_csv(cfg['aif_csv'])
-        self.assertEqual(aif.shape[1],5);self.assertEqual(aif.iloc[0,0],0);self.assertEqual(aif.iloc[-1,0],60)
+        self.assertEqual(Path(cfg['aif_csv']).name,'UCDavis_1H35.csv')
+        self.assertEqual(aif.shape[1],5);self.assertGreater(aif.iloc[0,0],0)
+        self.assertLess(aif.iloc[-1,0],t[-1])
+        input_t,pool=load_measured_inputs(cfg)
+        self.assertEqual((input_t[0],input_t[-1]),(0,t[-1]))
+        np.testing.assert_array_equal(pool[:,1:-1],aif.iloc[:,1:].to_numpy().T)
         self.assertEqual((cfg['n_train'],cfg['n_val'],cfg['n_test']),(50000,100000,100))
         self.assertEqual((training['lora_r'],training['lora_alpha']),(4,8))
         small,short=defaults(Path('workspaces/test_fixture'),small=True)

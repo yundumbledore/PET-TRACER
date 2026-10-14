@@ -24,7 +24,7 @@ python launch_gui.py
 
 The browser interface runs on your computer. **Project name** selects a folder under `LoRACM/workspaces/`; configs, uploaded files, logs, runs and analyses stay there. Use a new project/run name for an independent experiment. A single active background job is allowed per browser session. Its status and log remain available while you switch pages; keep the application running while jobs execute.
 
-**UC Davis Scenario 1 is the default example setup.** Follow numbered steps 1–6 with its 2TC model, four AIFs and patient-aligned 35-frame schedule. Choose **Quick installation check** before saving step 1 for a quick check, or retain full research-sized settings. **My own project** supplies the general defaults below. Settings and unfinished edits are retained across pages and browser sessions. Use a fresh project name for independent settings. [Read the GUI guide](docs/WORKBENCH.md) for project defaults, early stopping and inference controls.
+**UC Davis Scenario 1 is the default example setup.** Follow numbered steps 1–6 with its 2TC model, four original AIFs from `UCDavis_1H35.csv` and Sub001's 35-frame schedule. Choose **Quick installation check** before saving step 1 for a quick check, or retain full research-sized settings. **My own project** supplies the general defaults below. Settings and unfinished edits are retained across pages and browser sessions. Use a fresh project name for independent settings. [Read the GUI guide](docs/WORKBENCH.md) for project defaults, early stopping and inference controls.
 
 Terminal users run the following workflow commands from **`PET-TRACER/LoRACM`**. Relative config paths are interpreted from that directory. Absolute paths also work; quote paths containing spaces.
 
@@ -92,6 +92,6 @@ If using your own fine-tuning file, change `dataset_dir` in the training config 
 
 ## UC Davis example and original material
 
-The [UC Davis guide](docs/UCDAVIS.md) covers the complete numbered GUI/terminal route, supplied assets, small/full runs, posterior inference and interactive imaging. The portable walkthrough aligns AIFs to the measured patient schedule and uses explicit frame durations with RK4. The separate shortcut page and optional JAX generator preserve the earlier AIF-grid simulation conventions.
+The [UC Davis guide](docs/UCDAVIS.md) covers the complete numbered GUI/terminal route, supplied assets, small/full runs, posterior inference and interactive imaging. The portable walkthrough reads the original AIF CSV directly, uses explicit endpoint assumptions, and observes curves on the measured patient schedule with actual frame durations and RK4. The separate shortcut page and optional JAX generator preserve the earlier AIF-grid simulation conventions.
 
 [Original framework](../docs/legacy-framework.md) · [Detailed formats](docs/DATA_FORMATS.md) · [Provenance](docs/DATA_PROVENANCE.md) · [Scientific review](docs/RELEASE_REVIEW.md) · [Validation](docs/VALIDATION.md)

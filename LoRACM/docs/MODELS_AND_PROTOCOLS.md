@@ -43,7 +43,20 @@ time_min,subject_01,subject_02
 1,4000,4200
 ```
 
-Provide the full observation-window coverage and finite nonnegative activity. The AIF grid can be denser than the output frame schedule. The simulator interpolates each measured curve and randomly selects one curve for each pair. If the first AIF measurement is after zero, explicitly select `aif_before_first="zero_at_origin"` to insert a zero origin; otherwise include time zero yourself.
+Provide finite nonnegative activity. The AIF grid can differ from the output frame schedule. The simulator reads the original CSV samples, linearly interpolates on its integration grid and randomly selects one curve for each pair. It never rewrites or creates a resampled AIF CSV.
+
+Set endpoint assumptions in **1 · Model & protocol**, or in the terminal protocol JSON:
+
+| Setting | Behaviour |
+| :--- | :--- |
+| `aif_before_first="require_zero"` | Require an AIF sample at time zero (default if omitted) |
+| `aif_before_first="zero_at_origin"` | Insert zero activity at the origin, then interpolate to the first original sample |
+| `aif_after_last="require_coverage"` | Require samples through the simulation end (default if omitted) |
+| `aif_after_last="hold_last"` | Keep each curve's final measured value constant through the simulation end |
+
+Midpoint observations need input coverage through the **last measurement midpoint**; frame averages need coverage through the **end of the last frame**. Holding the final value is an approximation, so choose it deliberately or provide additional measured samples. GUI preview, protocol validation and dataset generation check the same rules. The saved dataset provenance records both policies and the source-file checksum.
+
+**UC Davis defaults use the original `data/aif/UCDavis_1H35.csv`**, with `zero_at_origin` and `hold_last`. Its last sample is at 57.48521667 minutes; the Sub001 schedule requires 57.5 minutes for midpoint observations or 60 minutes for frame averages. The default policies handle those boundaries without changing the source file.
 
 A small AIF pool is acceptable, but repeated use does not create new independent subjects. Input units, tracer metabolite correction, plasma/blood treatment and delay/dispersion conventions must agree between simulation and testing.
 

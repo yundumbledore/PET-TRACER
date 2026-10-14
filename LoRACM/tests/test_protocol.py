@@ -6,10 +6,11 @@ import tempfile
 import unittest
 import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from protocol import validate_protocol, validate_file, read_prediction_input, load_model, feng_curve
+from protocol import validate_protocol, validate_file, read_prediction_input, load_model, feng_curve, load_measured_inputs
 from simulate_protocol import integrate, observe_frames, main as simulate
 from analyse_tac import fit, predict_curve
 from common import summarize_samples, validate_dataset
+from ucdavis import defaults
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -88,6 +89,64 @@ class ProtocolTests(unittest.TestCase):
             simulate(cfg)
             self.assertEqual(validate_file(folder/'data.npz')['counts']['train'],4)
             with self.assertRaises(FileExistsError):simulate(cfg)
+
+    def test_original_ucdavis_samples_preserved_with_explicit_boundaries(self):
+        import pandas as pd
+        cfg,_=defaults(Path('workspaces/test_fixture'),small=True)
+        raw=pd.read_csv(cfg['aif_csv'])
+        for mode,end in [('midpoint',57.5),('frame_average',60.)]:
+            with self.subTest(mode=mode):
+                cfg['observation']=mode
+                t,pool=load_measured_inputs(cfg)
+                np.testing.assert_array_equal(t[1:-1],raw.iloc[:,0])
+                np.testing.assert_array_equal(pool[:,1:-1],raw.iloc[:,1:].to_numpy().T)
+                self.assertEqual(t[0],0);self.assertEqual(t[-1],end)
+                np.testing.assert_array_equal(pool[:,0],np.zeros(4))
+                np.testing.assert_array_equal(pool[:,-1],raw.iloc[-1,1:])
+
+    def test_missing_aif_coverage_reports_actual_observation_boundary(self):
+        cfg,_=defaults(Path('workspaces/test_fixture'),small=True)
+        cfg['aif_after_last']='require_coverage'
+        with self.assertRaisesRegex(ValueError,'last measurement midpoint is at 57.5 min'):
+            load_measured_inputs(cfg)
+        cfg['observation']='frame_average'
+        with self.assertRaisesRegex(ValueError,'end of the last frame is at 60 min'):
+            load_measured_inputs(cfg)
+        cfg['aif_after_last']='hold_last';cfg['aif_before_first']='require_zero'
+        with self.assertRaisesRegex(ValueError,'first sample is at .*zero_at_origin'):
+            load_measured_inputs(cfg)
+
+    def test_invalid_boundary_policy_rejected_even_with_complete_coverage(self):
+        cfg=config();cfg['aif_csv']=str(ROOT/cfg['aif_csv'])
+        cfg['aif_after_last']='extrapolate'
+        with self.assertRaisesRegex(ValueError,'aif_after_last must be'):
+            load_measured_inputs(cfg)
+        cfg['aif_after_last']='require_coverage';cfg['aif_before_first']='hold_first'
+        with self.assertRaisesRegex(ValueError,'aif_before_first must be'):
+            load_measured_inputs(cfg)
+
+    def test_ucdavis_original_csv_simulates_both_observation_modes(self):
+        import hashlib
+        import pandas as pd
+        with tempfile.TemporaryDirectory() as folder:
+            cfg,_=defaults(Path(folder),small=True)
+            source=Path(cfg['aif_csv']);original=source.read_bytes()
+            raw=pd.read_csv(source)
+            for mode in ('midpoint','frame_average'):
+                with self.subTest(mode=mode):
+                    cfg.update(observation=mode,output=str(Path(folder)/(mode+'.npz')))
+                    simulate(cfg)
+                    self.assertEqual(validate_file(cfg['output'])['counts'],{'train':32,'val':16,'test':8})
+                    metadata=json.loads(Path(cfg['output']).with_suffix('.json').read_text())
+                    self.assertEqual(metadata['source_sha256'],hashlib.sha256(original).hexdigest())
+                    self.assertEqual(metadata['input_boundary_policy']['after_last'],'hold_last')
+                    with np.load(cfg['output'],allow_pickle=False) as data:
+                        self.assertTrue(np.isfinite(data['y_train']).all())
+                        if mode=='midpoint':
+                            expected=np.array([np.interp(cfg['t_meas'],np.r_[0.,raw.iloc[:,0]],np.r_[0.,raw.iloc[:,i+1]])
+                                               for i in data['aif_index_train']])
+                            np.testing.assert_allclose(data['y_train'][:,len(cfg['t_meas']):],expected,rtol=1e-12)
+            self.assertEqual(source.read_bytes(),original)
 
 
 if __name__=='__main__':unittest.main()

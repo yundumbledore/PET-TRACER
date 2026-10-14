@@ -10,7 +10,7 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from protocol import validate_protocol, validate_file, read_prediction_input, load_model
+from protocol import validate_protocol, validate_file, read_prediction_input, load_model, load_measured_inputs
 from gui.jobs import Jobs
 from gui import state as project_state
 from gui.state import checkpoint_picker, model_run_picker
@@ -141,7 +141,7 @@ elif page == '1 · Model & protocol':
     st.title('1 · Define kinetics, input functions and timing')
     saved = json.loads(protocol_path.read_text(encoding='utf-8')) if protocol_path.exists() else default_protocol.copy()
     if preset==PRESETS[0] and (not protocol_path.exists() or saved.get('workflow_preset')==PRESETS[0]):
-        st.caption('UC Davis defaults: FDG 2TC, four measured AIFs, 35 Sub001 frames over 60 minutes and half-life 109.8 minutes. The original AIFs are explicitly aligned to the patient schedule for steps 4–6.')
+        st.caption('UC Davis defaults: FDG 2TC, four original AIFs from UCDavis_1H35.csv, 35 Sub001 frames over 60 minutes and half-life 109.8 minutes. The simulator uses the original AIF time points with linear interpolation, zero at the origin and the last value held where needed.')
     elif protocol_path.exists():
         st.caption('Using this project’s saved protocol. Choose a fresh project name to start from an unchanged template.')
     model_choice = st.selectbox('Kinetic model',['2TC','custom'],index=0 if saved.get('model')=='2TC' else 1,key='model_'+profile)
@@ -172,10 +172,11 @@ elif page == '1 · Model & protocol':
     aif_mode = st.selectbox('Input function source',['measured','feng_cohort'],index=0 if saved.get('aif_mode')=='measured' else 1)
     if aif_mode == 'measured':
         aif_source = upload_or_path('Measured AIF CSV',saved.get('aif_csv','data/aif/UCDavis_1H35.csv'),['csv'],'aif')
-        st.caption('First column: time in minutes; remaining columns: one nonnegative AIF each. Each simulated sample uses one measured curve. Full observation-window coverage is required.')
+        st.caption('First column: time in minutes; remaining columns: one nonnegative AIF each. Each simulated sample uses one measured curve. Original samples stay unchanged; interpolation and the endpoint assumptions below define the simulation input.')
         try:
             preview = pd.read_csv(aif_source); st.line_chart(preview.set_index(preview.columns[0]))
-        except (OSError,ValueError):
+            st.caption(f'Original AIF samples: {float(preview.iloc[0,0]):.6g}–{float(preview.iloc[-1,0]):.6g} minutes · {len(preview.columns)-1} input functions')
+        except (OSError,ValueError,IndexError):
             st.caption('Choose an existing CSV to preview it.')
     else:
         aif_source = upload_or_path('Fitted Feng cohort parameter CSV',saved.get('feng_parameters_csv',str(workspace/'feng.csv')),['csv'],'feng')
@@ -188,7 +189,19 @@ elif page == '1 · Model & protocol':
             f = pd.read_csv(fits); st.line_chart(f.set_index('time_min'))
             st.dataframe(pd.read_csv(workspace/'feng.csv'))
     jitter = st.number_input('Feng log-space variation (0 = row resampling only)',min_value=0.,max_value=.5,value=float(saved.get('feng_log_jitter',.05)),disabled=aif_mode=='measured')
-    origin = st.checkbox('If the first AIF sample is after zero, assume zero activity at time zero',value=saved.get('aif_before_first')=='zero_at_origin')
+    origin = st.checkbox('If the first AIF sample is after zero, assume zero activity at time zero',value=saved.get('aif_before_first')=='zero_at_origin',disabled=aif_mode!='measured')
+    tail_options = ['require_coverage', 'hold_last']
+    tail_default = saved.get('aif_after_last',default_protocol.get('aif_after_last','require_coverage'))
+    tail = st.selectbox('After the final AIF sample',tail_options,index=tail_options.index(tail_default) if tail_default in tail_options else 0,
+                        format_func=lambda value: {'require_coverage':'Require measured AIF coverage', 'hold_last':'Hold the last measured AIF value'}[value],
+                        disabled=aif_mode!='measured',help='Midpoint observations need coverage through the last midpoint; frame averages need coverage through the last frame end. Holding the last value is an explicit approximation, saved in the protocol.')
+    if aif_mode == 'measured':
+        try:
+            load_measured_inputs(dict(saved,aif_csv=str(aif_source),t_meas=schedule['time_min'].tolist(),
+                                      frame_durations_min=schedule['duration_min'].tolist(),observation=observation,
+                                      aif_before_first='zero_at_origin' if origin else 'require_zero',aif_after_last=tail))
+        except (OSError,ValueError,KeyError,IndexError) as e:
+            st.warning(str(e))
     if st.button('Save and validate protocol',type='primary'):
         try:
             cfg = dict(saved,model=model_choice,model_file=str(path(model_file)),parameter_names=[n.strip() for n in names.split(',')],
@@ -196,9 +209,12 @@ elif page == '1 · Model & protocol':
                        observation=observation,half_life_min=half_life,integration_step_min=step,aif_mode=aif_mode,
                        aif_csv=str(aif_source) if aif_mode=='measured' else saved.get('aif_csv'),
                        feng_parameters_csv=str(aif_source) if aif_mode=='feng_cohort' else saved.get('feng_parameters_csv'),
-                       feng_log_jitter=jitter,aif_before_first='zero_at_origin' if origin else 'require_zero',output=str(dataset_path),
+                       feng_log_jitter=jitter,aif_before_first='zero_at_origin' if origin else 'require_zero',aif_after_last=tail,output=str(dataset_path),
                        workflow_preset=preset,walkthrough_size=default_protocol['walkthrough_size'])
-            validate_protocol(cfg); load_model(cfg); write_json(protocol_path,cfg)
+            cfg.pop('input_alignment',None)
+            validate_protocol(cfg); load_model(cfg)
+            if aif_mode == 'measured': load_measured_inputs(cfg)
+            write_json(protocol_path,cfg)
             st.success('Protocol saved. Continue to Dataset to choose size and create pairs.')
         except Exception as e:
             st.error(f'Protocol needs attention: {e}')
@@ -225,6 +241,7 @@ elif page == '2 · Dataset':
                 try:
                     cfg.update(n_train=n_train,n_val=n_val,n_test=n_test,noise_prior={'type':'uniform','min':low,'max':high},chunk_size=chunk,seed=seed)
                     validate_protocol(cfg)
+                    if cfg.get('aif_mode','measured') == 'measured': load_measured_inputs(cfg)
                     if dataset_path.exists(): raise ValueError('Dataset already exists. Choose a new project or move it aside.')
                     write_json(protocol_path,cfg)
                     launch('Dataset simulation',['simulate_protocol.py','--config',protocol_path])

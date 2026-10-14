@@ -25,6 +25,12 @@ Use a new project name for independent settings. Returning to an existing name r
 
 UC Davis uses rank 4 and alpha 8 at either scale. My own project starts with 100,000 / 10,000 / 1,000 pairs, rank 8 and alpha 16. Once you begin configuring the workflow, defaults are fixed for that project; all individual settings remain editable on their relevant pages. The tiny practice model is for checking software, not interpreting patient parameters.
 
+## Measured input functions
+
+The UC Davis setup uses the original `data/aif/UCDavis_1H35.csv`. Step 1 previews its original samples and exposes both endpoint assumptions: zero activity at the origin, and holding the last measured value after the final sample. UC Davis enables both by default. Other projects require measured coverage after the last sample unless you explicitly choose **Hold the last measured AIF value**.
+
+The final AIF sample is at 57.48521667 minutes; the Sub001 schedule's last midpoint is at 57.5 minutes. Frame averaging instead requires coverage through 60 minutes. A coverage warning explains the missing interval before you save the protocol or launch simulation. See [input functions and endpoint policies](MODELS_AND_PROTOCOLS.md#use-measured-inputs) for terminal settings. Existing projects retain their earlier options: check the zero-origin option, choose the final-value hold and save step 1 before rerunning step 2.
+
 ## Training and early stopping
 
 The monitor shows dynamic batch progress, train/validation loss, current learning rate and separate loss/rate graphs. **Stop active job** requests a graceful stop. Training publishes `best.pth` and `last.pth` after every completed epoch. The first contains the lowest validation loss across completed epochs; the second contains the latest completed epoch. An unfinished training epoch is discarded when stopping. At least one completed epoch is required.

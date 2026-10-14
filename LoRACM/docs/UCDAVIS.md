@@ -8,7 +8,7 @@ Launch the GUI and choose a fresh project name. **UC Davis Scenario 1** is the d
 
 | Step | Action | UC Davis default |
 | :--- | :--- | :--- |
-| **1 · Model & protocol** | Review and save the model, AIFs, priors and schedule | FDG 2TC, four AIFs, 35 Sub001 frames over 60 minutes, half-life 109.8 min |
+| **1 · Model & protocol** | Review and save the model, AIFs, priors and schedule | FDG 2TC, original `UCDavis_1H35.csv`, 35 Sub001 frames over 60 minutes, half-life 109.8 min |
 | **2 · Dataset** | Generate, then validate/select the labelled NPZ | Full: 50,000 / 100,000 / 100 pairs; small: 32 / 16 / 8 |
 | **3 · Fine-tune** | Review settings and train | Rank 4, alpha 8; full: 5,000 epochs; small: two CPU epochs |
 | **4 · Predict** | Predict the supplied patient slice | All 24,237 foreground TACs; full: 1,000 draws; small: eight draws per voxel |
@@ -17,7 +17,11 @@ Launch the GUI and choose a fresh project name. **UC Davis Scenario 1** is the d
 
 The small model and low draw count check installation; they do not produce scientifically useful estimates. It is reasonable to inspect a few TACs before running whole-slice prediction. The [imaging guide](PARAMETRIC_IMAGING.md) explains voxel interaction and uncertainty.
 
-The original AIF CSV has slightly different midpoints from the patient HDF5. The new walkthrough explicitly uses the **patient's exact frame midpoints and durations**. `data/aif/UCDavis_Sub001_schedule.csv` linearly interpolates all four original AIFs to those midpoints, adds zero activity at the origin, and holds the last value to 60 minutes. `configs/protocol_ucdavis.json` records this alignment. This preserves Scenario 1 kinetics, priors and training settings while making prediction schedule-compatible. It uses the portable RK4 simulator, explicit durations and midpoint observations; it is not an exact numerical reproduction of the historical Euler simulation. The source CSV and historical configs remain unchanged.
+The default input file is the original **`data/aif/UCDavis_1H35.csv`**. The simulator reads all four AIFs at their original time points and linearly interpolates on the integration grid; it does not create a resampled CSV. The output TAC/AIF pairs use the **patient's exact frame midpoints and durations**, so the trained model can accept the supplied Sub001 prediction file.
+
+The first AIF sample is after zero and the last is at **57.48521667 minutes**, slightly before the patient's final midpoint at **57.5 minutes**. UC Davis defaults therefore select **assume zero activity at time zero** and **After the final AIF sample → Hold the last measured AIF value**. These explicit assumptions are recorded as `aif_before_first="zero_at_origin"` and `aif_after_last="hold_last"` in `configs/protocol_ucdavis.json`. If you choose frame averages, the final value is held through the last frame end at **60 minutes**. The source CSV is unchanged.
+
+For an existing project, return to step 1, select the original CSV and both endpoint options, then **Save and validate protocol** before generating data in step 2. Existing project drafts are retained; new defaults do not reset earlier choices. The portable RK4 simulator uses explicit durations and midpoint observations by default; it is not an exact numerical reproduction of the historical Euler simulation. Historical configs remain unchanged.
 
 Training/validation share the four-AIF pool; test kinetic priors use the central 50% of each range. These are not subject-held-out splits. New custom projects retain the separate 100,000-pair / rank-8 / alpha-16 defaults.
 
