@@ -37,6 +37,8 @@ def load_image(predictions, geometry, metadata, parameter=None, statistic='mean'
         values=source[key].copy()
         if key.startswith('params_'): values=values[:,names.index(parameter)]
         provenance=json.loads(str(source['metadata_json'])) if 'metadata_json' in source else {}
+    if meta.get('input_sha256') and meta['input_sha256']!=provenance.get('input_sha256'):
+        raise ValueError('This mask/mapping belongs to a different patient input file. Select the geometry prepared for the scan that produced these predictions.')
     if values.shape!=prediction_ids.shape or len(np.unique(prediction_ids))!=len(prediction_ids):
         raise ValueError('Prediction values and unique voxel identities must match')
     lookup=dict(zip(ids.tolist(),indices.tolist()))

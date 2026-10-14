@@ -23,6 +23,23 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class TrainingTests(unittest.TestCase):
+    def test_repeated_prediction_cli_keeps_old_samples_and_settings(self):
+        torch.set_num_threads(2)
+        from infer import main as infer
+        from common import file_sha256
+        run=train_cm(self.cfg)
+        source=self.root/'testing.npz'
+        np.savez(source,tac=np.ones((1,2)),aif=np.ones(2),t_meas=[.5,1.5],frame_durations_min=[1,1])
+        output=self.root/'predictions.npz'
+        args=SimpleNamespace(run=run,input=source,output=output,checkpoint='best.pth',samples=4,batch_size=1,sample_chunk=2,
+                             steps=2,seed=0,device='cpu',multi_gpu=False,max_voxels=None,allow_time_mismatch=False,save_samples=True,new_output=True)
+        infer(args);original=file_sha256(output)
+        args.samples=8;args.steps=3;infer(args)
+        self.assertEqual(file_sha256(output),original)
+        newer=self.root/'predictions_002.npz'
+        with np.load(newer) as data: self.assertEqual(data['posterior_samples'].shape,(1,8,3))
+        self.assertEqual(json.loads(newer.with_suffix('.json').read_text())['samples'],8)
+        self.assertEqual(len(json.loads(newer.with_suffix('.json').read_text())['sampling_times']),3)
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
         self.root=Path(self.temp.name)

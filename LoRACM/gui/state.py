@@ -25,8 +25,9 @@ def remember(name, value):
     workspace, page, store_key = st.session_state['_draft_context']
     store = st.session_state[store_key]
     if store.get(name) != value:
+        updated=dict(store);updated[name]=value
+        write_json_atomic(workspace/'gui_state.json', updated)
         store[name] = value
-        write_json_atomic(workspace/'gui_state.json', store)
 
 
 def get(name, default=None):
@@ -48,8 +49,9 @@ def _wrapper(original, method, bound=False):
         def save(value):
             store = st.session_state[store_key]
             if store.get(name) != value:
+                updated=dict(store);updated[name]=value
+                write_json_atomic(workspace/'gui_state.json', updated)
                 store[name] = value
-                write_json_atomic(workspace/'gui_state.json', store)
         name = page + ':' + method + ':' + str(kwargs.get('key', label))
         token = hashlib.sha256((str(workspace)+name).encode()).hexdigest()[:24]
         key = '_widget_' + token
@@ -138,8 +140,10 @@ def checkpoint_picker(run, label='Checkpoint'):
     return st.selectbox(label, choices, key=label+'_'+str(run), index=0 if (run/'best.pth').exists() or not (run/'last.pth').exists() else 1, format_func=description)
 
 
-def model_run_picker(workspace, default, label='Model to use'):
+def model_run_picker(workspace, default, label='Model to use', mode=None):
     runs = [p for p in sorted((Path(workspace)/'runs').glob('*')) if (p/'model_params.json').exists()]
+    if mode is not None:
+        runs=[p for p in runs if json.loads((p/'model_params.json').read_text(encoding='utf-8')).get('training_mode','lora')==mode]
     if not runs: return Path(default)
     labels = {str(p):('LoRACM' if json.loads((p/'model_params.json').read_text(encoding='utf-8')).get('training_mode','lora')=='lora' else 'CM from scratch')+' · '+p.name for p in runs}
     options = list(labels)

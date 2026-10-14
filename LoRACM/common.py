@@ -6,6 +6,17 @@ import numpy as np
 
 PARAMETERS = ['K1', 'k2', 'k3', 'k4', 'Vb']
 
+def next_prediction_output(filename):
+    """Choose an unused prediction/provenance pair without deleting history."""
+    filename=Path(filename)
+    if filename.suffix.lower()!='.npz': raise ValueError('Prediction output must end in .npz')
+    candidate=filename
+    index=2
+    while candidate.exists() or candidate.with_suffix('.json').exists():
+        candidate=filename.with_name(filename.stem+f'_{index:03d}'+filename.suffix)
+        index+=1
+    return candidate
+
 def file_sha256(path):
     digest = hashlib.sha256()
     with Path(path).open('rb') as stream:

@@ -57,6 +57,18 @@ macOS support targets **Apple M-series chips**. Use PyTorch 2.6 or later for the
 
 Simulation in `simulate_protocol.py` and NLS use NumPy/SciPy on CPU. Training and prediction `auto` select CUDA, then MPS, then CPU. Prediction caps the expanded MPS batch and checks identical model evaluations against CPU before generating results. Available operations and memory vary by hardware; use CPU if your device cannot run the model. Multi-GPU prediction uses PyTorch DataParallel on one node. See [PyTorch MPS documentation](https://docs.pytorch.org/docs/stable/notes/mps.html).
 
+### Windows NVIDIA setup and diagnostics
+
+For an RTX 50-series GPU, choose a current CUDA PyTorch build supporting Blackwell with the [official installation selector](https://pytorch.org/get-started/locally/). Older CUDA builds can lack kernels for these cards; current packaging guidance is described in the [PyTorch release notes](https://pytorch.org/blog/pytorch-2-12-release-blog/). The CUDA version embedded in the PyTorch wheel, the GPU architecture and the NVIDIA driver must be compatible; merely selecting `cuda:0` does not install GPU support.
+
+On either training page, select `cuda:0` and choose **Check compute setup**. Its report includes the actual Python interpreter, PyTorch version, CUDA build, GPU and a kernel/gradient test. The terminal equivalent, from `LoRACM/`, is:
+
+```bash
+python check_environment.py --device cuda:0 --output environment-check.json
+```
+
+If a job fails, use **Download job log** and **Download compute report**. Startup details are written before scientific imports, so an early process failure still leaves diagnostics. Out-of-memory errors call for a smaller training batch or inference batch/chunk; try a training batch of 64. Brief file-lock errors are retried. A permanent permission error includes the exact path: keep the checkout/project in a writable personal folder and check whether another application has locked the file.
+
 ## Optional legacy research generator
 
 The preserved `create_dataset.py` uses JAX; install it separately:

@@ -8,7 +8,7 @@ import torch
 from torch import nn
 import copy
 from model_factory import build_model
-from common import summarize_samples, PARAMETERS, file_sha256
+from common import summarize_samples, PARAMETERS, file_sha256, next_prediction_output
 from protocol import read_prediction_input, validate_names
 from runtime import select_device, Progress, check_cancelled
 from lora import merge_for_inference
@@ -77,7 +77,7 @@ def main(args):
         if args.max_voxels<1: raise ValueError('max-voxels must be positive')
         y=y[:args.max_voxels];columns=columns[:args.max_voxels]
         if truth is not None: truth=truth[:args.max_voxels]
-    output=Path(args.output)
+    output=next_prediction_output(args.output) if getattr(args,'new_output',False) else Path(args.output)
     if output.exists() or output.with_suffix('.json').exists():
         raise FileExistsError(f'Refusing to overwrite {output}')
     xm=np.asarray(scaling['x_mean']);xs=np.asarray(scaling['x_std'])
@@ -148,9 +148,10 @@ def main(args):
         metadata['test_rmse'] = np.sqrt(np.mean((means-truth)**2, axis=0)).tolist()
         metadata['test_bias'] = np.mean(means-truth, axis=0).tolist()
     extra = {'posterior_samples':np.concatenate(saved_draws)} if saved_draws else {}
-    np.savez_compressed(output, **extra,**{k:np.concatenate(v) for k,v in outputs.items()},
-        voxel_columns=columns,parameter_names=np.asarray(names),t_meas=expected,
-        observed_t_meas=observed_times,metadata_json=json.dumps(metadata))
+    with output.open('xb') as stream:
+        np.savez_compressed(stream, **extra,**{k:np.concatenate(v) for k,v in outputs.items()},
+            voxel_columns=columns,parameter_names=np.asarray(names),t_meas=expected,
+            observed_t_meas=observed_times,metadata_json=json.dumps(metadata))
     output.with_suffix('.json').write_text(json.dumps(metadata,indent=2)+'\n', encoding='utf-8')
     progress.update(len(y)*args.samples,state='complete',device=str(device),output=str(output))
     print(f'Saved {output}')
@@ -161,6 +162,7 @@ if __name__=='__main__':
     p.add_argument('--checkpoint',default='best.pth')
     p.add_argument('--input',default='data/real/Sub001_slice75_adjusted.h5')
     p.add_argument('--output',default='runs/scenario1/predictions.npz')
+    p.add_argument('--new-output',action='store_true',help='Preserve earlier predictions by choosing an unused numbered output filename')
     p.add_argument('--samples',type=int,default=1000)
     p.add_argument('--batch-size',type=int,default=16)
     p.add_argument('--sample-chunk',type=int,default=64)

@@ -57,14 +57,23 @@ def render(root,workspace,run_default,input_default,upload_or_path,launch=None):
             map_steps=b.number_input('Map reverse sampling steps',min_value=1,value=3)
             map_batch=c.number_input('Map curve batch size',min_value=1,value=16)
             map_chunk=st.number_input('Map sample chunk',min_value=1,value=64)
-            st.caption('Creates predictions at the path above; choose a new output filename to keep an existing map.')
+            st.caption('Each map prediction is preserved. An existing filename gets a new numbered output automatically.')
             if st.button('Generate predictions for this model',disabled=st.session_state.jobs.running()):
-                if predictions.exists(): st.error('Prediction file already exists. Enter a new prediction path above.')
-                else: launch('Parametric imaging posterior prediction',['infer.py','--run',run,'--input',source,'--output',predictions,
-                    '--checkpoint',checkpoint_to_predict,'--samples',map_draws,'--steps',map_steps,
-                    '--batch-size',map_batch,'--sample-chunk',map_chunk,'--device',device])
+                from gui.prediction import available_output, remember_prediction
+                try:
+                    destination=available_output(predictions)
+                    geometry_info=json.loads(metadata.read_text(encoding='utf-8'))
+                    if geometry_info.get('input_sha256') and checked_hash(source)!=geometry_info['input_sha256']:
+                        raise ValueError('Select the mask/geometry prepared for this patient scan in its prediction page first')
+                    if launch('Parametric imaging posterior prediction',['infer.py','--run',run,'--input',source,'--output',destination,
+                        '--checkpoint',checkpoint_to_predict,'--samples',map_draws,'--steps',map_steps,
+                        '--batch-size',map_batch,'--sample-chunk',map_chunk,'--device',device]):
+                        cfg=json.loads((run/'model_params.json').read_text(encoding='utf-8'))
+                        remember_prediction(workspace,run,destination,source,cfg.get('training_mode','lora'),geometry,metadata)
+                        predictions=destination
+                except Exception as error: st.error(str(error))
     if not predictions.exists():
-        st.info('Finish step 4 using the UC Davis patient slice, then return here. Simulated test pairs have no anatomical voxel geometry.')
+        st.info('Finish prediction on the LoRACM or CM page using the supplied slice or your own patient scan and mask, then return here. Simulated test pairs have no anatomical voxel geometry.')
         return
     try:
         initial=load_image(predictions,geometry,metadata)
@@ -82,7 +91,7 @@ def render(root,workspace,run_default,input_default,upload_or_path,launch=None):
         st.caption('Map produced by '+model_label+' · '+producer.get('exp_name','saved run')+' · '+Path(provenance.get('checkpoint','best.pth')).name)
     if provenance.get('device','').startswith('mps') and provenance.get('batch_size',0)*provenance.get('sample_chunk',0)>65536 and not provenance.get('expanded_batch_limit'):
         st.warning('This saved map used an oversized MPS batch that can corrupt predictions. Regenerate it with the updated inference path before interpreting it.')
-    st.caption('UC Davis provides one complete coronal slice through the body. Custom 2D slices and 3D masks use the same explicit voxel-ID mapping.')
+    st.caption('Maps use the selected patient’s mask and voxel identities. The UC Davis example supplies one coronal slice; your own scans use their separately prepared geometry.')
     if 'small' in result['provenance'].get('config',{}).get('exp_name','').lower() or 'smoke' in result['provenance'].get('config',{}).get('exp_name','').lower():
         st.warning('Walkthrough model: the image demonstrates the software and is not a scientifically validated parametric result.')
     axis=1;index=None

@@ -14,7 +14,7 @@ from protocol import validate_protocol, validate_file, read_prediction_input, lo
 from gui.jobs import Jobs
 from gui import state as project_state
 from gui.state import checkpoint_picker, model_run_picker
-from runtime import select_device
+from runtime import select_device, write_json_atomic
 from ucdavis import defaults as workflow_defaults, PRESETS, testing_from_dataset
 
 project_state.install()
@@ -39,8 +39,7 @@ def path(value):
 
 
 def write_json(target, config):
-    target.parent.mkdir(parents=True,exist_ok=True)
-    target.write_text(json.dumps(config,indent=2)+'\n', encoding='utf-8')
+    write_json_atomic(target,config)
 
 
 def launch(label, args, run=None):
@@ -95,11 +94,10 @@ with st.sidebar:
         st.caption('Defaults initialise this project. Once you begin configuring it, use a new project name to choose fresh defaults. Edits in any workflow page are retained automatically.')
     small = preset==PRESETS[0] and size=='Quick installation check'
     profile=project_name
-    enable_cm=st.checkbox('Enable CM from scratch comparison',value=False,help='Optional: train a baseline, compare its posterior in step 5, and select either model for imaging.')
+    enable_cm=st.checkbox('Enable CM from scratch comparison',value=False,help='Optional: prepare separate CM training data, train from scratch, predict on the CM page, compare in step 5, and select either model for imaging.')
     pages=['Welcome','1 · Model & protocol','2 · Dataset','3 · Fine-tune']
-    if enable_cm: pages+=['CM from scratch']
     pages+=['4 · Predict','5 · Single TAC & NLS','6 · Parametric imaging']
-    if enable_cm: pages+=['Compare models']
+    if enable_cm: pages+=['CM · Dataset','CM from scratch','CM · Predict','Compare models']
     pages+=['UC Davis demonstration','User manual']
     # Navigation is session-local; project settings live independently of widgets.
     st.session_state['_draft_context']=None
@@ -219,111 +217,24 @@ elif page == '1 · Model & protocol':
         except Exception as e:
             st.error(f'Protocol needs attention: {e}')
 
-elif page == '2 · Dataset':
-    st.title('2 · Prepare your fine-tuning dataset')
-    route = st.radio('Where will training pairs come from?',['Simulate my protocol','Use my own NPZ dataset'])
-    if route == 'Simulate my protocol':
-        if not protocol_path.exists():
-            st.info('Save your model and protocol in step 1 first.')
-        else:
-            cfg = json.loads(protocol_path.read_text(encoding='utf-8'))
-            a,b,c = st.columns(3)
-            n_train = a.number_input('Training pairs',min_value=2,value=int(cfg['n_train']),step=1000,key='n_train_'+profile)
-            n_val = b.number_input('Validation pairs',min_value=1,value=int(cfg['n_val']),step=1000,key='n_val_'+profile)
-            n_test = c.number_input('Test pairs',min_value=1,value=int(cfg['n_test']),step=100,key='n_test_'+profile)
-            a,b,c = st.columns(3)
-            low = a.number_input('Noise amplitude minimum',min_value=0.,value=float(cfg['noise_prior']['min']))
-            high = b.number_input('Noise amplitude maximum',min_value=0.,value=float(cfg['noise_prior']['max']))
-            chunk = c.number_input('Simulation chunk size',min_value=1,value=int(cfg['chunk_size']))
-            seed = st.number_input('Simulation random seed',min_value=0,value=int(cfg['seed']))
-            st.caption('Noise follows the released heteroscedastic Gaussian equation, using your explicit frame durations. Negative noisy TAC values are retained. Match noise amplitude to your acquisition and reconstruction.')
-            if st.button('Generate dataset',type='primary'):
-                try:
-                    cfg.update(n_train=n_train,n_val=n_val,n_test=n_test,noise_prior={'type':'uniform','min':low,'max':high},chunk_size=chunk,seed=seed)
-                    validate_protocol(cfg)
-                    if cfg.get('aif_mode','measured') == 'measured': load_measured_inputs(cfg)
-                    if dataset_path.exists(): raise ValueError('Dataset already exists. Choose a new project or move it aside.')
-                    write_json(protocol_path,cfg)
-                    launch('Dataset simulation',['simulate_protocol.py','--config',protocol_path])
-                except Exception as e: st.error(str(e))
-    else:
-        dataset_path = upload_or_path('Fine-tuning NPZ file',st.session_state.get('dataset_'+project_name,str(dataset_path)),['npz'],'dataset')
-        st.markdown('Required: `x_train/x_val/x_test` = parameters then noise amplitude; `y_train/y_val/y_test` = TAC then AIF; `t_meas`. Custom parameters also require `parameter_names`. Explicit durations are recommended.')
-        st.caption('Fine-tuning needs labelled parameter–curve pairs. Unlabelled clinical TACs alone are prediction inputs and cannot replace supervised training pairs.')
-    if st.button('Validate and select dataset'):
-        try:
-            report = validate_file(dataset_path)
-            st.session_state['dataset_'+project_name] = str(dataset_path)
-            write_json(workspace/'dataset_selection.json',{'path':str(dataset_path),'report':report})
-            for training_page,mode in [('3 · Fine-tune','lora'),('CM from scratch','cm')]:
-                project_state.remember(training_page+':text_input:'+mode+'_'+workspace.name+'_data_'+workspace.name,str(dataset_path))
-            st.success('Dataset accepted. Dimensions, parameter order, finite values and training scales checked.')
-            st.json(report)
-        except Exception as e: st.error(f'Dataset rejected: {e}')
+elif page in ('2 · Dataset','CM · Dataset'):
+    from gui.dataset import render as render_dataset
+    selected_dataset=render_dataset(ROOT,workspace,launch,upload_or_path,mode='cm' if page=='CM · Dataset' else 'lora',small=small)
+    if page=='2 · Dataset': dataset_path=selected_dataset
 
 elif page in ('3 · Fine-tune','CM from scratch'):
     from gui.training import render as render_training
     run_path=render_training(ROOT,workspace,launch,upload_or_path,mode='lora' if page=='3 · Fine-tune' else 'cm',defaults=default_training)
 
-elif page == '4 · Predict':
-    st.title('4 · Predict posteriors on your testing curves')
-    run_path = model_run_picker(workspace,run_path)
-    run_path = path(st.text_input('Model run folder',str(run_path),key='predict_run_'+str(run_path)))
-    route=st.selectbox('Prediction input',['UC Davis patient slice','Held-out simulated pairs','My own file'],index=0 if preset==PRESETS[0] else 2)
-    if route=='Held-out simulated pairs':
-        input_default=str(workspace/'testing.npz')
-        if st.button('Prepare held-out testing file'):
-            try:
-                selection=workspace/'dataset_selection.json'
-                source=json.loads(selection.read_text(encoding='utf-8'))['path'] if selection.exists() else dataset_path
-                testing_from_dataset(source,workspace/'testing.npz');st.success('Testing file prepared from the dataset’s held-out pairs.')
-            except Exception as e: st.error(str(e))
-        st.caption('These pairs can measure accuracy when truth is known; they do not have anatomical geometry for step 6.')
-    elif route=='UC Davis patient slice':
-        input_default=str(ROOT/'data/real/Sub001_slice75_adjusted.h5')
-        st.caption('Predict all 24,237 foreground voxel TACs to make the supplied coronal map in step 6.')
-    input_path = upload_or_path('Testing dataset',input_default,['npz','h5','hdf5'],'testing_'+route)
-    st.markdown('NPZ: `tac [N,T]`, `aif [T]` or `[N,T]`, `t_meas [T]`, `frame_durations_min [T]`; optional `voxel_columns [N]` and `truth [N,P]`. Legacy pandas HDF5 is also accepted.')
-    a,b,c = st.columns(3)
-    samples = a.number_input('Posterior samples per curve',min_value=2,value=8 if small else 1000,key='prediction_samples_'+profile)
-    batch = b.number_input('Curve batch size',min_value=1,value=64 if small else 16,key='prediction_batch_'+profile)
-    sample_chunk = c.number_input('Sample chunk',min_value=1,value=8 if small else 64,key='prediction_chunk_'+profile)
-    if small: st.caption('Eight draws per voxel are sufficient for an installation check; use a much larger sample count for credible-interval assessment.')
-    a,b,c=st.columns(3)
-    steps=a.number_input('Reverse sampling steps',min_value=1,value=3,help='Consistency sampling evaluations, evenly spaced from 1 towards 0. More steps do not necessarily improve a consistency model.')
-    seed=b.number_input('Inference random seed',min_value=0,value=0)
-    device=c.selectbox('Prediction device',['auto','cpu','cuda:0','mps'])
-    st.caption('Auto selects CUDA when available, then Apple MPS, then CPU. MPS expanded batches are automatically capped and checked against CPU.')
-    checkpoint_name = checkpoint_picker(run_path)
-    output = path(st.text_input('Prediction output',str(run_path/'predictions.npz'),key='predict_output_'+str(run_path)))
-    if st.button('Validate input'):
-        try:
-            model_cfg = json.loads((run_path/'model_params.json').read_text(encoding='utf-8'))
-            scale = json.loads((run_path/'scaling_params.json').read_text(encoding='utf-8'))
-            _,_,conditioning,_,_ = read_prediction_input(input_path,model_cfg['x_dim'],scale['t_meas'],scale.get('frame_durations_min'))
-            st.success(f'Accepted {len(conditioning)} curves on the training schedule.')
-        except Exception as e: st.error(f'Input rejected: {e}')
-    if st.button('Run prediction',type='primary'):
-        try:
-            if not (run_path/checkpoint_name).exists(): raise ValueError('Checkpoint missing; finish training or select last.pth')
-            cfg = json.loads((run_path/'model_params.json').read_text(encoding='utf-8')); scale=json.loads((run_path/'scaling_params.json').read_text(encoding='utf-8'))
-            read_prediction_input(input_path,cfg['x_dim'],scale['t_meas'],scale.get('frame_durations_min'))
-            st.session_state['prediction_'+str(workspace)]=str(output)
-            st.session_state['prediction_input_'+str(workspace)]=str(input_path)
-            launch('Posterior prediction',['infer.py','--run',run_path,'--checkpoint',checkpoint_name,'--input',input_path,'--output',output,
-                                          '--samples',samples,'--batch-size',batch,'--sample-chunk',sample_chunk,'--steps',steps,'--seed',seed,'--device',device])
-            key='imaging_predictions_'+str(run_path)
-            project_state.remember('file:'+key,str(output))
-            project_state.remember('6 · Parametric imaging:text_input:'+key+'_'+project_name+'_path',str(output))
-        except Exception as e: st.error(str(e))
-    if output.exists():
-        with np.load(output,allow_pickle=False) as data:
-            st.subheader('Posterior summaries')
-            names = data['parameter_names'].tolist()
-            st.dataframe(pd.DataFrame(data['params_mean'][:100],columns=names,index=data['voxel_columns'][:100]))
-            if 'Ki_mean' in data: st.caption('2TC Kᵢ statistics are calculated from joint draws. Inspect negative-draw fractions and Kᵢ tails.')
-        st.download_button('Download predictions',output.read_bytes(),file_name=output.name)
-        if output.with_suffix('.json').exists(): st.json(json.loads(output.with_suffix('.json').read_text(encoding='utf-8')))
+elif page in ('4 · Predict','CM · Predict'):
+    from gui.prediction import render as render_prediction
+    prediction_mode='cm' if page=='CM · Predict' else 'lora'
+    default_prediction_run=run_path
+    if prediction_mode=='cm':
+        saved_cm=workspace/'train_cm.json'
+        cm_name=json.loads(saved_cm.read_text(encoding='utf-8'))['exp_name'] if saved_cm.exists() else 'cm_scratch'
+        default_prediction_run=workspace/'runs'/cm_name
+    run_path=render_prediction(ROOT,workspace,launch,upload_or_path,default_prediction_run,preset,small,mode=prediction_mode)
 
 elif page == '5 · Single TAC & NLS':
     from gui.single_tac import render
@@ -430,7 +341,9 @@ def monitor():
         else:
             st.caption('Preparing inputs and model…' if code is None else 'Job finished.')
         with st.expander('Job log',expanded=code is not None and code!=0):
-            st.text(jobs.tail())
+            log_text=jobs.tail();st.text(log_text)
+            st.caption('Saved log: '+str(jobs.log_path))
+            st.download_button('Download job log',jobs.full_log(),file_name=jobs.log_path.name,key='log_'+str(jobs.log_path))
         if code is not None and st.session_state.get('finished_pid') != jobs.process.pid:
             st.session_state.finished_pid = jobs.process.pid
             st.rerun()

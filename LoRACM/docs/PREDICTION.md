@@ -30,13 +30,25 @@ np.savez_compressed(
 
 A legacy pandas HDF5 table is also supported: rows are frames; columns are duration, midpoint, AIF, then TACs. Negative **noisy TAC** values are accepted; AIF values must be nonnegative. Non-finite values are rejected.
 
-GUI: **4 · Predict**, load/choose a file, validate it, select the model, best/last/saved epoch, device, posterior sample count, reverse sampling steps, seed, curve batch and sample chunk, then run. Summaries and the prediction download appear after completion.
+GUI: **4 · Predict** for LoRACM, or **CM · Predict** for a trained scratch CM. Each page lists its own model type. Choose **My own file** to reuse the model on another compatible testing file, then validate it, select the checkpoint, device, posterior samples, reverse sampling steps, seed, curve batch and sample chunk. Summaries and a download appear after completion.
+
+For another patient's anatomical maps, choose **My own patient scan** and provide both the coronal TAC/AIF file and the corresponding mask. See [patient scan and mask preparation](PARAMETRIC_IMAGING.md#your-own-patient-scan-and-mask). A different patient does not require retraining when the trained protocol remains suitable and testing conventions match; a changed acquisition protocol still requires appropriate adaptation/training.
+
+Repeated GUI predictions automatically preserve earlier results under numbered filenames. **Open an earlier prediction** deliberately retrieves a completed result. CLI users add `--new-output` to choose an unused numbered name; without that flag, the terminal retains its explicit overwrite guard.
 
 Terminal, from `LoRACM/`:
 
 ```bash
 python infer.py --run workspaces/my_project/runs/adaptation --input workspaces/my_project/testing.npz --output workspaces/my_project/predictions.npz --samples 1000 --batch-size 16 --sample-chunk 64 --steps 3 --seed 0 --device auto
 ```
+
+For another inference setting without replacing the first prediction:
+
+```bash
+python infer.py --run workspaces/my_project/runs/adaptation --input workspaces/my_project/testing.npz --output workspaces/my_project/predictions.npz --new-output --samples 2000 --steps 5 --device auto
+```
+
+The terminal prints the actual saved filename. Each result retains its input/checkpoint checksum and inference settings.
 
 `auto` prefers CUDA, then Apple MPS, then CPU and records the actual device in prediction metadata. Inference merges LoRA adapter weights into the base layers once; original checkpoints are unchanged. For an Apple GPU use `--device mps`; for a supported CUDA GPU use `--device cuda:0`. Reduce `--batch-size` or `--sample-chunk` to control memory. On one node with multiple visible CUDA devices, add `--multi-gpu`.
 

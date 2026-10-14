@@ -39,9 +39,15 @@ In **Advanced settings**, **Save an epoch checkpoint every** defaults to 25. Epo
 
 ## Optional scratch CM comparison
 
-Enable **CM from scratch comparison** in the sidebar to show its training page and batch comparison page. Train it on the same labelled dataset for a controlled comparison. In step 5, enable **Overlay CM from scratch posterior** while using the LoRACM run to analyse the same voxel with both estimators. In steps 4 and 6, select either trained model. Each anatomical map needs predictions from that selected model.
+Enable **CM from scratch comparison** to show **CM · Dataset**, **CM from scratch**, **CM · Predict**, and **Compare models**. Scratch dataset counts, source selection and simulation protocol are independent of LoRACM. Its starting dataset size is 1,000,000 / 100,000 / 1,000 pairs, or 32 / 16 / 8 for the quick check. Adjust these values, or explicitly import the same NPZ for a comparison at equal target-data size.
+
+**4 · Predict** uses LoRACM; **CM · Predict** uses scratch CM. Each accepts another patient or testing file. In step 5, enable **Overlay CM from scratch posterior** for a paired voxel comparison. Step 6 can image either model's own predictions.
 
 ## Prediction and plots
+
+Repeated predictions keep earlier files: `predictions.npz`, `predictions_002.npz`, `predictions_003.npz`, etc. **Open an earlier prediction** restores a completed output and its recorded patient/geometry. The active display clears while a new request is running.
+
+Choose **My own patient scan** to load a coronal TAC slice plus its corresponding binary NumPy mask. Verify C-order foreground mapping, or supply an explicit voxel mapping CSV; choose the display origin and pixel aspect ratio. The app checks one TAC per foreground pixel and carries patient-specific geometry into step 6. A source checksum prevents a map from using another patient's mask even when voxel IDs match. Generic curve files without anatomy use **My own file**.
 
 Batch prediction and single-TAC analysis expose posterior sample count, reverse sampling steps, sample chunk, seed and device. `auto` chooses CUDA, then Apple MPS, then CPU. The inference metadata records the actual device and settings. The current default is three consistency-sampling evaluations; changing the step count is an experiment, not a guarantee of improved accuracy.
 
@@ -50,3 +56,7 @@ Step 5 shows parameter posteriors with dashed NLS estimates and a TAC graph cont
 Step 6 places the map on the left and the clicked voxel’s TAC/AIF and posterior density on the right. Choose a kinetic parameter, Ki (built-in 2TC), or a 95% credible-interval width. Older predictions made with oversized MPS batches are flagged; regenerate them using the [current MPS safeguards](PREDICTION.md#apple-mps-batch-safety).
 
 Dataset creation, fitting, training and prediction use dynamic progress bars outside the collapsible log. Logs hold diagnostics and file locations, so you do not need to scroll through printed progress updates.
+
+## Compute checks and failed jobs
+
+Training pages provide **Check compute setup** and a downloadable report with the Python interpreter, PyTorch version, CUDA build and actual device-kernel test. Every job log contains startup details before scientific imports, captures Python tracebacks and has **Download job log**. A process that exits without a traceback still leaves its command, interpreter and exit code for diagnosis. Project/progress writes retry short file-lock errors; permanent permission errors identify the path and retain the previous settings file. A locked progress-display file is reported in the log and does not abort computation.

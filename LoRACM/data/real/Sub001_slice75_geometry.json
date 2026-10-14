@@ -12,5 +12,6 @@
   "orientation_and_spacing_verified": true,
   "note": "Verified for the supplied Sub001 slice. Pixel coordinates are used; physical millimetre spacing is not supplied.",
   "verification_source": "Repository author confirmed the C-order mask[:,75,:] mapping, original notebook display convention and pixel aspect ratio of 1 in this project conversation on 2026-10-13.",
-  "display_convention": "origin=lower, equivalent to the original notebook imshow followed by invert_yaxis"
+  "display_convention": "origin=lower, equivalent to the original notebook imshow followed by invert_yaxis",
+  "input_sha256": "226f030f5e639cefa42220dd6ebca1c1978ecbec6b68b8da8166be49a98eb94e"
 }

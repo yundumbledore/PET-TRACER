@@ -5,6 +5,7 @@ import numpy as np
 import streamlit as st
 from protocol import validate_file, load_protocol, validate_protocol
 from training_config import resolve_training_config
+from runtime import write_json_atomic
 
 
 @st.cache_data(show_spinner=False)
@@ -25,8 +26,9 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
     if not is_lora:
         previous={k:v for k,v in previous.items() if k not in ('pretrained','lora_r','lora_alpha','lora_dropout','train_norms')}
         if not settings_path.exists(): previous['exp_name']='cm_scratch'
-    selection=workspace/'dataset_selection.json'
-    selected=json.loads(selection.read_text(encoding='utf-8'))['path'] if selection.exists() else previous.get('dataset_dir',str(workspace/'dataset.npz'))
+    selection=workspace/('dataset_selection.json' if is_lora else 'cm_dataset_selection.json')
+    fallback=previous.get('dataset_dir',str(workspace/'dataset.npz')) if is_lora or settings_path.exists() else str(workspace/'cm_dataset.npz')
+    selected=json.loads(selection.read_text(encoding='utf-8'))['path'] if selection.exists() else fallback
     source=st.text_input('Labelled dataset (.npz)',selected,key=prefix+'_data_'+workspace.name)
     data_path=Path(source).expanduser()
     if not data_path.is_absolute(): data_path=root/data_path
@@ -52,6 +54,14 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
     devices=['auto','cpu','cuda:0','mps']
     device=a.selectbox('Compute device',devices,index=devices.index(previous.get('device','auto')),key=prefix+'_device')
     name=b.text_input('Run name',previous.get('exp_name','adaptation' if is_lora else 'cm_scratch'),key=prefix+'_name',help='Use a new name for each experiment.')
+    if not is_lora: st.caption('Prepare a larger, separate dataset on CM · Dataset, or explicitly select an existing labelled NPZ.')
+    if st.button('Check compute setup',key=prefix+'_compute_check'):
+        launch('Compute environment check',['check_environment.py','--device',device,'--output',workspace/'environment-check.json'])
+    diagnostic=workspace/'environment-check.json'
+    if diagnostic.exists():
+        with st.expander('Last compute check'):
+            details=json.loads(diagnostic.read_text(encoding='utf-8'));st.json(details)
+            st.download_button('Download compute report',diagnostic.read_bytes(),file_name='environment-check.json')
     if is_lora:
         st.subheader('LoRA settings')
         a,b,c=st.columns(3)
@@ -88,7 +98,7 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
         drop_last=st.checkbox('Drop an incomplete final training batch',value=previous.get('drop_last',True),key=prefix+'_drop_last')
         train_norms=st.checkbox('Train normalization layers',value=previous.get('train_norms',True),key=prefix+'_norms') if is_lora else True
         st.markdown('**Kinetic model and provenance**')
-        protocol_default=workspace/'protocol.json'
+        protocol_default=workspace/('protocol.json' if is_lora else 'cm_protocol.json')
         inferred='2TC' if not report or report['parameter_names']==['K1','k2','k3','k4','Vb'] else 'custom'
         if protocol_default.exists():
             saved_protocol=json.loads(protocol_default.read_text(encoding='utf-8'))
@@ -142,7 +152,7 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
             cfg=configuration();run=workspace/'runs'/cfg['exp_name']
             if run.exists(): raise ValueError('Run already exists; choose another run name')
             settings_path.parent.mkdir(parents=True,exist_ok=True)
-            settings_path.write_text(json.dumps(cfg,indent=2)+'\n', encoding='utf-8')
+            write_json_atomic(settings_path,cfg)
             launch(title,['train.py' if is_lora else 'train_cm.py','--config',settings_path],run=run)
         except Exception as e: st.error(str(e))
     st.caption('Training and validation curves appear below. Both are consistency losses; assess parameter accuracy and calibration with held-out data.')

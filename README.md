@@ -28,9 +28,9 @@ The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and 
 3. Choose your data route:
    - **[Simulate labelled pairs](LoRACM/docs/MODELS_AND_PROTOCOLS.md)** using 2TC or your own kinetic model, measured AIFs or a fitted Feng cohort, and your frame schedule.
    - **[Prepare your own dataset](LoRACM/docs/PREPARE_DATA.md)** and validate its format before training.
-4. **[Fine-tune](LoRACM/docs/FINE_TUNING.md)** with defaults of **100,000 training pairs, LoRA rank 8, alpha 16**; track training loss, validation loss and learning rate. For a baseline, **[train a CM from scratch](LoRACM/docs/TRAIN_CM.md)** on the same pairs.
+4. **[Fine-tune](LoRACM/docs/FINE_TUNING.md)** with defaults of **100,000 training pairs, LoRA rank 8, alpha 16**; track losses and learning rate. The optional **[CM from scratch](LoRACM/docs/TRAIN_CM.md)** route has separate dataset, training and prediction pages.
 5. **[Predict on your own project](LoRACM/docs/PREDICTION.md)** in batches, or analyse one TAC with parameter posterior histograms, an NLS comparison and forward TACs from posterior medians.
-6. **[Make parametric images](LoRACM/docs/PARAMETRIC_IMAGING.md)** of Kᵢ, other kinetic parameters or 95% credible-interval widths. Click a voxel to view its TAC, input function and posterior KDE beside the map.
+6. **[Make parametric images](LoRACM/docs/PARAMETRIC_IMAGING.md)** of Kᵢ, fitted parameters or 95% credible-interval widths. Use the UC Davis example or your own patient's coronal TAC/AIF slice and corresponding mask. Click a voxel to view its TAC, input function and posterior KDE.
 
 UC Davis is the GUI's default template. It retains Scenario 1 priors and rank **4 / alpha 8** and uses the exact supplied patient's frame schedule for the complete imaging route. **My own project** retains the separate **100,000-pair / rank-8 / alpha-16** starting settings. Project settings, including unfinished edits, survive page navigation and browser refresh. A new project name creates an independent workspace. Scratch CM training is optional; enable it in the sidebar when you want a comparison.
 
@@ -40,7 +40,8 @@ flowchart LR
     C[Your own labelled dataset] --> D[Validate data]
     B --> D
     D --> E[LoRACM fine-tuning]
-    D --> M[CM training from scratch]
+    A --> S[Separate scratch-CM dataset]
+    S --> M[Validate and train CM from scratch]
     F[Pretrained consistency model] --> E
     E --> G[Adapted model]
     H[Your testing TACs + input functions] --> I[Posterior prediction]
@@ -51,6 +52,7 @@ flowchart LR
     J --> L[Single-TAC comparison]
     K --> L
     J --> N[Parameter and 95% interval-width images]
+    P[Corresponding patient mask + voxel mapping] --> N
     N --> O[Click voxel: TAC + AIF + posterior]
 ```
 

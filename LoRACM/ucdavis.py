@@ -8,6 +8,13 @@ ROOT = Path(__file__).resolve().parent
 PRESETS = ['UC Davis Scenario 1', 'My own project']
 
 
+def scratch_protocol(protocol,workspace,small=False):
+    cfg=dict(protocol)
+    cfg.update(n_train=32 if small else 1000000,n_val=16 if small else 100000,n_test=8 if small else 1000,
+               output=str(Path(workspace).resolve()/'cm_dataset.npz'),seed=int(protocol['seed'])+1)
+    return cfg
+
+
 def defaults(workspace, preset=PRESETS[0], small=False):
     workspace = Path(workspace).resolve()
     uc = preset == PRESETS[0]
@@ -44,12 +51,19 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--workspace',default='workspaces/ucdavis_walkthrough')
     parser.add_argument('--size',choices=['full','small'],default='full')
+    parser.add_argument('--with-cm',action='store_true',help='Also prepare a separate, larger scratch-CM dataset protocol and training configuration')
     args=parser.parse_args();workspace=Path(args.workspace).resolve()
     protocol,training=defaults(workspace,small=args.size=='small')
     targets=[workspace/'protocol.json',workspace/'train.json']
+    configs=[protocol,training]
+    if args.with_cm:
+        cm_protocol=scratch_protocol(protocol,workspace,small=args.size=='small')
+        cm_training={key:value for key,value in training.items() if key not in ('pretrained','lora_r','lora_alpha','lora_dropout','train_norms')}
+        cm_training.update(training_mode='cm',exp_name='cm_scratch',dataset_dir=cm_protocol['output'],simulation_protocol=str(workspace/'cm_protocol.json'))
+        targets.extend([workspace/'cm_protocol.json',workspace/'train_cm.json']);configs.extend([cm_protocol,cm_training])
     if any(p.exists() for p in targets): raise FileExistsError('Walkthrough configs exist; choose another workspace')
     workspace.mkdir(parents=True,exist_ok=True)
-    for path,cfg in zip(targets,[protocol,training]):
+    for path,cfg in zip(targets,configs):
         path.write_text(json.dumps(cfg,indent=2)+'\n',encoding='utf-8')
     print(f'UC Davis settings prepared: {workspace}. Continue with simulate_protocol.py and train.py.')
 

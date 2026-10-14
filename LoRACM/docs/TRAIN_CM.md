@@ -17,17 +17,18 @@ Both use the same dataset contract, training-only normalization, consistency obj
 
 ## GUI workflow
 
-1. Prepare and select your labelled NPZ on **2 · Dataset**. You can use the same file for both training routes.
-2. Enable **CM from scratch comparison** in the sidebar, then open **CM from scratch**. Parameter dimensions and names appear automatically from the data.
-3. Choose a run name, epochs, learning rate, batch size, and device. Default values are ready to use.
-4. Open **Advanced settings** only when you need to change embedding width, U-Net channels, optimizer, scheduler, consistency intervals, loss weights, seed, or epoch-checkpoint interval.
-5. Choose **Review configuration** to inspect/download the exact settings, then **Start CM training**.
-6. Use **4 · Predict** or **5 · Single TAC & NLS** with the scratch run folder. The inference module selects the correct CM architecture automatically.
-7. Enable **Overlay CM from scratch posterior** in step 5 for the same voxel, or open **Compare models** for a held-out file. In step 6, select the model and generate its own prediction file before mapping.
+1. Save the kinetic model, AIFs and timing in **1 · Model & protocol**.
+2. Enable **CM from scratch comparison**, then open **CM · Dataset**. Generate a separate dataset, or import and validate a labelled NPZ. Starting sizes are **1,000,000 training / 100,000 validation / 1,000 test pairs**; the quick check uses **32 / 16 / 8**. These are editable starting values, not evidence of sufficient training data.
+3. Open **CM from scratch**. The selected CM dataset and its dimensions appear automatically.
+4. Choose the run name, epochs, learning rate, batch size and device. **Check compute setup** tests the selected device before a full job.
+5. Open **Advanced settings** when you need architecture, optimizer, scheduler, consistency intervals, loss weights, seed or checkpoint controls.
+6. Choose **Review configuration**, then **Start CM training**.
+7. Open **CM · Predict**. It lists scratch-CM runs; **4 · Predict** lists LoRACM runs. Both accept a different testing file or **My own patient scan** with its corresponding mask.
+8. Use **5 · Single TAC & NLS** for either model, enable the scratch posterior overlay for a paired voxel comparison, or open **Compare models** for shared held-out curves. In step 6, select either model and its own predictions.
 
 Both routes support graceful early stopping and the [same best/last/epoch checkpoint selection](FINE_TUNING.md#interrupted-jobs-and-memory-limits).
 
-The scratch settings are saved independently in `workspaces/<project>/train_cm.json`; LoRACM uses `train.json`. Different run names preserve both models and their metrics.
+Scratch data/settings are independent: `cm_dataset.npz`, `cm_protocol.json`, `cm_dataset_selection.json` and `train_cm.json`. LoRACM uses `dataset.npz`, `protocol.json`, `dataset_selection.json` and `train.json`. Different run names preserve both models and metrics. For a study comparing initialization at equal target-data size, explicitly select the same NPZ on both dataset pages. For a larger scratch-training dataset, retain a common evaluation file that was not used for either model's training or selection.
 
 ## Defaults and settings
 
@@ -66,6 +67,18 @@ Run from `PET-TRACER/LoRACM`. Edit `configs/train_cm.json` to point at your data
 ```bash
 python train_cm.py --config configs/train_cm.json
 ```
+
+Prepare the UC Davis example with independent datasets and both training routes:
+
+```bash
+python ucdavis.py --workspace workspaces/cm_comparison --size small --with-cm
+python simulate_protocol.py --config workspaces/cm_comparison/protocol.json
+python simulate_protocol.py --config workspaces/cm_comparison/cm_protocol.json
+python train.py --config workspaces/cm_comparison/train.json
+python train_cm.py --config workspaces/cm_comparison/train_cm.json
+```
+
+Omit `--size small` for full starting sizes. GUI exports use the same config files and commands for a custom project.
 
 You can override critical settings without editing JSON:
 

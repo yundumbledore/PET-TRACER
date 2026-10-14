@@ -1,5 +1,13 @@
 # Workflow validation
 
+## Separate CM data, repeated prediction and patient masks — 14 October 2026
+
+**57/57 automated checks passed** in the Python 3.11 / PyTorch 2.6.0 Apple Silicon CPU environment. The GUI now separates CM dataset preparation and prediction from LoRACM, keeps repeated prediction files and settings, and prepares verified geometry for a user-provided patient TAC slice plus mask. New checks cover independent dataset sizes/protocols/selections, model-type filtering, cleared pending prediction displays, original-file preservation, patient-specific Ki/parameter/interval-width maps, explicit voxel mappings, and rejection of another patient's geometry even with matching voxel IDs. GUI checks were repeated after the final model/geometry handoff changes. Source parsing, whitespace checks and 124 local documentation links passed.
+
+An end-to-end run through the GUI's actual subprocess launcher exported both small UC Davis configurations, generated separate 32 / 16 / 8 datasets, trained each full-width model for one CPU epoch, and passed the compute diagnostic. A synthetic new patient with three 35-frame TACs and its own binary mask was prepared and predicted twice by each model. Original prediction files remained unchanged. Ki mean, K1 mean and Ki 95%-interval-width maps exported successfully for both models with verified voxel identities. These tiny runs check software interfaces, not trained-model quality or posterior calibration.
+
+Windows-style transient and permanent file locks were injected in automated tests: short locks recover, permanent locks preserve the prior settings file, and a locked progress display does not abort computation. Child startup exceptions and native exits without a Python traceback retain interpreters, arguments and readable logs. A simulated incompatible CUDA kernel reports the environment and installation guidance. **The original Windows WinError 5 and RTX 5060 training failure could not be reproduced without the original traceback/device environment. Actual Windows/CUDA and MPS execution remain unverified locally.** Run **Check compute setup** on the target computer and retain its report and job log if a failure recurs.
+
 ## Original UC Davis measured AIFs — 14 October 2026
 
 **42/42 automated checks passed** on the same Python 3.11 / PyTorch 2.6.0 Apple Silicon CPU environment. UC Davis now defaults to the unchanged original `data/aif/UCDavis_1H35.csv`; the intermediate resampled CSV has been removed. The simulator interpolates directly from original samples, with explicitly saved zero-origin and final-value-hold policies.

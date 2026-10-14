@@ -11,7 +11,8 @@
 | You need labelled fine-tuning data | Define your kinetic model, input functions and acquisition protocol; simulate parameter–curve pairs. |
 | You already have labelled fine-tuning data | Convert it to the NPZ format, validate it, and skip simulation. |
 | You have only measured TACs and input functions | These are prediction inputs. Obtain or simulate labelled pairs to adapt the model first. |
-| You want a scratch-CM baseline | Train the same labelled data with [CM from scratch](docs/TRAIN_CM.md), then evaluate both models on shared held-out curves. |
+| You want a scratch-CM baseline | Prepare a separately sized dataset and train [CM from scratch](docs/TRAIN_CM.md), then evaluate both models on shared held-out curves. |
+| You have a new patient scan | Reuse a compatible trained model with the coronal TAC/AIF slice and its corresponding mask; [prepare and image your patient](docs/PARAMETRIC_IMAGING.md#your-own-patient-scan-and-mask). |
 | You want to learn with supplied assets | Follow the [UC Davis demonstration](docs/UCDAVIS.md), starting with the small CPU check. |
 
 ## 1. Install and start
@@ -50,11 +51,11 @@ Dimensions and parameter names are derived from the dataset. **Advanced settings
 
 ### Train a scratch CM for comparison
 
-Choose **CM from scratch** to train a new randomly initialized model without foundation weights. It shares the configuration controls and output format with LoRACM. **Compare models** evaluates both runs on the same testing file and can overlay their posterior samples. Follow the [CM training and comparison manual](docs/TRAIN_CM.md).
+Enable the optional CM route, then use **CM · Dataset → CM from scratch → CM · Predict**. It prepares independently sized data and trains a randomly initialized model without foundation weights. The full starting dataset is 1,000,000 / 100,000 / 1,000 pairs; edit these values for your study. Training controls and output formats are shared with LoRACM. **Compare models** evaluates both runs on one held-out testing file. Follow the [CM training and comparison manual](docs/TRAIN_CM.md).
 
 ## 5. Predict on your project
 
-GUI: **4 · Predict** for batch NPZ/HDF5 data, or **5 · Single TAC & NLS** for a CSV or one selected curve. Prediction accepts either trained model type; inputs must match the model's schedule, units and observation convention. Models fitted to another schedule need adaptation or justified resampling.
+GUI: **4 · Predict** for LoRACM, **CM · Predict** for scratch CM, or **5 · Single TAC & NLS** for a CSV/selected curve from either model. Both batch pages support another testing file. **My own patient scan** requires the coronal TAC/AIF slice and matching mask. Inputs must match the model's schedule, units and observation convention. Repeated predictions preserve previous files with numbered names and an explicit history selector.
 
 The single-TAC page displays parameter posterior histograms, exports joint samples and figures, and optionally overlays dashed nonlinear least-squares estimates. Read the [prediction manual](docs/PREDICTION.md) for an exact file example, terminal commands and interpretation.
 
@@ -62,7 +63,7 @@ The single-TAC page displays parameter posterior histograms, exports joint sampl
 
 GUI: **6 · Parametric imaging**. Kᵢ posterior mean is selected by default for the supplied UC Davis coronal slice. Choose another predicted parameter or its **95% credible-interval width**. The image appears on the left; clicking a foreground voxel displays its TAC plus input function and posterior KDE on the right. Export figures, map values and selected joint samples. Samples for inspected voxels are generated on demand and cached.
 
-Run step 4 on the complete patient-slice file to provide anatomical voxel predictions. Simulated test pairs have no image geometry. The module checks explicit voxel identities and verified geometry, and supports custom 2D slices or 3D masks. Read [parametric imaging](docs/PARAMETRIC_IMAGING.md) for exact formats and terminal equivalents.
+Predict the complete slice from either model's page. Your own patient route prepares and carries its mask/geometry into step 6; the same Ki, parameter, uncertainty and voxel-inspection controls work on your data. Simulated test pairs have no anatomical geometry. Read [parametric imaging](docs/PARAMETRIC_IMAGING.md) for formats and terminal equivalents.
 
 ## Terminal quick start
 
@@ -81,7 +82,7 @@ python protocol.py workspaces/my_project/dataset.npz
 # Set data paths; dimensions, parameter names and equal weights resolve automatically.
 python train.py --config configs/train_custom.json
 
-# Optional baseline on the same labelled data, initialized randomly.
+# Optional baseline: configure its separate dataset (or explicitly reuse data).
 python train_cm.py --config configs/train_cm.json
 
 # Predict your own TACs. Supply a testing file in the documented format.

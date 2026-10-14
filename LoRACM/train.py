@@ -12,7 +12,7 @@ from model_factory import build_model
 from training_config import resolve_training_config
 from common import load_config, validate_dataset, PARAMETERS
 from protocol import validate_file, validate_names
-from runtime import select_device, Progress, stop_requested, write_json_atomic
+from runtime import select_device, probe_device, Progress, stop_requested, write_json_atomic
 import signal
 
 def get_device():
@@ -44,7 +44,9 @@ def main(cfg, training_mode="lora"):
     np.random.seed(cfg["seed"])
 
     device = select_device(cfg["device"])
+    compute = probe_device(device)
     print(f"[{training_mode}] Device: {device}; epochs: {cfg['epochs']}; embedding: {cfg['embed_dim']}; dimensions: {cfg['x_dim']} / {cfg['y_dim']}", flush=True)
+    print('Compute check: '+json.dumps(compute),flush=True)
 
     data = np.load(cfg['dataset_dir'], allow_pickle=False)
     validate_dataset(data, cfg['x_dim'], cfg['y_dim'])

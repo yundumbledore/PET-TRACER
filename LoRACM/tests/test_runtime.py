@@ -9,12 +9,23 @@ import unittest
 from unittest.mock import patch
 import torch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from runtime import select_device, Progress, check_cancelled
+from runtime import select_device, probe_device, Progress, check_cancelled
 from infer import inference_chunks, MPS_MAX_EXPANDED_BATCH
 from lora import inject_lora_adapters, merge_for_inference
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_locked_progress_file_does_not_abort_computation(self):
+        with patch.dict(os.environ,{'PET_TRACER_PROGRESS_FILE':'locked-status.json'}),patch('runtime.write_json_atomic',side_effect=PermissionError('locked')),patch('runtime.sys.stderr'):
+            progress=Progress('Training',10)
+            progress.update(4)
+            self.assertEqual(progress.completed,4)
+            self.assertTrue(progress.status_warning)
+    def test_compute_probe_exercises_cpu_and_explains_gpu_kernel_failure(self):
+        self.assertEqual(probe_device('cpu')['device'],'cpu')
+        with patch('torch.cuda.get_device_name',return_value='RTX fixture'),patch('torch.cuda.get_device_capability',return_value=(12,0)),patch('torch.cuda.get_arch_list',return_value=['sm_86']),patch('torch.ones',side_effect=RuntimeError('no kernel image is available')):
+            with self.assertRaisesRegex(ValueError,'Compute check failed.*no kernel image.*RTX fixture'):
+                probe_device('cuda:0')
     def test_auto_routes_cuda_then_mps_then_cpu_and_rejects_unavailable_device(self):
         with patch('torch.cuda.is_available',return_value=False),patch('torch.backends.mps.is_available',return_value=True):
             self.assertEqual(str(select_device()),'mps')

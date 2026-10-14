@@ -10,7 +10,7 @@
 
 ## Choose the imaging model
 
-Select **Model for parametric imaging**: LoRACM or a trained scratch CM. A map always belongs to the selected model’s own prediction file. **Generate a map prediction with the selected model** creates it directly from step 6, with checkpoint, sample count, sampling steps and memory controls. Existing outputs are protected; enter a new prediction filename when regenerating. The clicked-voxel inspector checks the input and checkpoint checksums against the map.
+Select **Model for parametric imaging**: LoRACM or a trained scratch CM. A map belongs to the selected model's own prediction file. **Generate a map prediction with the selected model** creates it from step 6 with checkpoint, sample count, sampling steps and memory controls. Existing outputs are preserved with new numbered filenames. The voxel inspector checks the input and checkpoint checksums against the map.
 
 ## GUI workflow
 
@@ -41,6 +41,31 @@ For built-in 2TC, Kᵢ is calculated for every joint draw as `K1*k3/(k2+k3)`, th
 New prediction files contain `params_ci95_low`, `params_ci95_high`, `params_ci95_width`, and corresponding `Ki_*` arrays where applicable. Older files can display available mean/median maps, but need updated inference to obtain interval-width maps. Keeping all whole-image draws is unnecessary: exact percentiles are calculated within each inference batch.
 
 ## Geometry for your own project
+
+### Your own patient scan and mask
+
+Reuse a trained model on a new patient through **4 · Predict** (LoRACM) or **CM · Predict** (scratch CM):
+
+1. Choose **My own patient scan**, then load its coronal TAC/AIF slice as prediction NPZ or pandas HDF5. The trained frame schedule and durations must match.
+2. Load the **corresponding mask** as a binary `.npy`, or an `.npz` containing `mask`. A 2D mask directly describes the slice. For a 3D mask, choose its array axis and slice index. The mask must have exactly one foreground pixel per TAC.
+3. Confirm the TAC columns follow foreground pixels in NumPy C order, or load an explicit CSV with `voxel_columns,voxel_indices`. Indices refer to the selected 2D mask flattened in C order.
+4. Set image origin and pixel aspect ratio, and confirm you verified the mapping and display convention against your data export.
+5. Validate and predict. The app prepares `patient_scans/<identity>/geometry.npz` and `geometry.json`, then carries that patient's input, mask/mapping and prediction into step 6.
+6. Choose **Ki** (built-in 2TC), any fitted parameter, or a **95% credible-interval width**. Click a foreground voxel to see that patient's TAC/AIF and posterior KDE.
+
+The original patient slice and mask stay unchanged. Geometry records input/mask checksums; a map is rejected if its input differs, even when both patients use identical voxel IDs. The supplied UC Davis mask is bound to the supplied Sub001 file and is not reused for other patients. Generic TAC files without anatomical masks remain valid for batch/single-TAC prediction through **My own file**.
+
+For a terminal workflow, first verify the ordering and display convention, then prepare the mask:
+
+```bash
+python prepare_scan.py --input new_patient_slice.h5 --mask corresponding_mask.npy --output workspaces/my_project/patient_scans/patient02 --verified --origin lower --aspect 1
+python infer.py --run workspaces/my_project/runs/adaptation --input new_patient_slice.h5 --output workspaces/my_project/patient02_predictions.npz --samples 1000
+python parametric_imaging.py --predictions workspaces/my_project/patient02_predictions.npz --geometry workspaces/my_project/patient_scans/patient02/geometry.npz --geometry-metadata workspaces/my_project/patient_scans/patient02/geometry.json --parameter Ki --statistic mean --output workspaces/my_project/patient02_Ki.png
+```
+
+Change `--parameter Ki` to a fitted parameter name and/or `--statistic ci95_width`. Custom models can set `prepare_scan.py --parameter-dim P`. For a 3D source mask add `--axis` and `--slice`; an explicit voxel mapping uses `--mapping-csv`. This workflow accepts already exported TACs and NumPy masks, not raw scanner DICOM/NIfTI images.
+
+### Prepared geometry format
 
 Supply a geometry NPZ with:
 

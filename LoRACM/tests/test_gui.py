@@ -20,6 +20,103 @@ class GuiTests(unittest.TestCase):
         self.environment.stop()
         self.workspace.cleanup()
 
+    def prediction_fixture(self,mode='lora',name='scenario1'):
+        workspace=Path(self.workspace.name)/'my_project'
+        run=workspace/'runs'/name;run.mkdir(parents=True,exist_ok=True)
+        cfg={'training_mode':mode,'x_dim':5,'y_dim':4,'parameter_names':['K1','k2','k3','k4','Vb'],'kinetic_model':'2TC'}
+        (run/'model_params.json').write_text(json.dumps(cfg))
+        (run/'scaling_params.json').write_text(json.dumps({'t_meas':[.5,1.5],'frame_durations_min':[1,1]}))
+        (run/'best.pth').touch()
+        source=workspace/'patient.npz'
+        np.savez(source,tac=np.ones((3,2)),aif=np.ones(2),t_meas=[.5,1.5],frame_durations_min=[1,1],voxel_columns=['a','b','c'])
+        return workspace,run,source,cfg
+
+    def saved_prediction(self,output,source,cfg):
+        from common import file_sha256
+        meta={'input':str(source),'input_sha256':file_sha256(source),'config':cfg}
+        np.savez(output,parameter_names=cfg['parameter_names'],voxel_columns=['a','b','c'],params_mean=np.ones((3,5)),
+                 params_ci95_width=np.ones((3,5)),Ki_mean=[1,2,3],Ki_ci95_width=[.1,.2,.3],metadata_json=json.dumps(meta))
+        output.with_suffix('.json').write_text(json.dumps(meta))
+
+    def test_scratch_dataset_has_independent_size_protocol_and_training_selection(self):
+        from streamlit.testing.v1 import AppTest
+        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        next(w for w in app.sidebar.checkbox if w.label=='Enable CM from scratch comparison').check().run()
+        app.sidebar.radio[0].set_value('1 · Model & protocol').run()
+        next(w for w in app.button if w.label=='Save and validate protocol').click().run()
+        workspace=Path(self.workspace.name)/'my_project';original=(workspace/'protocol.json').read_bytes()
+        app.sidebar.radio[0].set_value('2 · Dataset').run()
+        next(w for w in app.number_input if w.label=='Training pairs').set_value(1234).run()
+        app.sidebar.radio[0].set_value('CM · Dataset').run()
+        self.assertEqual(next(w for w in app.number_input if w.label=='Training pairs').value,1000000)
+        next(w for w in app.number_input if w.label=='Training pairs').set_value(9).run()
+        with patch('gui.jobs.Jobs.start') as start:
+            next(w for w in app.button if w.label=='Generate CM dataset').click().run()
+            self.assertTrue(start.called)
+        cfg=json.loads((workspace/'cm_protocol.json').read_text())
+        self.assertEqual(cfg['n_train'],9);self.assertEqual(Path(cfg['output']).name,'cm_dataset.npz')
+        self.assertEqual((workspace/'protocol.json').read_bytes(),original)
+        app.sidebar.radio[0].set_value('2 · Dataset').run()
+        self.assertEqual(next(w for w in app.number_input if w.label=='Training pairs').value,1234)
+        app.sidebar.radio[0].set_value('CM from scratch').run()
+        self.assertEqual(Path(next(w for w in app.text_input if w.label=='Labelled dataset (.npz)').value).name,'cm_dataset.npz')
+        app.sidebar.radio[0].set_value('3 · Fine-tune').run()
+        self.assertEqual(Path(next(w for w in app.text_input if w.label=='Labelled dataset (.npz)').value).name,'dataset.npz')
+        self.assertFalse(list(app.exception))
+
+    def test_repeated_gui_predictions_preserve_files_and_cm_route_filters_models(self):
+        from streamlit.testing.v1 import AppTest
+        workspace,run,source,cfg=self.prediction_fixture()
+        _,cm,_,_=self.prediction_fixture('cm','cm_scratch')
+        old=run/'predictions.npz';self.saved_prediction(old,source,cfg);original=old.read_bytes()
+        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        next(w for w in app.sidebar.checkbox if w.label=='Enable CM from scratch comparison').check().run()
+        app.sidebar.radio[0].set_value('4 · Predict').run()
+        self.assertEqual(next(w for w in app.selectbox if w.label=='Model to use').options,['LoRACM · scenario1'])
+        next(w for w in app.selectbox if w.label=='Prediction input').set_value('My own file').run()
+        next(w for w in app.text_input if w.label=='Testing dataset').set_value(str(source)).run()
+        with patch('gui.jobs.Jobs.start') as start:
+            next(w for w in app.button if w.label=='Run prediction').click().run()
+            args=start.call_args.args[1]
+            destination=Path(args[args.index('--output')+1]);self.assertEqual(destination.name,'predictions_002.npz')
+        self.assertFalse(any(w.value.startswith('Posterior summaries') for w in app.subheader))
+        self.saved_prediction(destination,source,cfg)
+        with patch('gui.jobs.Jobs.start') as start:
+            next(w for w in app.button if w.label=='Run prediction').click().run()
+            args=start.call_args.args[1]
+            self.assertEqual(Path(args[args.index('--output')+1]).name,'predictions_003.npz')
+        self.assertEqual(old.read_bytes(),original)
+        app.sidebar.radio[0].set_value('CM · Predict').run()
+        self.assertEqual(next(w for w in app.selectbox if w.label=='Model to use').options,['CM from scratch · cm_scratch'])
+        self.assertTrue(any(w.value=='CM · Predict with your scratch model' for w in app.title))
+        self.assertFalse(list(app.exception))
+
+    def test_own_scan_requires_mask_and_carries_verified_geometry_to_imaging(self):
+        from streamlit.testing.v1 import AppTest
+        workspace,run,source,cfg=self.prediction_fixture()
+        mask=workspace/'patient_mask.npy';np.save(mask,np.array([[0,1],[1,1]]))
+        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app.sidebar.radio[0].set_value('4 · Predict').run()
+        next(w for w in app.selectbox if w.label=='Prediction input').set_value('My own patient scan').run()
+        next(w for w in app.text_input if w.label=='Testing dataset').set_value(str(source)).run()
+        with patch('gui.jobs.Jobs.start') as start:
+            next(w for w in app.button if w.label=='Run prediction').click().run();start.assert_not_called()
+        self.assertTrue(any('corresponding mask' in w.value for w in app.error))
+        next(w for w in app.checkbox if w.label.startswith('I verified the TAC voxel order')).check().run()
+        with patch('gui.jobs.Jobs.start') as start:
+            next(w for w in app.button if w.label=='Run prediction').click().run()
+            self.assertTrue(start.called)
+            args=start.call_args.args[1];prediction=Path(args[args.index('--output')+1])
+        self.saved_prediction(prediction,source,cfg)
+        app.sidebar.radio[0].set_value('6 · Parametric imaging').run()
+        self.assertFalse(list(app.exception))
+        geometry=Path(next(w for w in app.text_input if w.label=='Voxel geometry NPZ').value)
+        self.assertIn('patient_scans',geometry.parts)
+        self.assertIn('Ki',next(w for w in app.selectbox if w.label=='Parameter to image').options)
+        self.assertIn('K1',next(w for w in app.selectbox if w.label=='Parameter to image').options)
+        next(w for w in app.selectbox if w.label=='Map value').set_value('95% credible-interval width').run()
+        self.assertFalse(list(app.exception))
+
     def test_drafts_survive_arbitrary_navigation_and_project_switches(self):
         from streamlit.testing.v1 import AppTest
         file=str(Path(__file__).resolve().parents[1]/'gui/app.py')
