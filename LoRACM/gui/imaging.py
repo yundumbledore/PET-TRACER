@@ -13,6 +13,8 @@ from common import file_sha256
 from parametric_imaging import load_image,plane,display_limits,map_figure,parameter_samples,density_figure,STATISTICS
 from protocol import read_prediction_input
 from inspect_voxel import inspect
+from gui.state import model_run_picker
+from gui import state as project_state
 
 picker=declare_component('pet_voxel_picker',path=str(Path(__file__).parent/'voxel_picker'))
 
@@ -30,19 +32,37 @@ def input_curves(filename,modified,size,dim,t,d):
     return read_prediction_input(filename,dim,t,d)
 
 
-def render(root,workspace,run_default,input_default,upload_or_path):
+def render(root,workspace,run_default,input_default,upload_or_path,launch=None):
     st.title('6 · Total-body parametric imaging')
     st.caption('Choose a parameter or its 95% credible-interval width. Click a voxel to inspect its measured curve and posterior.')
-    prediction_default=st.session_state.get('prediction_'+str(workspace),str(run_default/'predictions.npz'))
+    run_default=model_run_picker(workspace,run_default,'Model for parametric imaging')
+    prediction_default=str(run_default/'predictions.npz')
+    latest=st.session_state.get('prediction_'+str(workspace))
+    if latest and Path(latest).parent==run_default: prediction_default=latest
     with st.expander('Prediction, model and geometry files'):
-        predictions=upload_or_path('Voxel predictions NPZ',prediction_default,['npz'],'imaging_predictions')
+        predictions=upload_or_path('Voxel predictions NPZ',prediction_default,['npz'],'imaging_predictions_'+str(run_default))
         geometry=upload_or_path('Voxel geometry NPZ',str(root/'data/real/Sub001_slice75_geometry.npz'),['npz'],'imaging_geometry')
         metadata=upload_or_path('Geometry metadata JSON',str(root/'data/real/Sub001_slice75_geometry.json'),['json'],'imaging_metadata')
-        run=Path(st.text_input('Imaging model run',str(run_default))).expanduser()
+        run=Path(st.text_input('Imaging model run',str(run_default),key='imaging_run_'+str(run_default))).expanduser()
         if not run.is_absolute(): run=root/run
         source=upload_or_path('Imaging TACs and input function',input_default,['npz','h5','hdf5'],'imaging_input')
         draws=st.number_input('Selected-voxel posterior draws',min_value=2,max_value=100000,value=1000)
         device=st.selectbox('Voxel inspection device',['auto','cpu','cuda:0','mps'])
+    if launch:
+        with st.expander('Generate a map prediction with the selected model'):
+            from gui.state import checkpoint_picker
+            checkpoint_to_predict=checkpoint_picker(run,'Imaging checkpoint')
+            a,b,c=st.columns(3)
+            map_draws=a.number_input('Map posterior samples per voxel',min_value=2,value=1000)
+            map_steps=b.number_input('Map reverse sampling steps',min_value=1,value=3)
+            map_batch=c.number_input('Map curve batch size',min_value=1,value=16)
+            map_chunk=st.number_input('Map sample chunk',min_value=1,value=64)
+            st.caption('Creates predictions at the path above; choose a new output filename to keep an existing map.')
+            if st.button('Generate predictions for this model',disabled=st.session_state.jobs.running()):
+                if predictions.exists(): st.error('Prediction file already exists. Enter a new prediction path above.')
+                else: launch('Parametric imaging posterior prediction',['infer.py','--run',run,'--input',source,'--output',predictions,
+                    '--checkpoint',checkpoint_to_predict,'--samples',map_draws,'--steps',map_steps,
+                    '--batch-size',map_batch,'--sample-chunk',map_chunk,'--device',device])
     if not predictions.exists():
         st.info('Finish step 4 using the UC Davis patient slice, then return here. Simulated test pairs have no anatomical voxel geometry.')
         return
@@ -55,6 +75,13 @@ def render(root,workspace,run_default,input_default,upload_or_path):
         result=initial if parameter==initial['parameter'] and statistic=='mean' else load_image(predictions,geometry,metadata,parameter,statistic)
     except Exception as e:
         st.info(f'Imaging files need attention: {e}');return
+    provenance=initial['provenance']
+    producer=provenance.get('config',{})
+    if producer:
+        model_label='LoRACM' if producer.get('training_mode','lora')=='lora' else 'CM from scratch'
+        st.caption('Map produced by '+model_label+' · '+producer.get('exp_name','saved run')+' · '+Path(provenance.get('checkpoint','best.pth')).name)
+    if provenance.get('device','').startswith('mps') and provenance.get('batch_size',0)*provenance.get('sample_chunk',0)>65536 and not provenance.get('expanded_batch_limit'):
+        st.warning('This saved map used an oversized MPS batch that can corrupt predictions. Regenerate it with the updated inference path before interpreting it.')
     st.caption('UC Davis provides one complete coronal slice through the body. Custom 2D slices and 3D masks use the same explicit voxel-ID mapping.')
     if 'small' in result['provenance'].get('config',{}).get('exp_name','').lower() or 'smoke' in result['provenance'].get('config',{}).get('exp_name','').lower():
         st.warning('Walkthrough model: the image demonstrates the software and is not a scientifically validated parametric result.')
@@ -90,7 +117,7 @@ def render(root,workspace,run_default,input_default,upload_or_path):
         key='selected_voxel_'+context
         if selected and selected.get('context')==context and selected!=st.session_state.get('last_click_'+context):
             st.session_state['last_click_'+context]=selected
-            st.session_state[key]=str(selected['voxel_id'])
+            project_state.remember('6 · Parametric imaging:text_input:'+key,str(selected['voxel_id']))
         voxel=st.text_input('Voxel ID (or click the image)',key=key)
         if not voxel: st.info('Click a foreground voxel on the left. You can also enter its voxel ID here.');return
         if voxel not in set(ids.ravel()): st.error('That voxel is not in the displayed image plane');return
@@ -100,6 +127,7 @@ def render(root,workspace,run_default,input_default,upload_or_path):
             if cfg.get('parameter_names',['K1','k2','k3','k4','Vb'])!=result['parameter_names']:
                 raise ValueError('The selected model parameter names differ from this map')
             provenance=result['provenance'];checkpoint=Path(provenance.get('checkpoint','best.pth')).name
+            if not (run/checkpoint).exists() and (run/'epochs'/checkpoint).exists(): checkpoint='epochs/'+checkpoint
             for field,path in [('input_sha256',source),('checkpoint_sha256',run/checkpoint)]:
                 if provenance.get(field) and checked_hash(path)!=provenance[field]:
                     raise ValueError('Use the same input data and model checkpoint that produced this map')
@@ -111,7 +139,7 @@ def render(root,workspace,run_default,input_default,upload_or_path):
             ax.set(xlabel='Time (minutes)',ylabel='Activity (input units)',title=f'Voxel {voxel}');ax.legend(fontsize=8);fig.tight_layout();st.pyplot(fig);plt.close(fig)
             if st.session_state.jobs.running(): st.info('Voxel sampling will be available when the active job finishes.');return
             seed=int(provenance.get('seed',0));steps=len(provenance.get('sampling_times',[1.,2/3,1/3]))
-            digest=hashlib.sha256(json.dumps([checked_hash(run/checkpoint),checked_hash(source),voxel,draws,seed,steps,device]).encode()).hexdigest()[:20]
+            digest=hashlib.sha256(json.dumps([checked_hash(run/checkpoint),checked_hash(source),voxel,draws,seed,steps,device,'safe-mps-merged-v2']).encode()).hexdigest()[:20]
             cache=workspace/'imaging_voxels'/digest/'posterior.npz'
             marker=cache.parent/'completed.json'
             if marker.exists():

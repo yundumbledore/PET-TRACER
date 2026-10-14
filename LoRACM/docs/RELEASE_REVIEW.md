@@ -1,3 +1,5 @@
+> Historical release review: the current GUI workflow now selects the lowest validation loss from every completed epoch, retains interrupted-run checkpoints and applies MPS batch guards. See [the updated workbench guide](WORKBENCH.md). The observations below describe the earlier release.
+
 # Author review before public release
 
 This review is grounded in the supplied manuscript, scripts, CSV, and locally available supporting files. It separates scientific choices from packaging repairs.

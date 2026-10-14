@@ -6,19 +6,53 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
-from tqdm import tqdm
+import copy
 from model_factory import build_model
 from common import summarize_samples, PARAMETERS, file_sha256
 from protocol import read_prediction_input, validate_names
+from runtime import select_device, Progress, check_cancelled
+from lora import merge_for_inference
+
+# Bound the *expanded* neural-network batch, not just the number of voxels.
+# MPS has documented large-batch linear-kernel correctness limits; this also
+# prevents a user's voxel_batch × sample_chunk choice from exhausting memory.
+MPS_MAX_EXPANDED_BATCH = 4096
+
+
+def inference_chunks(batch, chunk, device):
+    if device.type == 'mps':
+        batch = min(batch, MPS_MAX_EXPANDED_BATCH)
+        chunk = min(chunk, max(1, MPS_MAX_EXPANDED_BATCH//batch))
+    return batch, chunk
+
+
+@torch.inference_mode()
+def check_mps_forward(model, conditioning, x_dim, expanded_batch=MPS_MAX_EXPANDED_BATCH):
+    """Compare identical tensors/weights on CPU and MPS before publishing results."""
+    reference = copy.deepcopy(model).to('cpu')
+    generator = torch.Generator().manual_seed(1729)
+    batch=max(len(conditioning),expanded_batch)
+    conditioning=conditioning.repeat((batch+len(conditioning)-1)//len(conditioning),1)[:batch].contiguous()
+    x = torch.randn(batch,1,x_dim,generator=generator)
+    t = torch.linspace(.25,1.,batch)
+    indices=torch.linspace(0,batch-1,min(16,batch)).long()
+    expected = reference(x[indices],conditioning[indices].cpu(),t[indices])
+    actual = model(x.to('mps'),conditioning.to('mps'),t.to('mps')).cpu()[indices]
+    difference = float((expected-actual).abs().max())
+    if not torch.isfinite(actual).all() or not torch.allclose(actual,expected,atol=2e-3,rtol=2e-3):
+        raise ValueError(f'MPS/CPU numerical check failed (max difference {difference:.6g}). Select CPU and retain this diagnostic for your PyTorch/macOS version.')
+    return {'cpu_comparison_max_absolute_error':difference,'checked_rows':len(indices),'expanded_batch':batch,'atol':.002,'rtol':.002}
 
 @torch.inference_mode()
 def sample(model, y, samples, x_dim, times):
     b,d=y.shape
     repeated=y.repeat_interleave(samples,dim=0)
-    x=torch.randn(b*samples,1,x_dim,device=y.device)
+    # CPU-generated noise on MPS avoids backend-specific random-view issues.
+    noise_device='cpu' if y.device.type=='mps' else y.device
+    x=torch.randn(b*samples,1,x_dim,device=noise_device).to(y.device)
     for i,t in enumerate(times):
         if i:
-            x=x+t*torch.randn_like(x)
+            x=x+t*torch.randn(x.shape,device=noise_device,dtype=x.dtype).to(y.device)
         x=model(x,repeated,torch.full((b*samples,),float(t),device=y.device))
     return x.reshape(b,samples,x_dim)
 
@@ -51,31 +85,45 @@ def main(args):
     if xm.shape!=(cfg['x_dim'],) or xs.shape!=(cfg['x_dim'],) or not np.isfinite(xm).all() or not np.isfinite(xs).all() or not np.isfinite(ym).all() or not np.isfinite(ys).all() or np.any(xs<=0) or np.any(ys<=0):
         raise ValueError('Invalid normalization statistics')
     y=(y-ym)/ys
-    device=torch.device(('cuda:0' if torch.cuda.is_available() else 'cpu') if args.device=='auto' else args.device)
+    device=select_device(args.device)
     if args.multi_gpu and (device.type!='cuda' or torch.cuda.device_count()<2):
         raise ValueError('--multi-gpu needs at least two visible CUDA devices')
     if args.multi_gpu and device.index not in (None,0):
         raise ValueError('Use cuda:0 as the primary DataParallel device')
     torch.manual_seed(args.seed);np.random.seed(args.seed)
-    model=build_model(cfg,device,training=False)
+    model=build_model(cfg,torch.device('cpu'),training=False)
     ckpt=run/args.checkpoint
-    state=torch.load(ckpt,map_location=device,weights_only=True)
+    state=torch.load(ckpt,map_location='cpu',weights_only=True)
     if state.get('training_mode',cfg.get('training_mode','lora'))!=cfg.get('training_mode','lora'):
         raise ValueError('Checkpoint training mode differs from model_params.json')
     model.load_state_dict(state['model_state_dict'],strict=True)
     model.eval()
+    merge_for_inference(model)
+    model.to(device)
+    mps_check=None
+    batch_size,sample_chunk=inference_chunks(args.batch_size,args.sample_chunk,device)
+    print(f'Device: {device}; effective curve batch {batch_size}, draw chunk {sample_chunk}; steps {args.steps}',flush=True)
+    if device.type=='mps':
+        indices=np.linspace(0,len(y)-1,min(8,len(y)),dtype=int)
+        mps_check=check_mps_forward(model,torch.as_tensor(y[indices],dtype=torch.float32),cfg['x_dim'],batch_size*sample_chunk)
     if args.multi_gpu: model=nn.DataParallel(model)
     times=np.linspace(1.,0.,num=args.steps,endpoint=False)
     if getattr(args, 'save_samples', False) and len(y)*args.samples*cfg['x_dim'] > 2_000_000:
         raise ValueError('Saving posterior draws is limited to 2 million values; use fewer curves/samples')
     outputs={}
     saved_draws=[]
-    for start in tqdm(range(0,len(y),args.batch_size)):
-        obs=torch.as_tensor(y[start:start+args.batch_size],dtype=torch.float32,device=device)
+    progress=Progress('Posterior prediction',len(y)*args.samples,'draws')
+    for start in range(0,len(y),batch_size):
+        check_cancelled()
+        obs=torch.as_tensor(y[start:start+batch_size],dtype=torch.float32,device=device)
         draws=[]
-        for offset in range(0,args.samples,args.sample_chunk):
-            z=sample(model,obs,min(args.sample_chunk,args.samples-offset),cfg['x_dim'],times)
+        for offset in range(0,args.samples,sample_chunk):
+            check_cancelled()
+            count=min(sample_chunk,args.samples-offset)
+            z=sample(model,obs,count,cfg['x_dim'],times)
             draws.append(z.cpu().numpy()*xs+xm)
+            if not np.isfinite(draws[-1]).all(): raise ValueError('Non-finite posterior draws; check checkpoint and device')
+            progress.update(start*args.samples+len(obs)*(offset+count),device=str(device),curves_completed=start)
         if getattr(args, 'save_samples', False):
             saved_draws.append(np.concatenate(draws,axis=1))
         # Retain only one voxel batch of samples in CPU memory for exact medians.
@@ -87,6 +135,10 @@ def main(args):
         'checkpoint_sha256':file_sha256(ckpt),'input_sha256':file_sha256(args.input),
         'credible_interval':'Equal-tailed 95% interval: 2.5th and 97.5th percentiles; width = upper - lower. Ki is transformed per joint draw.',
         'batch_size':args.batch_size,'sample_chunk':args.sample_chunk,'seed':args.seed,
+        'effective_batch_size':batch_size,'effective_sample_chunk':sample_chunk,
+        'expanded_batch_limit':MPS_MAX_EXPANDED_BATCH if device.type=='mps' else None,
+        'mps_numerical_check':mps_check,'lora_weights_merged':cfg.get('training_mode','lora')=='lora',
+        'random_noise_device':'cpu' if device.type=='mps' else str(device),
         'sampling_times':times.tolist(),'time_mismatch_allowed':bool(args.allow_time_mismatch), 'time_mismatch_detected':bool(mismatch), 'observed_frame_durations_min':durations.tolist(),'torch_version':str(torch.__version__),
         'device':str(device),'multi_gpu':args.multi_gpu,
         'Ki_policy':('K1*k3/(k2+k3) for each joint draw; no clipping; |denominator|<=1e-12 excluded' if names == PARAMETERS and cfg.get('kinetic_model', '2TC') == '2TC' else 'Not calculated for this kinetic model'),
@@ -100,6 +152,7 @@ def main(args):
         voxel_columns=columns,parameter_names=np.asarray(names),t_meas=expected,
         observed_t_meas=observed_times,metadata_json=json.dumps(metadata))
     output.with_suffix('.json').write_text(json.dumps(metadata,indent=2)+'\n', encoding='utf-8')
+    progress.update(len(y)*args.samples,state='complete',device=str(device),output=str(output))
     print(f'Saved {output}')
 
 if __name__=='__main__':

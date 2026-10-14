@@ -8,6 +8,10 @@
 
 *Interface preview using the small installation-check model.*
 
+## Choose the imaging model
+
+Select **Model for parametric imaging**: LoRACM or a trained scratch CM. A map always belongs to the selected model’s own prediction file. **Generate a map prediction with the selected model** creates it directly from step 6, with checkpoint, sample count, sampling steps and memory controls. Existing outputs are protected; enter a new prediction filename when regenerating. The clicked-voxel inspector checks the input and checkpoint checksums against the map.
+
 ## GUI workflow
 
 1. In step 4, predict **UC Davis patient slice** using the model trained in steps 1–3. Include all 24,237 foreground voxels. Simulated test pairs can assess accuracy but have no anatomical coordinates.

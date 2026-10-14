@@ -20,7 +20,7 @@ def defaults(workspace, preset=PRESETS[0], small=False):
                     training_mode='lora',kinetic_model='2TC',dataset_dir=protocol['output'],
                     pretrained=str(ROOT/'checkpoints/foundation.pth'),save_dir=str(workspace/'runs'),
                     simulation_protocol=str(workspace/'protocol.json'),exp_name='scenario1' if uc else 'adaptation',
-                    workflow_preset=preset,walkthrough_size=protocol['walkthrough_size'])
+                    workflow_preset=preset,walkthrough_size=protocol['walkthrough_size'],checkpoint_start_epoch=1)
     if small and uc:
         protocol.update(n_train=32,n_val=16,n_test=8)
         training.update(epochs=2,batch_size=8,checkpoint_start_epoch=1,device='cpu',exp_name='scenario1_small')

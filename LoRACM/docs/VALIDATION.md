@@ -1,5 +1,15 @@
 # Workflow validation
 
+## Project persistence, inference and early stopping — 14 October 2026
+
+**36/36 automated checks passed** on the existing Python 3.11 / PyTorch 2.6.0 Apple Silicon CPU environment. Added checks cover arbitrary page navigation, project switching and browser-session restoration of unfinished edits; pending voxel analyses clearing old results; lowest-validation checkpoint selection after an early stop before the historical epoch-151 threshold; per-epoch snapshot selection; LoRA weight folding for linear/convolution/transposed-convolution layers; automatic device routing; MPS expanded-batch limits; cooperative cancellation and structured progress; and forward simulation at the posterior medians of both LoRACM and scratch CM.
+
+A two-epoch UC Davis pair of models produced posterior overlays and median forward curves for a synthetic noiseless 2TC TAC on the supplied 35-frame schedule. Multistart NLS converged with TAC RMSE approximately `4.6e-11` in input units. This checks the forward-fitting implementation, not the predictive quality of the tiny models. CSV and terminal TAC-figure exports passed.
+
+Browser review confirmed an unsaved schedule-cell edit survived leaving/reopening step 1, a 4,120-pair simulation completed with a native progress bar, checkpoint epochs/losses and inference controls appeared, completed comparisons were explicitly selectable, and an image click populated the correct voxel ID with TAC/AIF and posterior panels. Old unsafe MPS maps show a warning. Source parsing and local documentation-link checks also passed.
+
+The author's Mac prediction file used PyTorch 2.14.1, MPS, 512 curves and a 200-draw chunk: **102,400 network rows per call**. Bright-band errors repeat in the 184-voxel tail above the reported 65,536-row MPS linear-kernel boundary. A 64-voxel, 1,000-draw CPU control using the same checkpoint removed those tail jumps. The updated code caps expanded MPS calls at 4,096 and runs a fixed-input CPU/MPS comparison before prediction. **MPS execution of the updated guard and CUDA remain unverified locally**, because GPU access was unavailable in this verification environment. Hosted Windows/Linux/macOS CI has not been run on these local changes.
+
 ## UC Davis numbered workflow and interactive imaging — 14 October 2026
 
 The updated default route was checked on the same Apple Silicon / PyTorch 2.6.0 CPU environment recorded below. **29/29 automated checks passed**, including default-preset agreement with the measured Sub001 schedule, empirical 95% interval widths, joint-draw Kᵢ intervals, voxel-ID reordering, geometry rejection, 3D slice coordinates and imported custom-data configuration without a simulation protocol.

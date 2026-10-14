@@ -104,7 +104,7 @@ class LoRAConvTranspose1d(LoRAModule):
             return base
         CinT, CoutT, K = self.wrapped.in_channels, self.wrapped.out_channels, self.wrapped.kernel_size[0]
         delta_flat_out = self.B @ self.A                         # (CoutT, CinT*K)
-        delta_w = delta_flat_out.view(CoutT, CinT, K).permute(1, 0, 2)  # (CinT, CoutT, K)
+        delta_w = delta_flat_out.view(CoutT, CinT, K).permute(1, 0, 2).contiguous()  # (CinT, CoutT, K)
         x_d = self.dropout(x)
         update = F.conv_transpose1d(
             x_d, delta_w, bias=None,
@@ -177,3 +177,24 @@ def lora_parameter_count(model: nn.Module) -> Tuple[int, int]:
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())
     return trainable, total
+
+
+@torch.no_grad()
+def merge_for_inference(model):
+    """Fold eval-mode adapters into base weights once, preserving the checkpoint."""
+    if model.training:
+        raise ValueError('Only an eval model can merge LoRA adapters')
+    for name, child in list(model.named_children()):
+        if isinstance(child, LoRAModule):
+            base = child.wrapped
+            if child.r:
+                delta = child.B @ child.A
+                if isinstance(child, LoRAConvTranspose1d):
+                    delta = delta.reshape(base.out_channels, base.in_channels, base.kernel_size[0]).permute(1,0,2)
+                else:
+                    delta = delta.reshape_as(base.weight)
+                base.weight.add_(delta.contiguous(), alpha=child.scaling)
+            setattr(model, name, base)
+        else:
+            merge_for_inference(child)
+    return model

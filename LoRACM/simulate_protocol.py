@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from protocol import validate_protocol, validate_times, load_model, feng_curve, FENG_NAMES, load_protocol
 from common import validate_dataset
+from runtime import Progress, check_cancelled
 
 
 def load_inputs(cfg, end):
@@ -90,10 +91,14 @@ def main(cfg):
     data = {'t_meas': t, 'frame_durations_min': duration,
             'parameter_names': np.asarray(cfg['parameter_names']),
             'observation': np.asarray(mode)}
+    total_pairs = sum(cfg['n_'+split] for split in ('train','val','test'))
+    progress = Progress('Dataset simulation',total_pairs,'pairs')
+    completed = 0
     for split in ('train','val','test'):
         xs, ys, indices = [], [], []
         total = cfg['n_'+split]
         for start in range(0, total, cfg['chunk_size']):
+            check_cancelled()
             n = min(cfg['chunk_size'], total-start)
             scale = cfg.get('test_prior_scale', 1.) if split == 'test' else 1.
             ranges = [((p['min']+p['max'])/2-(p['max']-p['min'])*scale/2,
@@ -120,7 +125,8 @@ def main(cfg):
             xs.append(np.column_stack([parameters,noise]))
             ys.append(np.column_stack([noisy,measured_input]))
             indices.append(selected)
-            print(f'{split}: {start+n}/{total} pairs', flush=True)
+            completed += n
+            progress.update(completed, split=split, split_completed=start+n, split_total=total)
         data['x_'+split],data['y_'+split] = np.concatenate(xs),np.concatenate(ys)
         data['aif_index_'+split] = np.concatenate(indices)
     validate_dataset(data,len(cfg['parameter_names']),2*len(t))
@@ -136,6 +142,7 @@ def main(cfg):
     if cfg.get('model') == 'custom':
         metadata['model_sha256'] = hashlib.sha256(Path(cfg['model_file']).read_bytes()).hexdigest()
     path.with_suffix('.json').write_text(json.dumps(metadata,indent=2)+'\n', encoding='utf-8')
+    progress.update(total_pairs,state='complete',output=str(path))
     print(f'Saved {path}',flush=True)
 
 

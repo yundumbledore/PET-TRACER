@@ -15,7 +15,7 @@ def dataset_report(filename, modified, size):
 def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
     is_lora=mode=='lora'
     defaults={} if defaults is None else defaults
-    prefix=mode+'_'+workspace.name+'_'+defaults.get('workflow_preset','custom')+'_'+defaults.get('walkthrough_size','full')
+    prefix=mode+'_'+workspace.name
     title='Fine-tune with LoRACM' if is_lora else 'Train a CM from scratch'
     st.title(title)
     st.caption('Adapt the foundation model with LoRA and selected trainable layers.' if is_lora else 'Initialize a new consistency model randomly and train all learnable weights.')
@@ -46,11 +46,7 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
     a,b,c=st.columns(3)
     epochs=a.number_input('Epochs',min_value=1,value=int(previous.get('epochs',5000)),key=prefix+'_epochs',help='One epoch passes through the training loader. Default: 5,000.')
     batch_default=min(int(previous.get('batch_size',512)),report['counts']['train']) if report else int(previous.get('batch_size',512))
-    if prefix+'_batch' not in st.session_state:
-        st.session_state[prefix+'_batch']=batch_default
-    if report and st.session_state[prefix+'_batch'] is not None and st.session_state[prefix+'_batch']>report['counts']['train']:
-        st.session_state[prefix+'_batch']=report['counts']['train']
-    batch=b.number_input('Batch size',min_value=1,value=None,key=prefix+'_batch',help='Reduce for limited memory. The initial value is capped by the dataset size.')
+    batch=b.number_input('Batch size',min_value=1,max_value=report['counts']['train'] if report else None,value=batch_default,key=prefix+'_batch',help='Reduce for limited memory. The initial value is capped by the dataset size.')
     lr=c.number_input('Learning rate',min_value=1e-8,value=float(previous.get('lr',.0001)),step=.00001,format='%.8f',key=prefix+'_lr',help='AdamW starting rate. Default: 0.0001.')
     a,b=st.columns(2)
     devices=['auto','cpu','cuda:0','mps']
@@ -85,7 +81,8 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
         min_lr=c.number_input('Minimum learning rate',min_value=1e-12,value=float(previous.get('min_lr',1e-8)),step=1e-8,format='%.12f',key=prefix+'_minlr')
         a,b=st.columns(2)
         seed=a.number_input('Training random seed',min_value=0,value=int(previous.get('seed',0)),key=prefix+'_seed')
-        start_epoch=b.number_input('First eligible best-checkpoint epoch',min_value=1,value=int(previous.get('checkpoint_start_epoch',1)),key=prefix+'_eligible')
+        interval=b.number_input('Save an epoch checkpoint every',min_value=1,value=int(previous.get('checkpoint_interval',25)),key=prefix+'_interval',help='Default: every 25 epochs, plus epoch 1, best and last. Set 1 to retain every epoch; a full run may need tens of GB.')
+        st.caption('Best and last are updated after every completed epoch, including when you stop early. The best checkpoint always has the lowest completed validation loss.')
         weights=previous.get('loss_weights','auto')
         weights_text=st.text_input('Parameter loss weights',weights if isinstance(weights,str) else ', '.join(map(str,weights)),key=prefix+'_weights',help='auto = equal weights. Otherwise one positive value per parameter, in order.')
         drop_last=st.checkbox('Drop an incomplete final training batch',value=previous.get('drop_last',True),key=prefix+'_drop_last')
@@ -114,7 +111,7 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
                    kinetic_model=model_type,epochs=epochs,batch_size=batch,lr=lr,device=device,exp_name=name,
                    embed_dim=embed,embedy=embedy,channels=[int(x.strip()) for x in channels.split(',')],sigma_data=sigma,
                    weight_decay=weight_decay,noise_levels=noise_levels,ema_decay=ema,lr_scheduler_patience=patience,
-                   lr_factor=factor,min_lr=min_lr,seed=seed,checkpoint_start_epoch=start_epoch,drop_last=drop_last,
+                   lr_factor=factor,min_lr=min_lr,seed=seed,checkpoint_start_epoch=1,checkpoint_interval=interval,drop_last=drop_last,
                    loss_weights='auto' if weights_text.strip()=='auto' else [float(x.strip()) for x in weights_text.split(',')],
                    save_dir=str(workspace/'runs'))
         if is_lora: cfg.update(pretrained=str(checkpoint),lora_r=rank,lora_alpha=alpha,lora_dropout=dropout,train_norms=train_norms)

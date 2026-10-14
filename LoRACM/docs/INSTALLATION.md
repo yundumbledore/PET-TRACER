@@ -55,7 +55,7 @@ macOS support targets **Apple M-series chips**. Use PyTorch 2.6 or later for the
 | macOS Apple Silicon | CPU workflow | `--device mps` for PyTorch |
 | Linux | CPU workflow | Supported CUDA PyTorch build |
 
-Simulation in `simulate_protocol.py` and NLS use NumPy/SciPy on CPU. Training `auto` selects CUDA, then MPS, then CPU; prediction `auto` uses CUDA or CPU (select MPS explicitly). Available operations and memory vary by hardware; use CPU if your device cannot run the model. Multi-GPU prediction uses PyTorch DataParallel on one node. See [PyTorch MPS documentation](https://docs.pytorch.org/docs/stable/notes/mps.html).
+Simulation in `simulate_protocol.py` and NLS use NumPy/SciPy on CPU. Training and prediction `auto` select CUDA, then MPS, then CPU. Prediction caps the expanded MPS batch and checks identical model evaluations against CPU before generating results. Available operations and memory vary by hardware; use CPU if your device cannot run the model. Multi-GPU prediction uses PyTorch DataParallel on one node. See [PyTorch MPS documentation](https://docs.pytorch.org/docs/stable/notes/mps.html).
 
 ## Optional legacy research generator
 

@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import least_squares
 from protocol import feng_curve, FENG_NAMES, validate_times
+from runtime import Progress, check_cancelled
 
 
 def main(source, output):
@@ -16,6 +17,8 @@ def main(source, output):
     if frame.shape[1] < 3 or len(t) < 8:
         raise ValueError('Cohort fitting needs at least two AIFs and eight time samples')
     rows, fits = [], {'time_min':t}
+    progress=Progress('Feng cohort fitting',(frame.shape[1]-1)*3,'fits')
+    completed=0
     for column in frame.columns[1:]:
         y = frame[column].to_numpy(dtype=float)
         if not np.isfinite(y).all() or np.any(y < 0) or y.max() <= 0:
@@ -27,10 +30,16 @@ def main(source, output):
         upper = [np.inf,np.inf,np.inf,100,100,100,max(peak,1e-6)]
         candidates = []
         for rate in (1.,5.,15.):
+            check_cancelled()
             guess = [rate*3,.2,.05,rate,.1,.01,min(peak/2,.1)]
-            result = least_squares(lambda p:(feng_curve(t,np.asarray(p)[None,:])[0]-target),
+            def residual(parameters):
+                check_cancelled()
+                return feng_curve(t,np.asarray(parameters)[None,:])[0]-target
+            result = least_squares(residual,
                                    guess,bounds=(np.zeros(7),upper),max_nfev=3000)
             candidates.append(result)
+            completed+=1
+            progress.update(completed,aif=str(column))
         result = min(candidates,key=lambda r:np.sum(r.fun**2))
         if not result.success:
             raise ValueError(f'{column}: Feng fitting did not converge: {result.message}')
@@ -46,6 +55,7 @@ def main(source, output):
     output.parent.mkdir(parents=True,exist_ok=True)
     pd.DataFrame(rows).to_csv(output,index=False,mode='x')
     pd.DataFrame(fits).to_csv(output.with_suffix('.fits.csv'),index=False,mode='x')
+    progress.update(completed,state='complete')
     print(f'Saved {output}; inspect fit errors and curves before simulation',flush=True)
 
 

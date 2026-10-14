@@ -12,13 +12,11 @@ from model_factory import build_model
 from training_config import resolve_training_config
 from common import load_config, validate_dataset, PARAMETERS
 from protocol import validate_file, validate_names
+from runtime import select_device, Progress, stop_requested, write_json_atomic
+import signal
 
 def get_device():
-    if torch.cuda.is_available():
-        return torch.device("cuda:0")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
+    return select_device('auto')
 
 def main(cfg, training_mode="lora"):
     if not cfg.get('dataset_dir'):
@@ -45,7 +43,7 @@ def main(cfg, training_mode="lora"):
     torch.manual_seed(cfg["seed"])
     np.random.seed(cfg["seed"])
 
-    device = get_device() if cfg["device"] == "auto" else torch.device(cfg["device"])
+    device = select_device(cfg["device"])
     print(f"[{training_mode}] Device: {device}; epochs: {cfg['epochs']}; embedding: {cfg['embed_dim']}; dimensions: {cfg['x_dim']} / {cfg['y_dim']}", flush=True)
 
     data = np.load(cfg['dataset_dir'], allow_pickle=False)
@@ -140,15 +138,33 @@ def main(cfg, training_mode="lora"):
     best = float("inf")
     start_time = time.time()
 
+    completed_epoch = 0
+    checkpoint_index = {}
+    interrupted = False
+    def request_stop(signum, frame):
+        nonlocal interrupted
+        interrupted = True
+    old_handlers = {}
+    # Main-thread CLI runs support Ctrl+C; GUI jobs use a cooperative stop file.
+    import threading
+    if threading.current_thread() is threading.main_thread():
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            old_handlers[sig] = signal.signal(sig, request_stop)
+    def cancelled(): return interrupted or stop_requested()
+    progress = Progress('Training', cfg['epochs']*(len(train_loader)+len(val_loader)), 'batches')
+    completed_batches = 0
     for epoch in range(1, cfg["epochs"] + 1):
+        if cancelled(): break
         model.train()
         run_loss = 0.0
         for i, (y, x) in enumerate(train_loader):
+            if cancelled(): break
             y = y.to(device)
             x = x.unsqueeze(1).float().to(device)
 
-            z = torch.randn_like(x)
-            n = torch.randint(0, Nk, (x.size(0),), device=device)
+            noise_device = 'cpu' if device.type == 'mps' else device
+            z = torch.randn(x.shape, dtype=x.dtype, device=noise_device).to(device)
+            n = torch.randint(0, Nk, (x.size(0),), device=noise_device).to(device)
             t_n = n / Nk
             t_n_plus_1 = (n + 1) / Nk
             x_noisy_n        = x + t_n.unsqueeze(1).unsqueeze(2) * z
@@ -172,7 +188,11 @@ def main(cfg, training_mode="lora"):
             # Update the EMA model weights
             update_ema(model, target_model, mu=cfg["ema_decay"])
             run_loss += loss.item()
+            completed_batches += 1
+            progress.update(completed_batches, epoch=epoch, epochs=cfg['epochs'], phase='Training',
+                            train_loss=run_loss/(i+1), learning_rate=optimizer.param_groups[0]['lr'], device=str(device))
 
+        if cancelled(): break
         avg_loss = run_loss / (i + 1)
         writer.add_scalar("Loss/train", avg_loss, epoch)
 
@@ -183,8 +203,8 @@ def main(cfg, training_mode="lora"):
                 for j, (vy, vx) in enumerate(val_loader):
                     vy = vy.to(device)
                     vx = vx.unsqueeze(1).float().to(device)
-                    vz = torch.randn_like(vx)
-                    vn = torch.randint(0, Nk, (vx.size(0),), device=device)
+                    vz = torch.randn(vx.shape, dtype=vx.dtype, device=noise_device).to(device)
+                    vn = torch.randint(0, Nk, (vx.size(0),), device=noise_device).to(device)
                     vt_n = vn / Nk
                     vt_n_plus_1 = (vn + 1) / Nk
                     vx_noisy_n        = vx + vt_n.unsqueeze(1).unsqueeze(2) * vz
@@ -198,6 +218,10 @@ def main(cfg, training_mode="lora"):
                     vloss = torch.mean(loss_weights * (vpred_n_plus_1 - vtarget_n) ** 2)
                     # vloss = torch.mean((vpred_n_plus_1 - vtarget_n) ** 2)
                     v_run += vloss.item()
+                    completed_batches += 1
+                    progress.update(completed_batches, epoch=epoch, epochs=cfg['epochs'], phase='Validation',
+                                    train_loss=avg_loss, val_loss=v_run/(j+1),
+                                    learning_rate=optimizer.param_groups[0]['lr'], device=str(device))
 
             avg_v = v_run / (j + 1)
             writer.add_scalar("Loss/val", avg_v, epoch)
@@ -207,7 +231,8 @@ def main(cfg, training_mode="lora"):
             scheduler.step(avg_v)
             current_lr = optimizer.param_groups[0]['lr']
             writer.add_scalar("LR", current_lr, epoch)
-            print(f"Epoch {epoch:04d} | LR: {current_lr:.6f} | train {avg_loss:.6f} | val {avg_v:.6f}")
+            if not os.environ.get('PET_TRACER_PROGRESS_FILE'):
+                print(f"Epoch {epoch:04d} | LR: {current_lr:.8g} | train {avg_loss:.6f} | val {avg_v:.6f}")
             # print(f"Epoch {epoch:04d} | train {avg_loss:.6f} | val {avg_v:.6f}")
         else:
             print(f"Epoch {epoch:04d} | train {avg_loss:.6f}")
@@ -215,11 +240,24 @@ def main(cfg, training_mode="lora"):
         with metrics_path.open('a', newline='', encoding='utf-8') as f:
             csv.writer(f).writerow([epoch, avg_loss, avg_v, optimizer.param_groups[0]['lr'], time.time()-start_time])
         writer.flush()
-        if avg_v < best and epoch >= cfg["checkpoint_start_epoch"]:
+        completed_epoch = epoch
+        item = {'epoch':epoch, 'val_loss':avg_v, 'train_loss':avg_loss, 'learning_rate':current_lr}
+        save_checkpoint(target_model, cfg, Path(save_dir, 'last.pth'), epoch, avg_v)
+        checkpoint_index['last.pth'] = item
+        if avg_v < best:
             best = avg_v
-            save_checkpoint(target_model, cfg, Path(save_dir, 'best.pth'), epoch)
-
-    save_checkpoint(target_model, cfg, Path(save_dir, 'last.pth'), cfg['epochs'])
+            save_checkpoint(target_model, cfg, Path(save_dir, 'best.pth'), epoch, avg_v)
+            checkpoint_index['best.pth'] = item
+        if epoch == 1 or epoch % cfg['checkpoint_interval'] == 0:
+            name = f'epochs/epoch_{epoch:06d}.pth'
+            save_checkpoint(target_model, cfg, Path(save_dir, name), epoch, avg_v)
+            checkpoint_index[name] = item
+        write_json_atomic(Path(save_dir, 'checkpoints.json'), checkpoint_index)
+    stopped = cancelled()
+    for sig, handler in old_handlers.items(): signal.signal(sig, handler)
+    progress.update(completed_batches, state='stopped' if stopped else 'complete',
+                    epoch=completed_epoch, epochs=cfg['epochs'], best_validation_loss=best if np.isfinite(best) else None,
+                    best_epoch=checkpoint_index.get('best.pth',{}).get('epoch'), device=str(device))
     writer.close()
     end_time = time.time()
     elapsed = end_time - start_time
@@ -229,26 +267,31 @@ def main(cfg, training_mode="lora"):
     summary={'training_mode':training_mode,'dataset_sha256':digest.hexdigest(),
              'parameter_names':names,'split_counts':report['counts'],'seed':cfg['seed'],
              'trainable_parameters':trainable_parameters,'total_parameters':total_parameters,
-             'training_seconds':elapsed,'epochs':cfg['epochs'],'device':str(device),
+             'training_seconds':elapsed,'epochs':completed_epoch,'planned_epochs':cfg['epochs'],'stopped_early':stopped,'device':str(device),
              'best_validation_loss':best if np.isfinite(best) else None,
-             'checkpoint_policy':'Best eligible and final EMA inference model',
+             'best_epoch':checkpoint_index.get('best.pth',{}).get('epoch'),
+             'checkpoint_policy':'Lowest validation loss across all completed epochs; last completed epoch; periodic EMA snapshots',
              'fixed_features':'Gaussian Fourier projection is held fixed; transferred when compatible, random for scratch or resized embeddings'}
     Path(save_dir,'training_summary.json').write_text(json.dumps(summary,indent=2)+'\n', encoding='utf-8')
-    print(f"Training completed in {elapsed:.3f} seconds. Run: {save_dir}",flush=True)
+    print(f"Training {'stopped' if stopped else 'completed'} after {completed_epoch} completed epochs in {elapsed:.3f} seconds. Run: {save_dir}",flush=True)
     return Path(save_dir)
 
 
-def save_checkpoint(model, cfg, path, epoch):
-    checkpoint={'model_state_dict':model.state_dict(),'training_mode':cfg['training_mode'],'epoch':epoch}
+def save_checkpoint(model, cfg, path, epoch, val_loss=None):
+    checkpoint={'model_state_dict':model.state_dict(),'training_mode':cfg['training_mode'],'epoch':epoch,'val_loss':val_loss}
     for key in ('lr','lora_r','lora_alpha','lora_dropout','channels','embed_dim','embedy','x_dim','y_dim'):
         if key in cfg: checkpoint[key]=cfg[key]
-    torch.save(checkpoint,path)
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name+'.tmp')
+    torch.save(checkpoint, temporary)
+    temporary.replace(path)
 
 
 def run_cli(mode='lora'):
     parser=argparse.ArgumentParser(description=__doc__ if mode=='lora' else 'Train a consistency model from scratch')
     parser.add_argument('--config',default='configs/train_scenario1.json' if mode=='lora' else 'configs/train_cm.json')
-    for flag,kind in [('epochs',int),('lr',float),('batch-size',int),('embed-dim',int),('x-dim',int),('y-dim',int),('seed',int)]:
+    for flag,kind in [('checkpoint-interval',int),('epochs',int),('lr',float),('batch-size',int),('embed-dim',int),('x-dim',int),('y-dim',int),('seed',int)]:
         parser.add_argument('--'+flag,type=kind,help='Override the corresponding JSON setting')
     parser.add_argument('--device',choices=['auto','cpu','cuda:0','mps'])
     args=parser.parse_args();cfg=load_config(args.config)

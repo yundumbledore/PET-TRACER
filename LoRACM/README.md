@@ -24,7 +24,7 @@ python launch_gui.py
 
 The browser interface runs on your computer. **Project name** selects a folder under `LoRACM/workspaces/`; configs, uploaded files, logs, runs and analyses stay there. Use a new project/run name for an independent experiment. A single active background job is allowed per browser session. Its status and log remain available while you switch pages; keep the application running while jobs execute.
 
-**UC Davis Scenario 1 is the default starting template.** Follow numbered steps 1–6 with its 2TC model, four AIFs and patient-aligned 35-frame schedule. Choose **Small CPU walkthrough** before saving step 1 for a quick check, or retain full research-sized settings. **My own project** supplies the general defaults below. Saved project settings take precedence; use a fresh project name to start the walkthrough unchanged.
+**UC Davis Scenario 1 is the default example setup.** Follow numbered steps 1–6 with its 2TC model, four AIFs and patient-aligned 35-frame schedule. Choose **Quick installation check** before saving step 1 for a quick check, or retain full research-sized settings. **My own project** supplies the general defaults below. Settings and unfinished edits are retained across pages and browser sessions. Use a fresh project name for independent settings. [Read the GUI guide](docs/WORKBENCH.md) for project defaults, early stopping and inference controls.
 
 Terminal users run the following workflow commands from **`PET-TRACER/LoRACM`**. Relative config paths are interpreted from that directory. Absolute paths also work; quote paths containing spaces.
 

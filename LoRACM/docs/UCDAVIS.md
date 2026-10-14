@@ -4,7 +4,7 @@
 
 ## Default six-step walkthrough (all three platforms)
 
-Launch the GUI and choose a fresh project name. **UC Davis Scenario 1** is the default starting template. Choose **Small CPU walkthrough** to learn quickly, or retain **Full Scenario 1** for the research-sized settings. Settings are editable at every numbered step; existing project files take precedence over new defaults.
+Launch the GUI and choose a fresh project name. **UC Davis Scenario 1** is the default example setup. Choose **Quick installation check** to learn quickly, or retain **Full Scenario 1** for the research-sized settings. Settings are editable at every numbered step; unfinished edits and saved settings are retained when you revisit any step. The sidebar’s **Project defaults** describes both scales; these initialise the project and never reset it during navigation.
 
 | Step | Action | UC Davis default |
 | :--- | :--- | :--- |
@@ -115,7 +115,7 @@ Outputs appear under `runs/scenario1/`:
 
 - `model_params.json`: resolved model and training configuration.
 - `scaling_params.json`: training-set normalization and time grid.
-- `best.pth`: best EMA checkpoint from epoch 151 onward, matching the supplied script's eligibility rule.
+- `best.pth`: EMA checkpoint with the lowest validation loss across every completed epoch. The historical research script used epoch 151 eligibility; the current workflow deliberately saves from epoch 1 so an early-stopped run remains usable.
 - `last.pth`: final EMA checkpoint, including for short runs.
 - `tb/`: TensorBoard logs.
 

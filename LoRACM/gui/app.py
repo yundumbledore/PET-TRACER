@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import re
 import sys
+import os
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -11,8 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from protocol import validate_protocol, validate_file, read_prediction_input, load_model
 from gui.jobs import Jobs
+from gui import state as project_state
+from gui.state import checkpoint_picker, model_run_picker
+from runtime import select_device
 from ucdavis import defaults as workflow_defaults, PRESETS, testing_from_dataset
 
+project_state.install()
+st.session_state['_draft_context'] = None
 st.set_page_config(page_title='PET-TRACER · LoRACM',page_icon='◈',layout='wide')
 st.markdown('''<style>
 .stApp {background: #f7fafc;}
@@ -41,13 +47,16 @@ def launch(label, args, run=None):
     try:
         st.session_state.jobs.start(label,args,workspace)
         if run is not None: st.session_state.active_run=str(run)
-        st.success(f'{label} started. Open the job monitor below for progress.')
+        st.success(f'{label} started. Progress appears below.')
+        return True
     except (ValueError,OSError) as e:
         st.error(str(e))
+        return False
 
 
 def upload_or_path(label, default, suffixes, key):
-    value = st.text_input(label,value=str(default),key=key+'_'+project_name+'_path')
+    remembered = project_state.get('file:'+key, str(default))
+    value = st.text_input(label,value=remembered,key=key+'_'+project_name+'_path')
     upload = st.file_uploader('Or select a local file',type=suffixes,key=key+'_'+project_name+'_upload')
     if upload is not None:
         import hashlib
@@ -57,26 +66,50 @@ def upload_or_path(label, default, suffixes, key):
         destination.parent.mkdir(parents=True,exist_ok=True)
         if not destination.exists():
             destination.write_bytes(upload.getbuffer())
+        project_state.remember(page+':text_input:'+key+'_'+project_name+'_path',str(destination))
+        project_state.remember('file:'+key,str(destination))
         return destination
+    project_state.remember('file:'+key,str(path(value)))
     return path(value)
 
 
 with st.sidebar:
     st.title('PET-TRACER')
     st.caption('Adapt a consistency model to your PET protocol')
-    project_name = st.text_input('Project name','my_project',help='Saved under LoRACM/workspaces/. Use a new name for an independent experiment.')
+    project_name = st.text_input('Project name',st.query_params.get('project','my_project'),key='_project_name',help='Saved under LoRACM/workspaces/. Use a new name for an independent experiment.')
     if not re.fullmatch(r'[A-Za-z0-9_-]+',project_name):
         st.error('Use letters, numbers, underscores or hyphens.'); st.stop()
-    workspace = ROOT/'workspaces'/project_name
-    preset = st.selectbox('Starting template',PRESETS,key='preset_'+project_name)
-    size = st.selectbox('UC Davis run size',['Full Scenario 1','Small CPU walkthrough'],disabled=preset!=PRESETS[0],key='size_'+project_name)
-    small = preset==PRESETS[0] and size=='Small CPU walkthrough'
-    profile=project_name+'_'+('uc_small' if small else 'uc_full' if preset==PRESETS[0] else 'custom')
-    page = st.radio('Your workflow',['Welcome','1 · Model & protocol','2 · Dataset','3 · Fine-tune','CM from scratch','4 · Predict','5 · Single TAC & NLS','6 · Parametric imaging','Compare models','UC Davis demonstration','User manual'])
+    st.query_params['project']=project_name
+    workspace = Path(os.environ.get('PET_TRACER_WORKSPACES',str(ROOT/'workspaces')))/project_name
+    project_state.context(workspace, 'Project')
+    with st.expander('Project defaults',expanded=not (workspace/'protocol.json').exists()):
+        previous_defaults={}
+        for saved_file in ('protocol.json','train.json'):
+            if (workspace/saved_file).exists(): previous_defaults.update(json.loads((workspace/saved_file).read_text(encoding='utf-8')))
+        previous_preset=previous_defaults.get('workflow_preset',PRESETS[0])
+        locked=any((workspace/name).exists() for name in ('protocol.json','train.json','train_cm.json','dataset_selection.json')) or any(not k.startswith('Project:') for k in st.session_state['_project_drafts_'+str(workspace)])
+        preset = st.selectbox('Example setup',PRESETS,index=PRESETS.index(previous_preset) if previous_preset in PRESETS else 0,key='preset_'+project_name,disabled=locked,
+            help='Initial values for a new project: the supplied UC Davis study, or generic settings for your own study. All settings can be edited in the workflow.')
+        size = st.selectbox('Walkthrough scale',['Full Scenario 1','Quick installation check'],index=1 if previous_defaults.get('walkthrough_size')=='small' else 0,disabled=preset!=PRESETS[0] or locked,key='size_'+project_name,
+            help='Full: 50,000 training / 100,000 validation / 100 test pairs and 5,000 epochs. Quick: 32 / 16 / 8 pairs and 2 epochs. These are initial values, not limits.')
+        st.caption('Defaults initialise this project. Once you begin configuring it, use a new project name to choose fresh defaults. Edits in any workflow page are retained automatically.')
+    small = preset==PRESETS[0] and size=='Quick installation check'
+    profile=project_name
+    enable_cm=st.checkbox('Enable CM from scratch comparison',value=False,help='Optional: train a baseline, compare its posterior in step 5, and select either model for imaging.')
+    pages=['Welcome','1 · Model & protocol','2 · Dataset','3 · Fine-tune']
+    if enable_cm: pages+=['CM from scratch']
+    pages+=['4 · Predict','5 · Single TAC & NLS','6 · Parametric imaging']
+    if enable_cm: pages+=['Compare models']
+    pages+=['UC Davis demonstration','User manual']
+    # Navigation is session-local; project settings live independently of widgets.
+    st.session_state['_draft_context']=None
+    if st.session_state.get('workflow_page') not in pages: st.session_state['workflow_page']=pages[0]
+    page = st.radio('Your workflow',pages,key='workflow_page')
     with st.expander('Project folder'):
         st.code(str(workspace),language='text')
     st.markdown('[User manual](https://github.com/yundumbledore/PET-TRACER/blob/main/LoRACM/README.md) · [Legacy framework](https://github.com/yundumbledore/PET-TRACER/blob/main/docs/legacy-framework.md)')
 
+project_state.context(workspace,page)
 if 'jobs' not in st.session_state:
     st.session_state.jobs = Jobs(ROOT)
 protocol_path = workspace/'protocol.json'
@@ -93,7 +126,7 @@ if st.session_state.get('active_run'):
 if page == 'Welcome':
     st.title('PET kinetic modelling for your study')
     st.write('Estimate kinetic parameter posteriors from tissue curves and input functions. Adapt the foundation model with LoRACM, or train a consistency model from scratch for comparison.')
-    st.info('**Start with the UC Davis walkthrough**\n\nFollow steps 1 → 6 with the supplied 2TC model, four AIFs, Sub001 frame schedule and coronal slice. Each step is editable when you are ready to use your own project. Choose Small CPU walkthrough for a quick installation check.')
+    st.info('**Start with the UC Davis walkthrough**\n\nFollow steps 1 → 6 with the supplied 2TC model, four AIFs, Sub001 frame schedule and coronal slice. Each step is editable when you are ready to use your own project. Choose Quick installation check for a short practice run.')
     a,b = st.columns(2)
     a.info('**Simulate training pairs**\n\nDefine kinetics and timing → choose measured or Feng AIFs → generate labelled pairs → fine-tune → predict.')
     b.info('**Bring your own training pairs**\n\nOpen Dataset → validate your NPZ → fine-tune → predict. You can skip simulation.')
@@ -107,8 +140,6 @@ if page == 'Welcome':
 elif page == '1 · Model & protocol':
     st.title('1 · Define kinetics, input functions and timing')
     saved = json.loads(protocol_path.read_text(encoding='utf-8')) if protocol_path.exists() else default_protocol.copy()
-    if saved.get('workflow_preset')==PRESETS[0] and saved.get('walkthrough_size')!=default_protocol['walkthrough_size']:
-        saved.update({k:default_protocol[k] for k in ['n_train','n_val','n_test']})
     if preset==PRESETS[0] and (not protocol_path.exists() or saved.get('workflow_preset')==PRESETS[0]):
         st.caption('UC Davis defaults: FDG 2TC, four measured AIFs, 35 Sub001 frames over 60 minutes and half-life 109.8 minutes. The original AIFs are explicitly aligned to the patient schedule for steps 4–6.')
     elif protocol_path.exists():
@@ -119,6 +150,9 @@ elif page == '1 · Model & protocol':
     if model_choice == 'custom' and st.button('Load the working 1TC template'):
         saved.update(model='custom',model_file=str(ROOT/'examples/custom_1tc.py'),
                      parameter_names=['K1','k2','Vb'],kinetic_priors={k:saved['kinetic_priors'].get(k,{'type':'uniform','min':.001,'max':1.}) for k in ['K1','k2','Vb']})
+        project_state.remember(page+':text_input:Custom model Python file',saved['model_file'])
+        project_state.remember(page+':text_input:Parameter names, in order',', '.join(saved['parameter_names']))
+        project_state.remember(page+':text_area:Parameter priors (uniform ranges)',json.dumps(saved['kinetic_priors'],indent=2))
         write_json(protocol_path,saved); st.rerun()
     names = st.text_input('Parameter names, in order',', '.join(saved['parameter_names']))
     prior_text = st.text_area('Parameter priors (uniform ranges)',json.dumps(saved['kinetic_priors'],indent=2),height=220,help='Keys must match the parameter names in the same order. Rates are per minute; Vb is a fraction.')
@@ -177,9 +211,6 @@ elif page == '2 · Dataset':
             st.info('Save your model and protocol in step 1 first.')
         else:
             cfg = json.loads(protocol_path.read_text(encoding='utf-8'))
-            if cfg.get('workflow_preset')==PRESETS[0] and cfg.get('walkthrough_size')!=default_protocol['walkthrough_size']:
-                cfg.update({k:default_protocol[k] for k in ['n_train','n_val','n_test']})
-                cfg['walkthrough_size']=default_protocol['walkthrough_size']
             a,b,c = st.columns(3)
             n_train = a.number_input('Training pairs',min_value=2,value=int(cfg['n_train']),step=1000,key='n_train_'+profile)
             n_val = b.number_input('Validation pairs',min_value=1,value=int(cfg['n_val']),step=1000,key='n_val_'+profile)
@@ -207,6 +238,8 @@ elif page == '2 · Dataset':
             report = validate_file(dataset_path)
             st.session_state['dataset_'+project_name] = str(dataset_path)
             write_json(workspace/'dataset_selection.json',{'path':str(dataset_path),'report':report})
+            for training_page,mode in [('3 · Fine-tune','lora'),('CM from scratch','cm')]:
+                project_state.remember(training_page+':text_input:'+mode+'_'+workspace.name+'_data_'+workspace.name,str(dataset_path))
             st.success('Dataset accepted. Dimensions, parameter order, finite values and training scales checked.')
             st.json(report)
         except Exception as e: st.error(f'Dataset rejected: {e}')
@@ -217,7 +250,8 @@ elif page in ('3 · Fine-tune','CM from scratch'):
 
 elif page == '4 · Predict':
     st.title('4 · Predict posteriors on your testing curves')
-    run_path = path(st.text_input('Model run folder',str(run_path)))
+    run_path = model_run_picker(workspace,run_path)
+    run_path = path(st.text_input('Model run folder',str(run_path),key='predict_run_'+str(run_path)))
     route=st.selectbox('Prediction input',['UC Davis patient slice','Held-out simulated pairs','My own file'],index=0 if preset==PRESETS[0] else 2)
     if route=='Held-out simulated pairs':
         input_default=str(workspace/'testing.npz')
@@ -238,9 +272,13 @@ elif page == '4 · Predict':
     batch = b.number_input('Curve batch size',min_value=1,value=64 if small else 16,key='prediction_batch_'+profile)
     sample_chunk = c.number_input('Sample chunk',min_value=1,value=8 if small else 64,key='prediction_chunk_'+profile)
     if small: st.caption('Eight draws per voxel are sufficient for an installation check; use a much larger sample count for credible-interval assessment.')
-    device = st.selectbox('Prediction device',['auto','cpu','cuda:0','mps'])
-    checkpoint_name = st.selectbox('Checkpoint',['best.pth','last.pth'],index=1 if not (run_path/'best.pth').exists() and (run_path/'last.pth').exists() else 0)
-    output = path(st.text_input('Prediction output',str(run_path/'predictions.npz')))
+    a,b,c=st.columns(3)
+    steps=a.number_input('Reverse sampling steps',min_value=1,value=3,help='Consistency sampling evaluations, evenly spaced from 1 towards 0. More steps do not necessarily improve a consistency model.')
+    seed=b.number_input('Inference random seed',min_value=0,value=0)
+    device=c.selectbox('Prediction device',['auto','cpu','cuda:0','mps'])
+    st.caption('Auto selects CUDA when available, then Apple MPS, then CPU. MPS expanded batches are automatically capped and checked against CPU.')
+    checkpoint_name = checkpoint_picker(run_path)
+    output = path(st.text_input('Prediction output',str(run_path/'predictions.npz'),key='predict_output_'+str(run_path)))
     if st.button('Validate input'):
         try:
             model_cfg = json.loads((run_path/'model_params.json').read_text(encoding='utf-8'))
@@ -256,7 +294,10 @@ elif page == '4 · Predict':
             st.session_state['prediction_'+str(workspace)]=str(output)
             st.session_state['prediction_input_'+str(workspace)]=str(input_path)
             launch('Posterior prediction',['infer.py','--run',run_path,'--checkpoint',checkpoint_name,'--input',input_path,'--output',output,
-                                          '--samples',samples,'--batch-size',batch,'--sample-chunk',sample_chunk,'--device',device])
+                                          '--samples',samples,'--batch-size',batch,'--sample-chunk',sample_chunk,'--steps',steps,'--seed',seed,'--device',device])
+            key='imaging_predictions_'+str(run_path)
+            project_state.remember('file:'+key,str(output))
+            project_state.remember('6 · Parametric imaging:text_input:'+key+'_'+project_name+'_path',str(output))
         except Exception as e: st.error(str(e))
     if output.exists():
         with np.load(output,allow_pickle=False) as data:
@@ -269,11 +310,11 @@ elif page == '4 · Predict':
 
 elif page == '5 · Single TAC & NLS':
     from gui.single_tac import render
-    run_path = render(ROOT,workspace,launch,default_run=run_path,default_input=input_default)
+    run_path = render(ROOT,workspace,launch,default_run=run_path,default_input=input_default,enable_cm=enable_cm)
 
 elif page == '6 · Parametric imaging':
     from gui.imaging import render as render_imaging
-    render_imaging(ROOT,workspace,run_path,st.session_state.get('prediction_input_'+str(workspace),input_default),upload_or_path)
+    render_imaging(ROOT,workspace,run_path,st.session_state.get('prediction_input_'+str(workspace),input_default),upload_or_path,launch=launch)
 
 elif page == 'Compare models':
     from gui.comparison import render as render_comparison
@@ -281,7 +322,7 @@ elif page == 'Compare models':
 
 elif page == 'User manual':
     st.title('LoRACM user manual')
-    sections={'Overview':'README.md','Installation':'docs/INSTALLATION.md','Models, inputs and protocols':'docs/MODELS_AND_PROTOCOLS.md',
+    sections={'Overview':'README.md','GUI and project settings':'docs/WORKBENCH.md','Installation':'docs/INSTALLATION.md','Models, inputs and protocols':'docs/MODELS_AND_PROTOCOLS.md',
               'Prepare your dataset':'docs/PREPARE_DATA.md','Fine-tuning':'docs/FINE_TUNING.md','CM from scratch and comparison':'docs/TRAIN_CM.md','Prediction and single-TAC NLS':'docs/PREDICTION.md',
               'Parametric imaging':'docs/PARAMETRIC_IMAGING.md','UC Davis demonstration':'docs/UCDAVIS.md'}
     section=st.selectbox('Manual section',list(sections))
@@ -347,24 +388,37 @@ elif page == 'UC Davis demonstration':
 @st.fragment(run_every=2)
 def monitor():
     jobs = st.session_state.jobs
-    if jobs.process is not None:
+    if jobs.process is not None and jobs.workspace==workspace:
         st.divider(); st.subheader('Job monitor')
         code = jobs.process.poll()
         if code is None:
             st.info(f'{jobs.label} is running')
-            if st.button('Stop active job'):
-                jobs.stop(); st.warning('Stop requested. Partial outputs may remain; choose a new run before restarting.')
+            if st.button('Stop active job',disabled=bool(jobs.stop_path and jobs.stop_path.exists())):
+                jobs.stop(); st.warning('Stop requested. Training keeps the best and last completed epochs; an incomplete epoch is discarded.')
         elif code == 0:
-            st.success(f'{jobs.label} completed')
+            if jobs.progress() and jobs.progress().get('state')=='stopped': st.info(f'{jobs.label} stopped; completed checkpoints are available.')
+            else: st.success(f'{jobs.label} completed')
         else:
             st.error(f'{jobs.label} stopped with exit code {code}. Review the log below.')
+        progress=jobs.progress()
+        if progress:
+            fraction=progress['completed']/max(1,progress['total'])
+            st.progress(min(1.,fraction),text=f"{progress['stage']} · {progress['completed']:,} / {progress['total']:,} {progress['unit']}")
+            details=[str(progress[k]) for k in ('phase','device') if k in progress]
+            if 'epoch' in progress: details.insert(0,f"Epoch {progress['epoch']} / {progress.get('epochs','')}")
+            st.caption(' · '.join(details)+f" · {progress.get('elapsed_seconds',0):.0f} seconds")
+            if 'learning_rate' in progress:
+                st.caption(f"Learning rate {progress['learning_rate']:.8g} · current training loss {progress.get('train_loss',float('nan')):.6g}"+
+                           (f" · current validation loss {progress['val_loss']:.6g}" if 'val_loss' in progress else ''))
+        else:
+            st.caption('Preparing inputs and model…' if code is None else 'Job finished.')
         with st.expander('Job log',expanded=code is not None and code!=0):
-            st.code(jobs.tail(),language='text')
+            st.text(jobs.tail())
         if code is not None and st.session_state.get('finished_pid') != jobs.process.pid:
             st.session_state.finished_pid = jobs.process.pid
             st.rerun()
     displayed_run=run_path
-    if not (displayed_run/'metrics.csv').exists() and st.session_state.get('active_run'):
+    if not (displayed_run/'metrics.csv').exists() and st.session_state.get('active_run') and workspace in Path(st.session_state.active_run).parents:
         displayed_run=Path(st.session_state.active_run)
     metrics_path = displayed_run/'metrics.csv'
     if metrics_path.exists() and page in ('3 · Fine-tune','CM from scratch','UC Davis demonstration'):
@@ -374,7 +428,14 @@ def monitor():
             resolved=json.loads((displayed_run/'model_params.json').read_text(encoding='utf-8'))
             epoch=int(metrics.iloc[-1]['epoch'])
             st.progress(min(1.,epoch/resolved['epochs']),text=f"Epoch {epoch:,} / {resolved['epochs']:,} · {resolved.get('training_mode','lora').upper()}")
-            st.line_chart(metrics.set_index('epoch')[['train_loss','val_loss']])
+            a,b,c=st.columns(3)
+            a.metric('Training loss',f"{metrics.iloc[-1]['train_loss']:.6g}")
+            b.metric('Validation loss',f"{metrics.iloc[-1]['val_loss']:.6g}")
+            c.metric('Learning rate',f"{metrics.iloc[-1]['learning_rate']:.8g}")
+            loss_tab,lr_tab=st.tabs(['Loss','Learning rate'])
+            loss_tab.line_chart(metrics.set_index('epoch')[['train_loss','val_loss']])
+            lr_tab.line_chart(metrics.set_index('epoch')[['learning_rate']])
+            st.caption(f"Lowest validation loss at epoch {int(metrics.loc[metrics.val_loss.idxmin(),'epoch'])}. Select best.pth or a saved epoch in prediction.")
             with st.expander('Epoch metrics'):
                 st.dataframe(metrics.tail(5),hide_index=True)
             st.caption('These are consistency/self-consistency losses; assess posterior accuracy on held-out labelled data separately.')

@@ -17,6 +17,7 @@ from train_cm import main as train_cm
 from train import main as train_lora
 from model_factory import build_model
 from compare_models import main as compare
+from analyse_tac import main as analyse, predict_curve
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -48,6 +49,29 @@ class TrainingTests(unittest.TestCase):
                          {'lr':float('nan')},{'ema_decay':1.},{'pretrained':'checkpoints/foundation.pth'}]:
             with self.subTest(override=override),self.assertRaises(ValueError):
                 resolve_training_config(dict(self.cfg,**override),self.report,'cm')
+
+    def test_stop_keeps_lowest_validation_checkpoint_before_legacy_warmup(self):
+        torch.set_num_threads(2)
+        from runtime import Progress
+        original=Progress.update
+        def request_after_two(progress,completed,state='running',**details):
+            original(progress,completed,state,**details)
+            if details.get('phase')=='Validation' and details.get('epoch')==2:
+                (self.root/'stop').touch()
+        cfg=dict(self.cfg,epochs=8,checkpoint_start_epoch=151,checkpoint_interval=1)
+        with patch.dict(os.environ,{'PET_TRACER_STOP_FILE':str(self.root/'stop')}),patch.object(Progress,'update',request_after_two):
+            run=train_cm(cfg)
+        import pandas as pd
+        metrics=pd.read_csv(run/'metrics.csv')
+        self.assertEqual(metrics.epoch.tolist(),[1,2])
+        best=torch.load(run/'best.pth',map_location='cpu',weights_only=True)
+        last=torch.load(run/'last.pth',map_location='cpu',weights_only=True)
+        self.assertEqual(best['epoch'],int(metrics.loc[metrics.val_loss.idxmin(),'epoch']))
+        self.assertEqual(last['epoch'],2)
+        index=json.loads((run/'checkpoints.json').read_text())
+        self.assertIn('epochs/epoch_000001.pth',index)
+        self.assertIn('epochs/epoch_000002.pth',index)
+        self.assertTrue(json.loads((run/'training_summary.json').read_text())['stopped_early'])
 
     def test_unicode_configuration_without_utf8_locale(self):
         config=self.root/'unicode.json'
@@ -90,6 +114,26 @@ class TrainingTests(unittest.TestCase):
             self.assertEqual(data['posterior_samples'].shape,(1,8,3))
             self.assertNotIn('Ki_mean',data)
         self.assertIn('rmse',(output/'metrics.csv').read_text())
+        # The single-TAC worker must publish a median forward curve for both
+        # estimators and mark the new analysis complete only after both finish.
+        protocol=json.loads((ROOT/'configs/dataset_custom.json').read_text())
+        protocol.update(model='custom',model_file=str(ROOT/'examples/custom_1tc.py'),
+                        parameter_names=['K1','k2','Vb'],t_meas=[.5,1.5],frame_durations_min=[1.,1.],
+                        observation='midpoint',integration_step_min=.1,
+                        kinetic_priors={k:{'type':'uniform','min':.001,'max':1.} for k in ['K1','k2','Vb']})
+        protocol_path=self.root/'protocol.json';protocol_path.write_text(json.dumps(protocol))
+        folder=self.root/'single'
+        analyse(SimpleNamespace(run=str(lora_run),comparison_run=str(cm_run),comparison_checkpoint='best.pth',
+            protocol=str(protocol_path),input=str(testing),output=str(folder/'nls.json'),posterior_output=str(folder/'posterior.npz'),
+            checkpoint='best.pth',samples=8,steps=2,sample_chunk=4,seed=17,device='cpu',skip_nls=True))
+        forward=json.loads((folder/'forward.json').read_text())
+        self.assertEqual([c['model'] for c in forward['curves']],['lora','cm'])
+        for item,file in zip(forward['curves'],['posterior.npz','cm_posterior.npz']):
+            with np.load(folder/file) as data: median=np.median(data['posterior_samples'][0],axis=0)
+            np.testing.assert_allclose(item['posterior_median'],median)
+            expected=predict_curve(median,np.array([.5,1.5]),np.ones(2),np.array([100.,100.]),protocol)
+            np.testing.assert_allclose(item['fitted_tac'],expected)
+        self.assertEqual(json.loads((folder/'analysis.json').read_text())['state'],'complete')
 
 
 if __name__=='__main__':unittest.main()

@@ -10,7 +10,7 @@ DEFAULTS = {
     'embed_dim':1024, 'channels':[32,64,128,256], 'embedy':'Linear', 'sigma_data':1.,
     'epochs':5000, 'batch_size':512, 'lr':.0001, 'weight_decay':.01,
     'lr_scheduler_patience':25, 'lr_factor':.75, 'min_lr':1e-8,
-    'noise_levels':15, 'ema_decay':.99, 'seed':0, 'checkpoint_start_epoch':1,
+    'noise_levels':15, 'ema_decay':.99, 'seed':0, 'checkpoint_start_epoch':1, 'checkpoint_interval':25,
     'device':'auto', 'save_dir':'runs', 'drop_last':True,
     'lora_r':8, 'lora_alpha':16, 'lora_dropout':.05, 'train_norms':True,
 }
@@ -54,8 +54,11 @@ def resolve_training_config(config, report, mode='lora'):
     cfg.setdefault('kinetic_model','2TC' if cfg['parameter_names']==PARAMETERS else 'custom')
     if cfg['kinetic_model'] not in ('2TC','custom') or (cfg['kinetic_model']=='2TC' and cfg['parameter_names']!=PARAMETERS):
         raise ValueError('Choose kinetic_model=custom for another parameter set')
-    for key in ('epochs','batch_size','embed_dim','checkpoint_start_epoch'):
+    for key in ('epochs','batch_size','embed_dim','checkpoint_start_epoch','checkpoint_interval'):
         _integer(cfg,key)
+    if cfg['checkpoint_start_epoch'] != 1:
+        cfg['legacy_checkpoint_start_epoch'] = cfg['checkpoint_start_epoch']
+        cfg['checkpoint_start_epoch'] = 1
     for key in ('seed','lr_scheduler_patience'):
         _integer(cfg,key,0)
     _integer(cfg,'noise_levels',2)

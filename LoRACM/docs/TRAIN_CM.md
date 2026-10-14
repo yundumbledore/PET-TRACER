@@ -18,12 +18,14 @@ Both use the same dataset contract, training-only normalization, consistency obj
 ## GUI workflow
 
 1. Prepare and select your labelled NPZ on **2 · Dataset**. You can use the same file for both training routes.
-2. Open **CM from scratch**. Parameter dimensions and names appear automatically from the data.
+2. Enable **CM from scratch comparison** in the sidebar, then open **CM from scratch**. Parameter dimensions and names appear automatically from the data.
 3. Choose a run name, epochs, learning rate, batch size, and device. Default values are ready to use.
-4. Open **Advanced settings** only when you need to change embedding width, U-Net channels, optimizer, scheduler, consistency intervals, loss weights, seed, or checkpoint eligibility.
+4. Open **Advanced settings** only when you need to change embedding width, U-Net channels, optimizer, scheduler, consistency intervals, loss weights, seed, or epoch-checkpoint interval.
 5. Choose **Review configuration** to inspect/download the exact settings, then **Start CM training**.
 6. Use **4 · Predict** or **5 · Single TAC & NLS** with the scratch run folder. The inference module selects the correct CM architecture automatically.
-7. Open **Compare models** to evaluate a LoRACM run and the scratch run on the same testing file.
+7. Enable **Overlay CM from scratch posterior** in step 5 for the same voxel, or open **Compare models** for a held-out file. In step 6, select the model and generate its own prediction file before mapping.
+
+Both routes support graceful early stopping and the [same best/last/epoch checkpoint selection](FINE_TUNING.md#interrupted-jobs-and-memory-limits).
 
 The scratch settings are saved independently in `workspaces/<project>/train_cm.json`; LoRACM uses `train.json`. Different run names preserve both models and their metrics.
 
@@ -49,7 +51,7 @@ This table lists general training defaults. The UC Davis GUI preset follows Scen
 | `lr_scheduler_patience`, `lr_factor` | **25 / 0.75** | Reduce learning rate after a validation-loss plateau |
 | `min_lr` | **0.00000001** | Scheduler floor; must not exceed the initial rate |
 | `seed` | **0** | Random initialization and training streams |
-| `checkpoint_start_epoch` | **1** | First epoch eligible for the best EMA checkpoint |
+| `checkpoint_interval` | **25** | Save selectable epoch snapshots every 25 epochs, plus epoch 1; best and last update every completed epoch |
 | `drop_last` | **`true`** | Drop an incomplete final training batch; set false to include it |
 | `device` | **`"auto"`** | CUDA, then MPS, then CPU for training |
 
@@ -75,7 +77,7 @@ The same overrides work with `train.py`. `--x-dim` and `--y-dim` are optional ex
 
 ## Outputs and inference
 
-A run saves `best.pth`, `last.pth`, `model_params.json`, `scaling_params.json`, `metrics.csv`, TensorBoard events, and optional copied kinetic-model source/protocol. `training_summary.json` records the training mode, target-dataset checksum, trainable/total parameter counts, seed, training time and best eligible validation loss. The transfer report states random initialization and no foundation loading for a scratch CM.
+A run saves `best.pth`, `last.pth`, `model_params.json`, `scaling_params.json`, `metrics.csv`, TensorBoard events, and optional copied kinetic-model source/protocol. `training_summary.json` records the training mode, target-dataset checksum, trainable/total parameter counts, seed, training time and lowest completed validation loss. The transfer report states random initialization and no foundation loading for a scratch CM.
 
 Training and validation graphs are consistency/self-consistency losses. They are not direct parameter RMSE or proof of posterior calibration. Checkpoints contain complete EMA **inference models**, not optimizer/RNG snapshots for exact resumption.
 

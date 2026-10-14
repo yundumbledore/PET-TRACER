@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 from plot_posteriors import posterior_figure
+from gui.state import checkpoint_picker
 
 
 def render(root, workspace, launch, upload_or_path):
@@ -28,12 +29,13 @@ def render(root, workspace, launch, upload_or_path):
     retain=st.checkbox('Keep posterior draws for overlays (small curve sets)',value=False)
     with st.expander('Inference settings'):
         a,b=st.columns(2)
-        lora_checkpoint=a.selectbox('LoRACM checkpoint',['best.pth','last.pth'])
-        cm_checkpoint=b.selectbox('CM checkpoint',['best.pth','last.pth'])
+        with a: lora_checkpoint=checkpoint_picker(Path(lora),'LoRACM checkpoint')
+        with b: cm_checkpoint=checkpoint_picker(Path(cm),'CM checkpoint')
         a,b,c=st.columns(3)
         batch=a.number_input('Comparison curve batch',min_value=1,value=16)
         chunk=b.number_input('Comparison sample chunk',min_value=1,value=64)
         seed=c.number_input('Comparison seed',min_value=0,value=0)
+        steps=st.number_input('Comparison reverse sampling steps',min_value=1,value=3)
     output=workspace/'comparisons'/name
     if st.button('Compare models',type='primary'):
         try:
@@ -47,7 +49,7 @@ def render(root, workspace, launch, upload_or_path):
                 if cfg.get('training_mode','lora')!=expected: raise ValueError('Select the correct LoRACM and scratch CM run folders')
             args=['compare_models.py','--lora-run',local(lora),'--cm-run',local(cm),'--input',testing,'--output',output,
                   '--samples',samples,'--device',device,'--batch-size',batch,'--sample-chunk',chunk,'--seed',seed,
-                  '--lora-checkpoint',lora_checkpoint,'--cm-checkpoint',cm_checkpoint]
+                  '--lora-checkpoint',lora_checkpoint,'--cm-checkpoint',cm_checkpoint,'--steps',steps]
             if retain: args+=['--save-samples']
             launch('Model comparison',args)
         except Exception as e: st.error(str(e))
