@@ -36,7 +36,7 @@ def render(root,workspace,launch,upload_or_path,mode='lora',small=False):
             high=b.number_input('Noise amplitude maximum',min_value=0.,value=float(cfg['noise_prior']['max']))
             chunk=c.number_input('Simulation chunk size',min_value=1,value=int(cfg['chunk_size']))
             seed=st.number_input('Simulation random seed',min_value=0,value=int(cfg['seed']))
-            st.caption('HPC paper noise uses delta_t=[t0, diff(t)] on the original CSV times.' if cfg.get('simulation_mode')=='hpc_euler' else 'Noise uses explicit frame durations. Negative noisy TAC values are retained. Match noise to your acquisition and reconstruction.')
+            st.caption('Choose training, validation and test sizes, then set the noise amplitude for your application.')
             if st.button('Generate CM dataset' if scratch else 'Generate dataset',type='primary'):
                 try:
                     if st.session_state.jobs.running(): raise ValueError('Wait for or stop the active job first')

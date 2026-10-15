@@ -75,7 +75,7 @@ macOS support targets **Apple M-series chips**. Use PyTorch 2.6 or later for the
 | macOS Apple Silicon | CPU workflow | `--device mps` for PyTorch |
 | Linux | CPU workflow | Supported CUDA PyTorch build |
 
-Simulation in `simulate_protocol.py` and NLS use NumPy/SciPy on CPU. Training and prediction `auto` select CUDA, then MPS, then CPU. Prediction caps the expanded MPS batch and checks identical model evaluations against CPU before generating results. Available operations and memory vary by hardware; use CPU if your device cannot run the model. Multi-GPU prediction uses PyTorch DataParallel on one node. See [PyTorch MPS documentation](https://docs.pytorch.org/docs/stable/notes/mps.html).
+Simulation and NLS run on CPU. Dataset generation uses CPU JAX for the original random draws and NumPy for bounded-memory integration; JAX is included in the standard requirements and needs no GPU add-on. Training and prediction `auto` select CUDA, then MPS, then CPU. Prediction caps the expanded MPS batch and checks identical model evaluations against CPU before generating results. Available operations and memory vary by hardware; use CPU if your device cannot run the model. Multi-GPU prediction uses PyTorch DataParallel on one node. See [PyTorch MPS documentation](https://docs.pytorch.org/docs/stable/notes/mps.html).
 
 ### Windows NVIDIA setup and diagnostics
 
@@ -89,15 +89,11 @@ python check_environment.py --device cuda:0 --output environment-check.json
 
 If a job fails, use **Download job log** and **Download compute report**. Startup details are written before scientific imports, so an early process failure still leaves diagnostics. Out-of-memory errors call for a smaller training batch or inference batch/chunk; try a training batch of 64. Brief file-lock errors are retried. A permanent permission error includes the exact path: keep the checkout/project in a writable personal folder and check whether another application has locked the file.
 
-## Optional legacy research generator
+## Update an existing environment
 
-The original unmarked research-config path in `create_dataset.py` uses JAX. The explicit UC Davis paper recipe and GUI use portable NumPy and need no JAX. For the old generator path, install JAX separately:
+This update adds CPU JAX to reproduce the original dataset generator’s random sampling. Rerun `setup_environment.py` from the repository root using the command for your platform above. It installs missing dependencies in the same external environment; your projects and model files stay in place.
 
-```bash
-python -m pip install -r LoRACM/requirements-legacy.txt
-```
-
-Current upstream JAX CPU wheels cover Linux, Apple Silicon macOS, and experimental Windows x86-64; Consult the [JAX installation page](https://docs.jax.dev/en/latest/installation.html) for supported versions/builds. The portable simulator, supplied-data GUI demo, fine-tuning and prediction do not require JAX.
+The preserved research generator also uses JAX. CPU wheels are available for Apple Silicon macOS, Linux and Windows x86-64; Windows wheel support is currently experimental. See the [official JAX installation guide](https://docs.jax.dev/en/latest/installation.html) for platform requirements. JAX is imported only for dataset generation; using an existing checkpoint for prediction does not require it.
 
 ## Check installation
 

@@ -27,7 +27,7 @@ UC Davis uses rank 4 and alpha 8 at either scale. My own project starts with 100
 
 ## Measured input functions
 
-The default UC Davis paper recipe reads the original `data/aif/UCDavis_1H35.csv`, retains its AIF values unchanged, and uses its CSV times for the original Euler solver and delta_t noise. Patient frame labels and durations are recorded separately; the GUI preserves the HPC frame-order pairing without resampling activities. Choose **Custom protocol · RK4 and frame-duration noise** for another model, schedule, Feng inputs or frame averaging; its endpoint controls use explicit zero-origin/last-value-hold assumptions. [Timing and simulation details](UCDAVIS.md#timing-forward-model-and-noise).
+Step 1 uses midpoint observations. Review or change the model, schedule, input functions, priors and isotope half-life, then save. The default `data/aif/UCDavis_1H35.csv` and matching Sub001 schedule preserve the original activity samples in frame order. Custom schedules interpolate measured inputs to the selected midpoints; Feng inputs and custom kinetic models remain available. [Technical details](MODELS_AND_PROTOCOLS.md).
 
 The model selectors in steps 4–6 include **Paper LoRACM · UC Davis · epoch 2755** without requiring a dataset or training. Step 3 also has **Use supplied paper checkpoint**. The original weights and normalization are copied into your project's `runs/paper_ucdavis`; fine-tuning creates a separate run. The **UC Davis demonstration** page predicts and exports a paper-style Ki map in one job.
 

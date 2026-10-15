@@ -73,7 +73,14 @@ def main(cfg):
             raise ValueError('feng_log_jitter must be between 0 and 0.5')
     else:
         raise ValueError('aif_mode must be measured or feng_cohort')
+    if historical and source=='measured' and cfg.get('aif_sampling')=='interpolate_to_schedule':
+        pool=np.asarray([np.interp(t,aif_t,curve) for curve in pool])
+        aif_t=t
     rng = np.random.default_rng(cfg['seed'])
+    sampler=None
+    if cfg.get('random_stream')=='jax_hpc':
+        from hpc_random import HPCSampler
+        sampler=HPCSampler(cfg,len(pool))
     data = {'t_meas': t, 'frame_durations_min': duration,
             'parameter_names': np.asarray(cfg['parameter_names']),
             'observation': np.asarray(mode)}
@@ -85,14 +92,22 @@ def main(cfg):
     for split in ('train','val','test'):
         xs, ys, indices = [], [], []
         total = cfg['n_'+split]
+        scale=cfg.get('test_prior_scale',1.) if split=='test' else 1.
+        priors=[dict(p) for p in cfg['kinetic_priors'].values()]
+        if split=='test':
+            for prior in priors:
+                midpoint=(prior['min']+prior['max'])/2
+                half_width=(prior['max']-prior['min'])/2
+                prior.update(min=midpoint-half_width*scale,max=midpoint+half_width*scale)
+        full_draws=sampler.draw(split,priors) if sampler else None
         for start in range(0, total, cfg['chunk_size']):
             check_cancelled()
             n = min(cfg['chunk_size'], total-start)
-            scale = cfg.get('test_prior_scale', 1.) if split == 'test' else 1.
-            ranges = [((p['min']+p['max'])/2-(p['max']-p['min'])*scale/2,
-                       (p['min']+p['max'])/2+(p['max']-p['min'])*scale/2) for p in cfg['kinetic_priors'].values()]
-            parameters = np.column_stack([rng.uniform(low,high,n) for low,high in ranges])
-            selected = rng.integers(0, len(pool), n)
+            if full_draws is not None:
+                parameters,noise,epsilon,selected=[array[start:start+n] for array in full_draws]
+            else:
+                parameters=np.column_stack([rng.uniform(p['min'],p['max'],n) for p in priors])
+                selected=rng.integers(0,len(pool),n)
             if source == 'measured':
                 inputs = np.asarray([np.interp(grid, aif_t, curve) for curve in pool[selected]])
             else:
@@ -102,14 +117,19 @@ def main(cfg):
                 if np.any(inputs < -1e-8):
                     raise ValueError('Sampled Feng curves became negative; inspect fitted curves or reduce jitter')
                 inputs = np.maximum(inputs,0)
-            clean = (euler_observations(model,parameters,pool[selected],t,cfg.get('integration_step_min',.01)) if historical
+            frame_input=pool[selected] if source=='measured' else feng_curve(t,fp)
+            if np.any(frame_input < -1e-8): raise ValueError('Sampled input became negative; inspect fitted inputs')
+            frame_input=np.maximum(frame_input,0.)
+            clean = (euler_observations(model,parameters,frame_input,t,cfg.get('integration_step_min',.01)) if historical
                      else observe_frames(integrate(model,parameters,inputs,grid),grid,t,duration,mode))
             if np.any(clean < -1e-8):
                 raise ValueError('Clean simulated TAC is negative; check model and priors')
-            measured_input = pool[selected] if historical else observe_frames(inputs,grid,t,duration,mode)
-            noise = rng.uniform(cfg['noise_prior']['min'],cfg['noise_prior']['max'],(n,1))
+            measured_input = frame_input if historical else observe_frames(inputs,grid,t,duration,mode)
+            if full_draws is None:
+                noise=rng.uniform(cfg['noise_prior']['min'],cfg['noise_prior']['max'],(n,1))
+                epsilon=rng.normal(size=clean.shape)
             sigma = noise_standard_deviation(clean,noise,t,cfg['half_life_min'],None if historical else duration)
-            noisy = clean+sigma*rng.normal(size=clean.shape)
+            noisy = clean+sigma*epsilon
             xs.append(np.column_stack([parameters,noise]))
             ys.append(np.column_stack([noisy,measured_input]))
             indices.append(selected)
@@ -128,10 +148,14 @@ def main(cfg):
                 'numpy_version':np.__version__, 'noise_timing':'Explicit frame durations; decay constant ln(2)/half_life_min',
                 'split_policy':'Independent parameter/noise draws, shared measured/fitted AIF pool; not subject-held-out'}
     if historical:
-        metadata.update(solver='Original forward Euler; grid starts at first CSV time; first dt=t0; searchsorted observations',
+        metadata.update(solver='Original forward Euler; grid starts at first observation time; first dt=t0; searchsorted observations',
                         noise_timing='Historical delta_t=[t0,diff(t_meas)]; not frame durations',
                         conditioning='Original measured AIF activity samples, unchanged',
                         randomness='Portable NumPy streams; same forward/noise equations, not byte-identical to historical JAX samples')
+    if sampler:
+        metadata['randomness']=sampler.metadata
+    if historical:
+        metadata['conditioning']='Original measured AIF samples' if cfg.get('aif_sampling','source_samples')=='source_samples' and source=='measured' else 'Input evaluated on the configured observation grid'
     if cfg.get('model') == 'custom':
         metadata['model_sha256'] = hashlib.sha256(Path(cfg['model_file']).read_bytes()).hexdigest()
     if source == 'measured':

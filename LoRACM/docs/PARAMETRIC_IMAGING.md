@@ -16,13 +16,13 @@ Select **Model for parametric imaging**: LoRACM or a trained scratch CM. A map b
 
 1. In step 4, predict **UC Davis patient slice** using the model trained in steps 1–3. Include all 24,237 foreground voxels. Simulated test pairs can assess accuracy but have no anatomical coordinates.
 2. Open **6 · Parametric imaging**. The prediction output and model folder follow your preceding run. The supplied geometry is selected automatically.
-3. Choose Kᵢ or any predicted kinetic parameter. Choose **Posterior mean**, **Posterior median**, or **95% credible-interval width**.
+3. Choose Kᵢ or any predicted kinetic parameter. Choose **Posterior mean**, **Posterior median**, or **95% credible-interval width**. Set **Colourbar maximum** above the image to adjust the scale; **Colourbar minimum** is also editable. These settings are remembered for each parameter/map type and apply to downloaded figures.
 4. Click a foreground voxel in the image on the **left**. On the **right**, the app displays that voxel's measured TAC and input function in one graph, followed by a KDE of the chosen parameter's posterior. Entering a voxel ID also supports keyboard access.
 5. Export the map figure, numeric map or selected voxel's joint posterior samples.
 
 The app generates and caches joint samples only for the selected voxel, using the model/checkpoint and measured data that generated the image. It verifies voxel identities, schedule and file checksums. These fresh Monte Carlo draws can differ slightly from the bulk map summaries. A KDE is a smoothed display of samples; interval limits are empirical percentiles.
 
-UC Davis initially uses **Paper display**: the original 2×2 median filter, with a fixed 0–0.06 scale for Ki mean/median. Select **Raw values** to disable filtering. Other maps use 2nd/98th percentile limits. Numeric exports preserve the raw `image` and separately include `display_image`; the displayed plane is not a new voxel posterior. A tiny two-epoch walkthrough model and eight draws per voxel demonstrate the interface; they do not establish posterior calibration or useful research estimates.
+UC Davis initially uses **Paper display**: the original 2×2 median filter, with a default 0–0.06 scale for Ki mean/median. Select **Raw values** to disable filtering. Other maps start with 2nd/98th percentile limits. Adjusting the colourbar changes the displayed scale without changing voxel values or posterior samples. Numeric exports preserve the raw `image` and separately include `display_image` and the chosen `display_settings`; the displayed plane is not a new voxel posterior. A tiny two-epoch walkthrough model and eight draws per voxel demonstrate the interface; they do not establish posterior calibration or useful research estimates.
 
 ## What uncertainty means here
 
@@ -89,7 +89,7 @@ python parametric_imaging.py --predictions workspaces/ucdavis_walkthrough/runs/s
 python parametric_imaging.py --predictions workspaces/ucdavis_walkthrough/runs/scenario1_small/predictions.npz --parameter K1 --statistic ci95_width --output workspaces/ucdavis_walkthrough/K1_ci95_width.png
 ```
 
-Each command exports a PNG, a numeric map NPZ and a provenance JSON. Pass `--geometry` and `--geometry-metadata` for your own data, and `--axis` / `--slice` for a 3D array. Existing outputs are protected.
+Each command exports a PNG, a numeric map NPZ and a provenance JSON. Set `--vmax 0.04` to change the colourbar maximum; optionally set `--vmin 0`. The selected limits are recorded in the exports. Pass `--geometry` and `--geometry-metadata` for your own data, and `--axis` / `--slice` for a 3D array. Existing outputs are protected.
 
 Inspect one voxel and save its TAC/AIF and joint samples:
 

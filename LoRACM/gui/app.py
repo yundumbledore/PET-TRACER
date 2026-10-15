@@ -124,7 +124,7 @@ if st.session_state.get('active_run'):
 if page == 'Welcome':
     st.title('PET kinetic modelling for your study')
     st.write('Estimate kinetic parameter posteriors from tissue curves and input functions. Adapt the foundation model with LoRACM, or train a consistency model from scratch for comparison.')
-    st.info('**Start with the UC Davis walkthrough**\n\nFor paper-model imaging, open UC Davis demonstration or use the supplied checkpoint in step 3. Follow steps 1 → 6 to learn simulation and retraining with the original HPC conventions. Each step is editable when you are ready to use your own project. Choose Quick installation check for a short practice run.')
+    st.info('**Start with the UC Davis walkthrough**\n\nFor paper-model imaging, open UC Davis demonstration or use the supplied checkpoint in step 3. Follow steps 1 → 6 to learn simulation and fine-tuning. Each step is editable when you are ready to use your own project. Choose Quick installation check for a short practice run.')
     a,b = st.columns(2)
     a.info('**Simulate training pairs**\n\nDefine kinetics and timing → choose measured or Feng AIFs → generate labelled pairs → fine-tune → predict.')
     b.info('**Bring your own training pairs**\n\nOpen Dataset → validate your NPZ → fine-tune → predict. You can skip simulation.')
@@ -139,13 +139,9 @@ elif page == '1 · Model & protocol':
     st.title('1 · Define kinetics, input functions and timing')
     saved = json.loads(protocol_path.read_text(encoding='utf-8')) if protocol_path.exists() else default_protocol.copy()
     if preset==PRESETS[0] and (not protocol_path.exists() or saved.get('workflow_preset')==PRESETS[0]):
-        st.caption('UC Davis defaults: FDG 2TC, four original AIFs from UCDavis_1H35.csv, 35 Sub001 frames over 60 minutes and half-life 109.8 minutes. The simulator uses the original AIF time points with linear interpolation, original Euler observations and historical noise timing. AIF activity samples remain unchanged.')
+        st.caption('UC Davis defaults: FDG 2TC, four original AIFs from UCDavis_1H35.csv, 35 Sub001 frames over 60 minutes and half-life 109.8 minutes.')
     elif protocol_path.exists():
         st.caption('Using this project’s saved protocol. Choose a fresh project name to start from an unchanged template.')
-    conventions={'UC Davis paper · original HPC Euler':'hpc_euler','Custom protocol · RK4 and frame-duration noise':'rk4'}
-    convention=conventions[st.selectbox('Simulation convention',list(conventions),index=0 if saved.get('simulation_mode')=='hpc_euler' else 1)]
-    historical=convention=='hpc_euler'
-    if historical: st.info('Paper convention: original CSV AIF values, Euler grid and delta_t noise. The table shows the patient frame midpoints; the original CSV timestamps are retained separately for simulation. Choose Custom protocol for a different kinetic model, sampling schedule or Feng inputs.')
     model_choice = st.selectbox('Kinetic model',['2TC','custom'],index=0 if saved.get('model')=='2TC' else 1,key='model_'+profile)
     model_file = st.text_input('Custom model Python file',saved.get('model_file','examples/custom_1tc.py'),disabled=model_choice=='2TC')
     st.caption('Custom models run your local Python code. Use only code you trust. The working 1TC template documents the batched rhs/observe interface; multiple input channels are outside this GUI contract.')
@@ -164,8 +160,6 @@ elif page == '1 · Model & protocol':
     if schedule_upload is not None:
         schedule_default = pd.read_csv(schedule_upload)
     schedule = st.data_editor(schedule_default,num_rows='dynamic',hide_index=True,key='schedule_'+profile)
-    observation = st.selectbox('How are your measured curves sampled?',['midpoint','frame_average'],index=0 if saved.get('observation')=='midpoint' else 1,
-                               help='Frame averages integrate both TAC and AIF over each frame. Midpoint samples evaluate at the supplied times.')
     c1,c2 = st.columns(2)
     half_life = c1.number_input('Isotope half-life (minutes)',min_value=.0001,value=float(saved['half_life_min']))
     c1.caption(f'Decay constant: {np.log(2)/half_life:.6g} min⁻¹')
@@ -174,7 +168,7 @@ elif page == '1 · Model & protocol':
     aif_mode = st.selectbox('Input function source',['measured','feng_cohort'],index=0 if saved.get('aif_mode')=='measured' else 1)
     if aif_mode == 'measured':
         aif_source = upload_or_path('Measured AIF CSV',saved.get('aif_csv','data/aif/UCDavis_1H35.csv'),['csv'],'aif')
-        st.caption('First column: time in minutes; remaining columns: one nonnegative AIF each. Each simulated sample uses one measured curve. Original samples stay unchanged; interpolation and the endpoint assumptions below define the simulation input.')
+        st.caption('First column: time in minutes; remaining columns: one nonnegative AIF each. Each simulated sample uses one measured curve. Activities are interpolated to your measurement times when required.')
         try:
             preview = pd.read_csv(aif_source); st.line_chart(preview.set_index(preview.columns[0]))
             st.caption(f'Original AIF samples: {float(preview.iloc[0,0]):.6g}–{float(preview.iloc[-1,0]):.6g} minutes · {len(preview.columns)-1} input functions')
@@ -191,35 +185,35 @@ elif page == '1 · Model & protocol':
             f = pd.read_csv(fits); st.line_chart(f.set_index('time_min'))
             st.dataframe(pd.read_csv(workspace/'feng.csv'))
     jitter = st.number_input('Feng log-space variation (0 = row resampling only)',min_value=0.,max_value=.5,value=float(saved.get('feng_log_jitter',.05)),disabled=aif_mode=='measured')
-    origin = st.checkbox('If the first AIF sample is after zero, assume zero activity at time zero',value=saved.get('aif_before_first')=='zero_at_origin',disabled=aif_mode!='measured' or historical)
-    tail_options = ['require_coverage', 'hold_last']
-    tail_default = saved.get('aif_after_last',default_protocol.get('aif_after_last','require_coverage'))
-    tail = st.selectbox('After the final AIF sample',tail_options,index=tail_options.index(tail_default) if tail_default in tail_options else 0,
-                        format_func=lambda value: {'require_coverage':'Require measured AIF coverage', 'hold_last':'Hold the last measured AIF value'}[value],
-                        disabled=aif_mode!='measured' or historical,help='Midpoint observations need coverage through the last midpoint; frame averages need coverage through the last frame end. Holding the last value is an explicit approximation, saved in the protocol.')
-    if aif_mode == 'measured':
-        try:
-            load_measured_inputs(dict(saved,aif_csv=str(aif_source),t_meas=pd.read_csv(aif_source).iloc[:,0].tolist() if historical else schedule['time_min'].tolist(),
-                                      prediction_t_meas=schedule['time_min'].tolist(),simulation_mode=convention,frame_durations_min=schedule['duration_min'].tolist(),observation=observation,
-                                      aif_before_first='zero_at_origin' if origin else 'require_zero',aif_after_last=tail))
-        except (OSError,ValueError,KeyError,IndexError) as e:
-            st.warning(str(e))
+    def current_protocol():
+        cfg = dict(saved,model=model_choice,model_file=str(path(model_file)),parameter_names=[n.strip() for n in names.split(',')],
+                   kinetic_priors=json.loads(prior_text),t_meas=schedule['time_min'].tolist(),frame_durations_min=schedule['duration_min'].tolist(),
+                   observation='midpoint',half_life_min=half_life,integration_step_min=step,aif_mode=aif_mode,
+                   aif_csv=str(aif_source) if aif_mode=='measured' else saved.get('aif_csv'),
+                   feng_parameters_csv=str(aif_source) if aif_mode=='feng_cohort' else saved.get('feng_parameters_csv'),
+                   feng_log_jitter=jitter,aif_before_first='hpc_first_sample',aif_after_last='hold_last',output=str(dataset_path),
+                   workflow_preset=preset,walkthrough_size=default_protocol['walkthrough_size'],
+                   simulation_mode='hpc_euler',random_stream='jax_hpc',aif_sampling='interpolate_to_schedule')
+        cfg.pop('prediction_t_meas',None)
+        # Retain the supplied UC Davis observation labels only when both the
+        # source CSV and patient frame schedule are unchanged.
+        if aif_mode=='measured' and aif_source.is_file():
+            from common import file_sha256
+            reference=ROOT/'data/aif/UCDavis_1H35.csv'
+            uc=json.loads((ROOT/'configs/protocol_ucdavis.json').read_text(encoding='utf-8'))
+            same_schedule=(len(cfg['t_meas'])==len(uc['prediction_t_meas']) and
+                           np.allclose(cfg['t_meas'],uc['prediction_t_meas'],atol=1e-8,rtol=0) and
+                           np.allclose(cfg['frame_durations_min'],uc['frame_durations_min'],atol=1e-8,rtol=0))
+            if same_schedule and file_sha256(aif_source)==file_sha256(reference):
+                cfg.update(t_meas=uc['t_meas'],prediction_t_meas=schedule['time_min'].tolist(),aif_sampling='source_samples')
+        cfg.pop('input_alignment',None)
+        return cfg
+    if aif_mode=='measured':
+        try: load_measured_inputs(current_protocol())
+        except (OSError,ValueError,KeyError,IndexError) as error: st.warning(str(error))
     if st.button('Save and validate protocol',type='primary'):
         try:
-            cfg = dict(saved,model=model_choice,model_file=str(path(model_file)),parameter_names=[n.strip() for n in names.split(',')],
-                       kinetic_priors=json.loads(prior_text),t_meas=schedule['time_min'].tolist(),frame_durations_min=schedule['duration_min'].tolist(),
-                       observation=observation,half_life_min=half_life,integration_step_min=step,aif_mode=aif_mode,
-                       aif_csv=str(aif_source) if aif_mode=='measured' else saved.get('aif_csv'),
-                       feng_parameters_csv=str(aif_source) if aif_mode=='feng_cohort' else saved.get('feng_parameters_csv'),
-                       feng_log_jitter=jitter,aif_before_first='zero_at_origin' if origin else 'require_zero',aif_after_last=tail,output=str(dataset_path),
-                       workflow_preset=preset,walkthrough_size=default_protocol['walkthrough_size'])
-            cfg['simulation_mode']=convention
-            if historical:
-                if model_choice!='2TC' or aif_mode!='measured' or observation!='midpoint': raise ValueError('Paper reproduction uses measured-input 2TC midpoint observations; choose Custom protocol for other settings')
-                cfg.update(t_meas=pd.read_csv(aif_source).iloc[:,0].tolist(),prediction_t_meas=schedule['time_min'].tolist(),aif_before_first='hpc_first_sample',ki_policy='hpc_floor_1e-4')
-            else:
-                cfg.pop('prediction_t_meas',None)
-            cfg.pop('input_alignment',None)
+            cfg=current_protocol()
             validate_protocol(cfg); load_model(cfg)
             if aif_mode == 'measured': load_measured_inputs(cfg)
             write_json(protocol_path,cfg)
@@ -277,7 +271,7 @@ elif page == 'User manual':
 
 elif page == 'UC Davis demonstration':
     st.title('UC Davis · Reproduce the paper example')
-    st.write('Use the original epoch-2755 LoRACM checkpoint and normalization. The default example preserves the original measured AIF values, three reverse steps, 1,000 posterior draws, the HPC Ki transform and 2×2 median-filtered display.')
+    st.write('Use the original epoch-2755 LoRACM checkpoint and normalization. The default example preserves the original measured AIF values, three reverse steps, 1,000 posterior draws, the paper’s Ki calculation and 2×2 median-filtered display.')
     st.info('To learn dataset creation and retraining, follow numbered steps 1 → 6 in a fresh UC Davis project. To reproduce the paper model, use the supplied checkpoint here or in step 3.')
     demo_device=st.selectbox('Paper-example compute device',['auto','cpu','cuda:0','mps'])
     st.caption('Auto selects CUDA, Apple MPS, then CPU. Whole-slice CPU inference can take substantially longer.')

@@ -9,3 +9,6 @@ tqdm>=4.65
 tensorboard>=2.14
 jupyterlab>=4
 ipykernel>=6
+
+# CPU random sampling matching the original dataset generator.
+jax>=0.4.35

@@ -70,7 +70,7 @@ def display_limits(image):
     return float(low),float(high)
 
 
-def display_plane(result,axis=1,index=None,style='auto'):
+def display_plane(result,axis=1,index=None,style='auto',vmin=None,vmax=None):
     """Display filtering is explicit; raw posterior summaries are preserved."""
     image=plane(result['image'],axis,index).copy()
     if style == 'auto':
@@ -83,18 +83,22 @@ def display_plane(result,axis=1,index=None,style='auto'):
         image[~valid]=np.nan
     low,high=display_limits(image)
     if filtered and result['parameter']=='Ki' and result['statistic']!='ci95_width': low,high=0.,.06
+    low=low if vmin is None else float(vmin)
+    high=high if vmax is None else float(vmax)
+    if not np.isfinite([low,high]).all() or high<=low:
+        raise ValueError('Colourbar limits must be finite, with maximum greater than minimum')
     return image,dict(style=style,median_filter_size=2 if filtered else 0,vmin=low,vmax=high,
                       note='Display only; raw voxel estimates and posterior samples are unchanged')
 
 
 def map_figure(result,axis=1,index=None,vmin=None,vmax=None,style='auto'):
-    image,settings=display_plane(result,axis,index,style)
+    image,settings=display_plane(result,axis,index,style,vmin,vmax)
     low,high=settings['vmin'],settings['vmax']
     fig,ax=plt.subplots(figsize=(5,8))
     cmap=plt.get_cmap('inferno').copy()
     if settings['style']=='ucdavis_hpc': cmap.set_bad(cmap(0.))
     shown=ax.imshow(image,origin=result['metadata'].get('origin','lower'),aspect=result['metadata'].get('pixel_aspect_ratio',1.),
-                    cmap=cmap,vmin=low if vmin is None else vmin,vmax=high if vmax is None else vmax,interpolation='nearest')
+                    cmap=cmap,vmin=low,vmax=high,interpolation='nearest')
     label=result['parameter']+(' · 95% CI width' if result['statistic']=='ci95_width' else ' · '+result['statistic'])
     ax.set_title(label);ax.set_xlabel('Column (pixels)');ax.set_ylabel('Row (pixels)')
     if settings['style']=='ucdavis_hpc': ax.set_axis_off()
@@ -135,15 +139,17 @@ def main():
     parser.add_argument('--parameter',default=None);parser.add_argument('--statistic',choices=list(STATISTICS.values()),default='mean')
     parser.add_argument('--axis',type=int,default=1);parser.add_argument('--slice',type=int)
     parser.add_argument('--display',choices=['auto','ucdavis_hpc','raw'],default='auto',help='UC Davis: original 2x2 median filter and Ki scale 0–0.06; raw: no filtering')
+    parser.add_argument('--vmin',type=float,help='Colourbar minimum (otherwise use the display default)')
+    parser.add_argument('--vmax',type=float,help='Colourbar maximum (otherwise use the display default)')
     parser.add_argument('--output',required=True);args=parser.parse_args()
     output=Path(args.output)
     if output.suffix.lower()!='.png': raise ValueError('Figure output must end in .png')
     if any(p.exists() for p in [output,output.with_suffix('.npz'),output.with_suffix('.json')]): raise FileExistsError('Map output exists')
     result=load_image(args.predictions,args.geometry,args.geometry_metadata,args.parameter,args.statistic)
-    displayed,settings=display_plane(result,args.axis,args.slice,args.display)
-    fig=map_figure(result,args.axis,args.slice,style=args.display);output.parent.mkdir(parents=True,exist_ok=True)
+    displayed,settings=display_plane(result,args.axis,args.slice,args.display,args.vmin,args.vmax)
+    fig=map_figure(result,args.axis,args.slice,args.vmin,args.vmax,style=args.display);output.parent.mkdir(parents=True,exist_ok=True)
     fig.savefig(output,dpi=180);plt.close(fig)
-    np.savez_compressed(output.with_suffix('.npz'),image=result['image'],display_image=displayed,voxel_ids=result['ids'],mask=result['mask'])
+    np.savez_compressed(output.with_suffix('.npz'),image=result['image'],display_image=displayed,display_settings=json.dumps(settings),voxel_ids=result['ids'],mask=result['mask'])
     report=dict(predictions=args.predictions,geometry=args.geometry,parameter=result['parameter'],statistic=args.statistic,
                 display=settings,raw_values_preserved=True,
                 credible_interval='97.5th minus 2.5th percentile, not standard deviation',geometry_metadata=result['metadata'])

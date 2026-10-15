@@ -28,7 +28,7 @@ This uses the original epoch-2755 weights, 1,000 joint draws and three reverse s
 | Guided pages for protocol setup, data validation, training, and prediction. Runs locally in your browser. | The same workflow through Python commands and editable configuration files. Suitable for servers and batch jobs. |
 | [Launch the GUI](LoRACM/docs/INSTALLATION.md#launch-the-gui) | [Terminal quick start](LoRACM/README.md#terminal-quick-start) |
 
-The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and Linux** with Python 3.11. CPU is the common baseline; PyTorch can use a supported CUDA GPU or Apple MPS device. The preserved research generator has separate [JAX installation requirements](LoRACM/docs/INSTALLATION.md#optional-legacy-research-generator).
+The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and Linux** with Python 3.11. CPU is the common baseline; PyTorch can use a supported CUDA GPU or Apple MPS device. Standard installation includes CPU JAX for dataset generation. See the [platform and acceleration guide](LoRACM/docs/INSTALLATION.md#hardware-and-platform-support).
 
 ![PET-TRACER local workbench with LoRACM, scratch CM and shared prediction workflows](Assets/LoRACM_Workbench.png)
 

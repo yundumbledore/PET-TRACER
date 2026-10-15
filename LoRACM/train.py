@@ -71,8 +71,7 @@ def main(cfg, training_mode="lora"):
                           y_mean=y_mean, 
                           y_std=y_std,
                           log_transform=False)
-    train_loader = DataLoader(train_set, batch_size=cfg["batch_size"], shuffle=True, drop_last=cfg["drop_last"],
-                              generator=torch.Generator().manual_seed(cfg["seed"]))
+    train_loader = DataLoader(train_set, batch_size=cfg["batch_size"], shuffle=True, drop_last=cfg["drop_last"])
 
     val_set = myDataset(data['x_val'][:,:cfg['x_dim']], 
                         data['y_val'],
@@ -268,6 +267,7 @@ def main(cfg, training_mode="lora"):
     with Path(cfg['dataset_dir']).open('rb') as stream:
         for block in iter(lambda:stream.read(1024*1024),b''): digest.update(block)
     summary={'training_mode':training_mode,'dataset_sha256':digest.hexdigest(),
+             'torch_version':str(torch.__version__),'numpy_version':np.__version__,'batch_shuffle_rng':'global_torch',
              'parameter_names':names,'split_counts':report['counts'],'seed':cfg['seed'],
              'trainable_parameters':trainable_parameters,'total_parameters':total_parameters,
              'training_seconds':elapsed,'epochs':completed_epoch,'planned_epochs':cfg['epochs'],'stopped_early':stopped,'device':str(device),

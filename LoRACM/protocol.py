@@ -49,8 +49,10 @@ def validate_protocol(cfg):
         raise ValueError('Patient and simulation time labels must have the same frame count')
     if convention == 'rk4' and not np.allclose(midpoints,t,atol=1e-6,rtol=0):
         raise ValueError('Separate patient time labels require the explicit hpc_euler convention')
-    if convention == 'hpc_euler' and (cfg.get('observation','midpoint') != 'midpoint' or cfg.get('aif_mode','measured') != 'measured'):
-        raise ValueError('HPC reproduction requires midpoint observations and measured AIFs; use RK4 for other protocols')
+    if convention == 'hpc_euler' and cfg.get('observation','midpoint') != 'midpoint':
+        raise ValueError('Euler simulation requires midpoint observations')
+    if cfg.get('random_stream','numpy') not in ('numpy','jax_hpc'):
+        raise ValueError('random_stream must be numpy or jax_hpc')
     starts, ends = midpoints-duration/2, midpoints+duration/2
     if np.any(starts < -1e-8) or np.any(starts[1:] < ends[:-1]-1e-8):
         raise ValueError('Frames must start at/after zero and must not overlap; t_meas are frame midpoints')
@@ -96,8 +98,11 @@ def load_measured_inputs(cfg, end=None):
         raise ValueError('AIF CSV requires at least one finite nonnegative activity column')
     if cfg.get('simulation_mode') == 'hpc_euler':
         expected = np.asarray(cfg['t_meas'])
-        if t.shape != expected.shape or not np.allclose(t,expected,atol=1e-10,rtol=0):
-            raise ValueError('HPC reproduction preserves original AIF samples: CSV times must equal simulation t_meas')
+        if cfg.get('aif_sampling','source_samples')=='source_samples':
+            if t.shape != expected.shape or not np.allclose(t,expected,atol=1e-10,rtol=0):
+                raise ValueError('Original AIF samples require CSV times to equal simulation t_meas')
+        elif cfg['aif_sampling']!='interpolate_to_schedule':
+            raise ValueError('Unknown aif_sampling policy')
         return t, aifs
     origin = cfg.get('aif_before_first', 'require_zero')
     tail = cfg.get('aif_after_last', 'require_coverage')

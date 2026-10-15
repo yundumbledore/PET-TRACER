@@ -1,5 +1,15 @@
 # Workflow validation
 
+## Dataset and trainer parity — 15 October 2026
+
+**70/70 automated checks passed** in the Apple Silicon Python 3.11 / PyTorch 2.6.0 CPU environment, with JAX/jaxlib 0.10.2, x64 enabled and `jax_threefry_partitionable=true`. Step 1 no longer exposes simulation-convention, observation-mode or endpoint controls. GUI tests check midpoint defaults, unchanged UC Davis AIF conditioning, edited-schedule handling and persistence. Custom 1TC and Feng-cohort Euler datasets also generate and validate.
+
+A direct comparison with the author's `Create_dataset.py` used the same broad source priors, seed 42, four measured AIFs and 32 / 16 / 8 split sizes. Parameter/noise-amplitude arrays and AIF indices matched **exactly**; maximum absolute TAC/AIF difference was **2.91e-11**. The reference sampling, solver, model, noise and central-prior functions are syntactically identical to the preserved `simulation.py` functions. A separate regression compares against those preserved functions and verifies that changing numerical chunk size leaves every dataset array unchanged. Matching historical draws also requires matching the original JAX version/PRNG settings and all split sizes; those historical runtime settings are unavailable.
+
+With the same dataset, seed, batch size 8, full 1024-dimensional embedding and [32, 64, 128, 256] channels, the current and original trainers completed two CPU epochs. All **82 saved model tensors matched exactly** (maximum absolute difference 0). The reference device and scheduler were explicitly set to CPU and the saved experiment's patience 50; automatic dimensions and equal loss weights were resolved before invoking the original trainer. This checks implementation parity under controlled conditions, not full-training convergence or equality across MPS/CUDA/PyTorch versions. Training summaries now record package versions and the batch-shuffle RNG policy.
+
+No full 5,000-epoch retraining or new MPS/CUDA/Windows/Linux execution was performed. Existing user datasets, runs, checkpoint tensors and paper normalization were unchanged. The current source priors differ from the distribution indicated by the archived dataset and paper normalization; agreement with today's generator does not establish regeneration of that historical dataset.
+
 ## UC Davis source-prior correction — 15 October 2026
 
 UC Davis simulation and forward-protocol bounds follow `REGION_PRIORS['universal']` in the supplied `Create_dataset.py`: K1/k2 0.0001–2.0, k3 0.0001–0.5, k4 0.0001–0.2 and Vb 0.001–1. The earlier narrower defaults inferred from the archive were corrected. Original checkpoint weights and normalization remain unchanged. A GUI regression check verifies the default ranges and persistence of user edits across pages. The current suite has **67 passing checks**; older dated results below are retained as history.

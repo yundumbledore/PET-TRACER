@@ -167,5 +167,7 @@
     52.5,
     57.5
   ],
-  "recipe_version": "ucdavis-hpc-v1"
+  "recipe_version": "ucdavis-hpc-v1",
+  "random_stream": "jax_hpc",
+  "aif_sampling": "source_samples"
 }

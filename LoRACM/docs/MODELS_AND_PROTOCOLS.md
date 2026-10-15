@@ -25,7 +25,7 @@ A complete working 1TC example is in [`examples/custom_1tc.py`](../examples/cust
 
 Validate the configuration before generation with `python protocol.py --config configs/dataset_custom.json`.
 
-Custom-protocol simulation uses zero initial states, one input channel, fixed-grid RK4 and linear input interpolation. The separate default UC Davis paper recipe preserves the original HPC Euler and noise conventions described in [its guide](UCDAVIS.md). Test a custom model against analytical solutions or a validated independent implementation, and check convergence at smaller step sizes. Delay equations, multiple independent inputs and state-dependent discontinuities need an extension of this contract; the old dual-input/SRTM research classes are not automatically exposed as GUI plugins. No AATH scenario is claimed as validated by this update.
+GUI simulation uses zero initial states, one input channel, midpoint observations and fixed-step Euler integration. Test a custom model against analytical solutions or a validated independent implementation, and check convergence at smaller step sizes. Delay equations, multiple independent inputs and state-dependent discontinuities need an extension of this contract; the old dual-input/SRTM research classes are not automatically exposed as GUI plugins. No AATH scenario is claimed as validated by this update. Existing terminal RK4 protocols remain readable. See [the UC Davis guide](UCDAVIS.md#timing-forward-model-and-noise) for the original observation/noise equations.
 
 **Transfer limits.** Compatible foundation backbone weights transfer. Changed parameter names/order or any custom model resets and trains the parameter encoder/decoder, even if the number of parameters remains five. Changed frame counts train resized conditioning weights. LoRA and optional normalization weights train alongside these layers. The original pretrained model represents FDG–2TC; using a new tracer or model does not establish posterior accuracy or calibration. Review `transfer_report.json` and validate on held-out labels or an independent estimator.
 
@@ -45,18 +45,9 @@ time_min,subject_01,subject_02
 
 Provide finite nonnegative activity. The AIF grid can differ from the output frame schedule. The simulator reads the original CSV samples, linearly interpolates on its integration grid and randomly selects one curve for each pair. It never rewrites or creates a resampled AIF CSV.
 
-Set endpoint assumptions in **1 · Model & protocol**, or in the terminal protocol JSON:
+The GUI interpolates measured AIFs to the selected midpoints, holding the first/last measured values outside their sampled range. Supply an AIF covering your measurement times whenever possible. The default UC Davis CSV and unchanged Sub001 schedule retain their original activity samples, with the recorded CSV simulation times and patient labels stored separately. The dataset provenance records the source checksum and interpolation policy.
 
-| Setting | Behaviour |
-| :--- | :--- |
-| `aif_before_first="require_zero"` | Require an AIF sample at time zero (default if omitted) |
-| `aif_before_first="zero_at_origin"` | Insert zero activity at the origin, then interpolate to the first original sample |
-| `aif_after_last="require_coverage"` | Require samples through the simulation end (default if omitted) |
-| `aif_after_last="hold_last"` | Keep each curve's final measured value constant through the simulation end |
-
-Midpoint observations need input coverage through the **last measurement midpoint**; frame averages need coverage through the **end of the last frame**. Holding the final value is an approximation, so choose it deliberately or provide additional measured samples. GUI preview, protocol validation and dataset generation check the same rules. The saved dataset provenance records both policies and the source-file checksum.
-
-**UC Davis paper defaults use the original `data/aif/UCDavis_1H35.csv`** unchanged, with the original first Euler update and CSV observation times. Its explicit recorded patient time labels permit the matching Sub001 file without activity resampling. The endpoint options above apply to custom RK4 simulation; they do not change the HPC recipe.
+For older terminal `simulation_mode="rk4"` protocols, `aif_before_first` selects `require_zero` or `zero_at_origin`, and `aif_after_last` selects `require_coverage` or `hold_last`. Those saved protocols retain their original endpoint and frame-average behavior.
 
 A small AIF pool is acceptable, but repeated use does not create new independent subjects. Input units, tracer metabolite correction, plasma/blood treatment and delay/dispersion conventions must agree between simulation and testing.
 
@@ -78,15 +69,15 @@ Set `aif_mode="feng_cohort"` and `feng_parameters_csv` in the protocol. Whole pa
 | :--- | :--- |
 | `t_meas` | Positive increasing **frame midpoints**, minutes |
 | `frame_durations_min` | One positive actual acquisition duration per frame, minutes |
-| `observation` | `midpoint` or `frame_average` for both TAC and input |
+| `observation` | GUI: `midpoint`; saved terminal RK4 protocols also support `frame_average` |
 | `half_life_min` | Isotope half-life; noise decay constant is `ln(2)/half_life_min` |
-| `integration_step_min` | RK4 step limit (default 0.01 min); check convergence |
+| `integration_step_min` | Integration step (default 0.01 min); check convergence |
 | `kinetic_priors` | Ordered uniform ranges, one per predicted parameter |
 | `noise_prior` | Uniform nonnegative noise-amplitude range |
 | `seed`, `chunk_size` | Reproducibility and bounded simulation working memory |
 
-Midpoints/durations define nonoverlapping frames starting at or after zero; gaps are allowed. `frame_average` numerically integrates activity over each frame. In `midpoint` mode the model samples the curve at its midpoint. Noise uses **actual durations**, not distances between midpoints. Activity is treated as decay-corrected by this noise equation; use consistent correction conventions throughout your project.
+Midpoints/durations define nonoverlapping frames starting at or after zero; gaps are allowed. GUI simulation uses midpoint observations and noise with `delta_t=[t_meas[0], diff(t_meas)]`. Activity is treated as decay-corrected by this noise equation; use consistent correction conventions throughout your project. The UC Davis recipe stores its original CSV observation labels separately from patient frame midpoints. Legacy terminal RK4/frame-average protocols retain duration-based noise.
 
-The simulator selects the original HPC Euler/noise convention for UC Davis and RK4/frame-duration noise for custom protocols. Its NumPy random streams are not byte-identical to historical JAX-generated pairs. Use the supplied epoch-2755 checkpoint and original scaling for paper-model prediction. Both simulation modes share the training array contract.
+Dataset generation uses CPU JAX for the original split-key/random-shape sequence, then integrates in bounded chunks. The seed, all three split sizes, priors, JAX version and PRNG settings determine the draws; changing chunk size does not change them. The dataset JSON records these settings. The original unmarked research-config path in `create_dataset.py` retains its older behavior; use `simulate_protocol.py` for the current protocol workflow. Use the supplied epoch-2755 checkpoint and original scaling for paper-model prediction.
 
 Use [the schedule CSV](../examples/schedule.csv) as a format example. Its five-minute schedule and the default FDG half-life of 109.8 min are illustrative; replace them for your tracer and scan. Config units are minutes, including Feng rates/delay and kinetic rates.

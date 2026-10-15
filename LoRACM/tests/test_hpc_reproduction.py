@@ -19,6 +19,64 @@ from pet_environment import candidates
 
 
 class HPCReproductionTests(unittest.TestCase):
+    def test_generated_pairs_match_original_jax_functions_and_ignore_chunk_size(self):
+        import jax
+        import jax.numpy as jnp
+        from simulate_protocol import main
+        from simulation import generate_dataset,TwoTissueCompartment,get_central_priors
+        with tempfile.TemporaryDirectory() as folder:
+            cfg,_=defaults(folder,small=True)
+            cfg.update(n_train=5,n_val=3,n_test=2,chunk_size=2)
+            main(cfg)
+            with np.load(cfg['output']) as data:
+                first={k:data[k].copy() for k in data.files}
+            csv=pd.read_csv(cfg['aif_csv']);t=csv.iloc[:,0].to_numpy();pool=csv.iloc[:,1:].to_numpy().T
+            indices=np.random.RandomState(cfg['seed']).choice(len(pool),size=10,replace=True)
+            keys=jax.random.split(jax.random.PRNGKey(cfg['seed']),3)
+            offset=0
+            for split,key in zip(('train','val','test'),keys):
+                count=cfg['n_'+split];selected=indices[offset:offset+count];offset+=count
+                priors=get_central_priors(cfg['kinetic_priors'],cfg['test_prior_scale']) if split=='test' else cfg['kinetic_priors']
+                y,x=generate_dataset(count,TwoTissueCompartment,priors,{},cfg['noise_prior'],jnp.asarray(t),key,
+                                     cfg['half_life_min'],external_input_curves=pool[selected],return_clean=False)
+                np.testing.assert_array_equal(x,first['x_'+split])
+                np.testing.assert_array_equal(selected,first['aif_index_'+split])
+                np.testing.assert_array_equal(pool[selected],first['y_'+split][:,len(t):])
+                np.testing.assert_allclose(y,first['y_'+split],atol=2e-8,rtol=3e-12)
+            cfg.update(output=str(Path(folder)/'different_chunks.npz'),chunk_size=4)
+            main(cfg)
+            with np.load(cfg['output']) as data:
+                for name in first:
+                    np.testing.assert_array_equal(first[name],data[name],err_msg=name)
+            metadata=json.loads(Path(cfg['output']).with_suffix('.json').read_text())
+            self.assertTrue(metadata['randomness']['chunk_invariant'])
+            self.assertEqual(metadata['randomness']['sampling_device'],'cpu')
+
+    def test_euler_generation_supports_custom_model_and_feng_inputs(self):
+        from simulate_protocol import main
+        with tempfile.TemporaryDirectory() as folder:
+            cfg,_=defaults(folder,small=True)
+            cfg.pop('prediction_t_meas')
+            cfg.update(model='custom',model_file=str(ROOT/'examples/custom_1tc.py'),parameter_names=['K1','k2','Vb'],
+                       t_meas=[.5,1.5,2.5],frame_durations_min=[1.,1.,1.],aif_sampling='interpolate_to_schedule',
+                       n_train=4,n_val=2,n_test=2,chunk_size=3,integration_step_min=.01)
+            cfg['kinetic_priors']={name:cfg['kinetic_priors'][name] for name in cfg['parameter_names']}
+            main(cfg)
+            csv=pd.read_csv(cfg['aif_csv']);pool=csv.iloc[:,1:].to_numpy().T
+            expected=np.asarray([np.interp(cfg['t_meas'],csv.iloc[:,0],curve) for curve in pool])
+            with np.load(cfg['output']) as data:
+                self.assertEqual(data['y_train'].shape,(4,6))
+                np.testing.assert_array_equal(data['y_train'][:,3:],expected[data['aif_index_train']])
+            cohort=Path(folder)/'feng.csv'
+            cohort.write_text('beta1,beta2,beta3,kappa1,kappa2,kappa3,t0\n300,10,2,3,.1,.01,.1\n310,12,3,3,.12,.02,.2\n')
+            cfg.update(aif_mode='feng_cohort',feng_parameters_csv=str(cohort),feng_log_jitter=0.,output=str(Path(folder)/'feng.npz'))
+            main(cfg)
+            from protocol import feng_curve
+            curves=feng_curve(np.asarray(cfg['t_meas']),pd.read_csv(cohort).to_numpy())
+            with np.load(cfg['output']) as data:
+                self.assertTrue(np.isfinite(data['y_train']).all())
+                np.testing.assert_array_equal(data['y_train'][:,3:],curves[data['aif_index_train']])
+
     def test_euler_first_update_and_rightward_observations(self):
         class OneTC:
             STATE_SIZE=1

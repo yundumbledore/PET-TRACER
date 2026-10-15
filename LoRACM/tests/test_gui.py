@@ -228,30 +228,45 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(cfg['half_life_min'],100.)
         self.assertFalse(list(app.exception))
 
-    def test_original_aif_defaults_and_coverage_checked_before_saving(self):
+    def test_protocol_page_uses_midpoints_without_convention_controls(self):
         from streamlit.testing.v1 import AppTest
         app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
         app.sidebar.radio[0].set_value('1 · Model & protocol').run()
-        next(w for w in app.selectbox if w.label=='Simulation convention').set_value('Custom protocol · RK4 and frame-duration noise').run()
         self.assertEqual(Path(next(w for w in app.text_input if w.label=='Measured AIF CSV').value).name,'UCDavis_1H35.csv')
-        next(w for w in app.checkbox if w.label.startswith('If the first AIF')).check().run()
-        tail=next(w for w in app.selectbox if w.label=='After the final AIF sample')
-        tail.set_value('hold_last').run()
-        next(w for w in app.checkbox if w.label.startswith('If the first AIF')).check().run()
-        tail.set_value('require_coverage').run()
-        self.assertTrue(any('last measurement midpoint' in w.value for w in app.warning))
-        next(w for w in app.button if w.label=='Save and validate protocol').click().run()
-        workspace=Path(self.workspace.name)/'my_project'
-        self.assertFalse((workspace/'protocol.json').exists())
-        self.assertTrue(any('57.5 min' in w.value for w in app.error))
-        next(w for w in app.selectbox if w.label=='After the final AIF sample').set_value('hold_last').run()
+        labels=[w.label for w in app.selectbox]
+        self.assertNotIn('Simulation convention',labels)
+        self.assertNotIn('How are your measured curves sampled?',labels)
+        self.assertFalse(any('Paper convention:' in w.value for w in app.info))
         next(w for w in app.button if w.label=='Save and validate protocol').click().run()
         self.assertFalse(list(app.exception))
+        workspace=Path(self.workspace.name)/'my_project'
         cfg=json.loads((workspace/'protocol.json').read_text())
-        self.assertEqual((cfg['aif_before_first'],cfg['aif_after_last']),('zero_at_origin','hold_last'))
+        self.assertEqual((cfg['simulation_mode'],cfg['observation'],cfg['random_stream']),('hpc_euler','midpoint','jax_hpc'))
+        from ucdavis import defaults
+        original,_=defaults(workspace)
+        self.assertEqual(cfg['t_meas'],original['t_meas'])
+        np.testing.assert_allclose(cfg['prediction_t_meas'],original['prediction_t_meas'],atol=1e-8,rtol=0)
+        self.assertEqual(cfg['aif_sampling'],'source_samples')
         app.sidebar.radio[0].set_value('2 · Dataset').run()
         app.sidebar.radio[0].set_value('1 · Model & protocol').run()
-        self.assertEqual(next(w for w in app.selectbox if w.label=='After the final AIF sample').value,'hold_last')
+        self.assertFalse(list(app.exception))
+
+    def test_custom_schedule_is_saved_without_hidden_ucdavis_override(self):
+        from streamlit.testing.v1 import AppTest
+        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app.sidebar.radio[0].set_value('1 · Model & protocol').run()
+        # Restore an edited schedule draft, as on return from another page.
+        drafts=app.session_state['_project_drafts_'+str(Path(self.workspace.name)/'my_project')]
+        key='1 · Model & protocol:data_editor:schedule_my_project'
+        frame=json.loads(drafts[key]['_dataframe']);frame['data'][-1][0]=57.51
+        drafts[key]={'_dataframe':json.dumps(frame)}
+        app.run()
+        next(w for w in app.button if w.label=='Save and validate protocol').click().run()
+        self.assertFalse(list(app.exception))
+        cfg=json.loads((Path(self.workspace.name)/'my_project/protocol.json').read_text())
+        self.assertEqual(cfg['t_meas'][-1],57.51)
+        self.assertNotIn('prediction_t_meas',cfg)
+        self.assertEqual(cfg['aif_sampling'],'interpolate_to_schedule')
 
     def test_dataset_preflight_rejects_incomplete_saved_aif_before_launch(self):
         from streamlit.testing.v1 import AppTest

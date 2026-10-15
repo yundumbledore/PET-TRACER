@@ -100,17 +100,18 @@ def render(root,workspace,run_default,input_default,upload_or_path,launch=None):
         a,b=st.columns(2);axis=a.selectbox('Volume slice axis',[0,1,2]);index=b.slider('Slice index',0,result['image'].shape[axis]-1,result['image'].shape[axis]//2)
     styles={'Paper display · 2×2 median filter':'ucdavis_hpc','Raw values · no spatial filtering':'raw'}
     default_style=producer.get('map_display',result['metadata'].get('display_profile','raw'))
-    style=styles[st.selectbox('Image display',list(styles),index=0 if default_style=='ucdavis_hpc' else 1)]
+    style_column,minimum_column,maximum_column=st.columns([2,1,1])
+    style=styles[style_column.selectbox('Image display',list(styles),index=0 if default_style=='ucdavis_hpc' else 1)]
     try:
         values,display=display_plane(result,axis,index,style);ids=plane(result['ids'],axis,index)
         low,high=display['vmin'],display['vmax']
     except ValueError as e: st.info(str(e)+'. Choose another parameter or review posterior validity.');return
-    with st.expander('Colour scale'):
-        a,b=st.columns(2);colourkey=identity+'_'+parameter+'_'+statistic+'_'+style
-        low=a.number_input('Colour minimum',value=low,format='%.6g',key=colourkey+'_low')
-        high=b.number_input('Colour maximum',value=high,format='%.6g',key=colourkey+'_high')
-        st.caption('Paper display applies the original 2×2 median filter and uses 0–0.06 for Ki estimates. Other maps use percentile limits. Raw exported values and voxel posteriors remain unchanged.')
-    if high<=low: st.error('Colour maximum must exceed minimum');return
+    colourkey=identity+'_'+parameter+'_'+statistic+'_'+style
+    low=minimum_column.number_input('Colourbar minimum',value=low,format='%.6g',key=colourkey+'_low')
+    high=maximum_column.number_input('Colourbar maximum',value=high,format='%.6g',key=colourkey+'_high')
+    if not np.isfinite([low,high]).all() or high<=low:
+        st.error('Colourbar limits must be finite, with maximum greater than minimum.');return
+    display.update(vmin=float(low),vmax=float(high))
     left,right=st.columns([.9,1.1],gap='large')
     context=identity+'_'+str(axis)+'_'+str(index)
     with left:
