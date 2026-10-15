@@ -30,14 +30,16 @@ Full-run prior ranges:
 
 | Parameter | Uniform range |
 | :--- | :--- |
-| K1 | 0.0001–1.5 |
-| k2 | 0.0001–1.5 |
+| K1 | 0.0001–2.0 |
+| k2 | 0.0001–2.0 |
 | k3 | 0.0001–0.5 |
-| k4 | 0.0001–0.05 |
+| k4 | 0.0001–0.2 |
 | Vb | 0.001–1 |
 | Noise amplitude | 0.1–7 |
 
-The prior ranges follow the archived training distribution and saved HPC normalization. The author confirmed that fine-tuning used 100,000 examples. The archive currently contains more rows, and today's original generator has since-edited defaults; neither overrides that confirmed training count. The old bundled `data/simulated/scenario1.npz` has wider priors and **is not the paper reproduction dataset**. It remains accessible for earlier workflows.
+The simulation ranges follow `REGION_PRIORS['universal']` in the supplied HPC `Create_dataset.py`. The author confirmed that fine-tuning used 100,000 examples. The supplied epoch-2755 checkpoint retains its original normalization; its historical saved scales do not set the defaults for new simulations. The older bundled `data/simulated/scenario1.npz` remains available for earlier workflows and is not selected by the paper-checkpoint route.
+
+New projects use these default ranges. Existing projects retain their saved settings.
 
 **Quick installation check** uses 32 / 16 / 8 pairs, two CPU epochs and a small posterior sample count. It checks software operation and cannot reproduce a useful research map. Retraining with matching settings can still select different weights: the portable simulator uses NumPy random streams, whereas the historical run used JAX; CUDA/MPS training also need not follow the same numerical trajectory. Use the supplied checkpoint for paper-model prediction.
 

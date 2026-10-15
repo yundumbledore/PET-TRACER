@@ -207,6 +207,27 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(next(w for w in app.number_input if w.label=='Rank').value,4)
         self.assertEqual(next(w for w in app.number_input if w.label=='Alpha').value,8.)
 
+    def test_corrected_ucdavis_prior_defaults_and_project_edits_persist(self):
+        from streamlit.testing.v1 import AppTest
+        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app.sidebar.radio[0].set_value('1 · Model & protocol').run()
+        prior=next(w for w in app.text_area if w.label=='Parameter priors (uniform ranges)')
+        expected=json.loads(prior.value)
+        self.assertEqual({name:spec['max'] for name,spec in expected.items()},dict(K1=2.,k2=2.,k3=.5,k4=.2,Vb=1.))
+        changed=json.loads(prior.value);changed['K1']['max']=1.1
+        prior.set_value(json.dumps(changed)).run()
+        next(w for w in app.number_input if w.label=='Isotope half-life (minutes)').set_value(100.).run()
+        app.sidebar.radio[0].set_value('2 · Dataset').run()
+        app.sidebar.radio[0].set_value('1 · Model & protocol').run()
+        self.assertEqual(json.loads(next(w for w in app.text_area if w.label=='Parameter priors (uniform ranges)').value)['K1']['max'],1.1)
+        self.assertFalse(any(w.label=='Load UC Davis source priors' for w in app.button))
+        self.assertEqual(next(w for w in app.number_input if w.label=='Isotope half-life (minutes)').value,100.)
+        next(w for w in app.button if w.label=='Save and validate protocol').click().run()
+        cfg=json.loads((Path(self.workspace.name)/'my_project/protocol.json').read_text())
+        self.assertEqual(cfg['kinetic_priors'],changed)
+        self.assertEqual(cfg['half_life_min'],100.)
+        self.assertFalse(list(app.exception))
+
     def test_original_aif_defaults_and_coverage_checked_before_saving(self):
         from streamlit.testing.v1 import AppTest
         app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()

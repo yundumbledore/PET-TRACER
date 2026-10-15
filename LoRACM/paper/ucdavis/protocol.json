@@ -16,12 +16,12 @@
     "K1": {
       "type": "uniform",
       "min": 0.0001,
-      "max": 1.5
+      "max": 2.0
     },
     "k2": {
       "type": "uniform",
       "min": 0.0001,
-      "max": 1.5
+      "max": 2.0
     },
     "k3": {
       "type": "uniform",
@@ -31,7 +31,7 @@
     "k4": {
       "type": "uniform",
       "min": 0.0001,
-      "max": 0.05
+      "max": 0.2
     },
     "Vb": {
       "type": "uniform",

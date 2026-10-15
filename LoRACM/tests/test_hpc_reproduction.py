@@ -47,8 +47,10 @@ class HPCReproductionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             cfg,training=defaults(folder,small=True)
             self.assertEqual(training['lr_scheduler_patience'],50)
-            self.assertEqual(cfg['kinetic_priors']['k4']['max'],.05)
-            self.assertEqual(cfg['kinetic_priors']['K1']['max'],1.5)
+            expected_priors = {'K1': {'type': 'uniform', 'min': 0.0001, 'max': 2.0}, 'k2': {'type': 'uniform', 'min': 0.0001, 'max': 2.0}, 'k3': {'type': 'uniform', 'min': 0.0001, 'max': 0.5}, 'k4': {'type': 'uniform', 'min': 0.0001, 'max': 0.2}, 'Vb': {'type': 'uniform', 'min': 0.001, 'max': 1.0}}
+            self.assertEqual(cfg['kinetic_priors'],expected_priors)
+            for relative in ('configs/dataset_scenario1.json','paper/ucdavis/protocol.json'):
+                self.assertEqual(json.loads((ROOT/relative).read_text())['kinetic_priors'],expected_priors)
             main(cfg)
             raw=pd.read_csv(cfg['aif_csv']).iloc[:,1:].to_numpy().T
             with np.load(cfg['output']) as data:

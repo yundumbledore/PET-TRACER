@@ -10,8 +10,8 @@
   "retraining": "Same equations/settings; regenerated NumPy draws and hardware training are not bitwise replicas of historical JAX/CUDA run",
   "assets": {
     "paper/ucdavis/README.md": {
-      "sha256": "92f536f227e776a9c2ddb2d02932cb578cdf5441efe1fcefe28ec2740de99f14",
-      "bytes": 1594
+      "sha256": "6db825b77a9f04ae8583a84f9c31647c76e10dd087902caa71d0a9fa3d018bbf",
+      "bytes": 1823
     },
     "paper/ucdavis/best.pth": {
       "sha256": "f4eef814a56b78e639a4398fcf6eaa29f2526f3afb018b5fbd55b986ae04b420",
@@ -26,8 +26,8 @@
       "bytes": 935
     },
     "paper/ucdavis/protocol.json": {
-      "sha256": "5ffbe358a7003c696a735e327704a14f378fb1184faf98618c0e612a66104aa8",
-      "bytes": 2971
+      "sha256": "f9ab5981a3e7368c447b5a23497059881a2905bacb6df01116c1048077d2a47e",
+      "bytes": 2970
     },
     "paper/ucdavis/reference_ki.npz": {
       "sha256": "220fe1fe50bbed9b22a17b0da4f92844c0f93b939c464210781545aca9c624e3",
@@ -41,5 +41,33 @@
       "sha256": "5780b70489d5b70b26e41997aeee2b067b562cce50b973f34a9e1a39826d5f0c",
       "bytes": 2049
     }
-  }
+  },
+  "simulation_priors": {
+    "K1": {
+      "type": "uniform",
+      "min": 0.0001,
+      "max": 2.0
+    },
+    "k2": {
+      "type": "uniform",
+      "min": 0.0001,
+      "max": 2.0
+    },
+    "k3": {
+      "type": "uniform",
+      "min": 0.0001,
+      "max": 0.5
+    },
+    "k4": {
+      "type": "uniform",
+      "min": 0.0001,
+      "max": 0.2
+    },
+    "Vb": {
+      "type": "uniform",
+      "min": 0.001,
+      "max": 1.0
+    }
+  },
+  "simulation_priors_source": "Supplied Create_dataset.py REGION_PRIORS['universal']; source file SHA-256 d68dfe768c60eaf6d64b57414d2f352fca7258ef8d50360bc203417c271efb14"
 }

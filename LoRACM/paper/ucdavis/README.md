@@ -12,6 +12,8 @@ Its SHA-256 is `f4eef814a56b78e639a4398fcf6eaa29f2526f3afb018b5fbd55b986ae04b420
 
 Keep **best.pth**, **model_params.json** and **scaling_params.json** together. Original x/y normalization is unchanged. Added metadata records the explicit simulation/patient timestamp labels, parameter order, paper Ki policy and display convention. `protocol.json` retains the corresponding forward model for single-TAC NLS and posterior-median TAC overlays.
 
+The forward-protocol bounds follow the supplied `Create_dataset.py`: K1/k2 up to 2.0 and k4 up to 0.2. New simulation priors and NLS bounds are configurable; inference uses the original normalization saved with this checkpoint.
+
 In the GUI's prediction, Single TAC & NLS or parametric imaging model selector, choose **Paper LoRACM · UC Davis · epoch 2755**. No fine-tuning or new dataset is required. The GUI copies the model to your project so analyses do not write into these supplied assets.
 
 From `PET-TRACER/LoRACM`:

@@ -1,5 +1,9 @@
 # Workflow validation
 
+## UC Davis source-prior correction — 15 October 2026
+
+UC Davis simulation and forward-protocol bounds follow `REGION_PRIORS['universal']` in the supplied `Create_dataset.py`: K1/k2 0.0001–2.0, k3 0.0001–0.5, k4 0.0001–0.2 and Vb 0.001–1. The earlier narrower defaults inferred from the archive were corrected. Original checkpoint weights and normalization remain unchanged. A GUI regression check verifies the default ranges and persistence of user edits across pages. The current suite has **67 passing checks**; older dated results below are retained as history.
+
 ## HPC reproduction and reusable environment — 15 October 2026
 
 **66/66 automated checks passed** on Apple Silicon macOS, Python 3.11, PyTorch 2.6.0 CPU. Tests include direct paper-checkpoint selection without training, patient/CSV time-label contracts, unchanged AIF conditioning, HPC solver/noise behavior, explicit Ki flooring, raw/display-map separation, and shared environment discovery for POSIX/Windows paths. Previous project-persistence, custom-model, CM comparison, voxel identity, logging and memory checks continue to pass.

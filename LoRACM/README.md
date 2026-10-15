@@ -95,6 +95,6 @@ If using your own fine-tuning file, change `dataset_dir` in the training config 
 
 ## UC Davis example and original material
 
-The [UC Davis guide](docs/UCDAVIS.md) covers the complete numbered GUI/terminal route, supplied assets, small/full runs, posterior inference and interactive imaging. The default UC Davis GUI uses the original HPC Euler solver, noise timing and unchanged AIF conditioning, narrower paper priors, scheduler patience 50, and the original 2×2-filtered Ki display. Use **Use supplied paper checkpoint** in step 3 or the **UC Davis demonstration** page to reproduce the paper model without retraining. [Exact settings and provenance](docs/UCDAVIS.md).
+The [UC Davis guide](docs/UCDAVIS.md) covers the complete numbered GUI/terminal route, supplied assets, small/full runs, posterior inference and interactive imaging. The default UC Davis GUI uses the original HPC Euler solver, noise timing and unchanged AIF conditioning, the parameter ranges in the supplied HPC `Create_dataset.py`, scheduler patience 50, and the original 2×2-filtered Ki display. Use **Use supplied paper checkpoint** in step 3 or the **UC Davis demonstration** page to reproduce the paper model without retraining. [Exact settings and provenance](docs/UCDAVIS.md).
 
 [Original framework](../docs/legacy-framework.md) · [Detailed formats](docs/DATA_FORMATS.md) · [Provenance](docs/DATA_PROVENANCE.md) · [Scientific review](docs/RELEASE_REVIEW.md) · [Validation](docs/VALIDATION.md)
