@@ -93,8 +93,9 @@ def main(cfg, training_mode="lora"):
         Path(save_dir, 'protocol.json').write_text(json.dumps(protocol,indent=2)+'\n', encoding='utf-8')
     writer = SummaryWriter(os.path.join(save_dir, "tb"))
 
+    timing = {key:data[key].tolist() for key in ("prediction_t_meas","simulation_mode") if key in data}
     with open(os.path.join(save_dir, "scaling_params.json"), "w", encoding='utf-8') as f:
-        json.dump({"x_mean": x_mean.tolist(), "x_std": x_std.tolist(),
+        json.dump({**timing,"x_mean": x_mean.tolist(), "x_std": x_std.tolist(),
                    "y_mean": y_mean.tolist(), "y_std": y_std.tolist(), "t_meas": data["t_meas"].tolist(),
                    "frame_durations_min": report['frame_durations_min'],
                    "observation": str(data['observation']) if 'observation' in data else 'midpoint',

@@ -1,4 +1,5 @@
 """Single-curve import, posterior viewing and nonlinear least-squares comparison."""
+from protocol import prediction_times
 import json
 from pathlib import Path
 from datetime import datetime
@@ -62,7 +63,7 @@ def render(root, workspace, launch, default_run=None, default_input=None,enable_
                 if not converted.exists(): converted.write_bytes(buffer.getvalue())
                 input_path=converted
             stat=input_path.stat()
-            payload=prediction_payload(str(input_path),stat.st_mtime_ns,stat.st_size,cfg['x_dim'],scale['t_meas'],scale.get('frame_durations_min'))
+            payload=prediction_payload(str(input_path),stat.st_mtime_ns,stat.st_size,cfg['x_dim'],prediction_times(scale),scale.get('frame_durations_min'))
             t,duration,y,columns,_=payload
             selected=st.selectbox('TAC identifier',columns.tolist())
             index=columns.tolist().index(selected)

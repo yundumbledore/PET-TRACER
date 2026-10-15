@@ -19,7 +19,7 @@ The GUI starts with the **UC Davis Scenario 1** template: rank 4, alpha 8 and it
 | Parameter / input dimensions | **Automatic** | `x_dim=P`, `y_dim=2T`, inferred and checked against the dataset |
 | Epoch snapshots | Every 25 epochs | Plus epoch 1, best and last; set interval 1 to retain every epoch |
 
-These are starting values, not optimized recommendations for every tracer/protocol. Track convergence and posterior performance on held-out data. The preserved UC Davis research configs use **rank 4, alpha 8**, a different split size ; the current checkpoint policy saves the best model from the first completed epoch, including for UC Davis.
+These are starting values, not optimized recommendations for every tracer/protocol. Track convergence and posterior performance on held-out data. The preserved UC Davis research configs use **rank 4, alpha 8**, scheduler patience **50** and the narrower paper parameter ranges; the current checkpoint policy saves the best model from the first completed epoch, including for UC Davis.
 
 ## GUI
 

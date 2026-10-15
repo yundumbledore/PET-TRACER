@@ -41,7 +41,17 @@ def validate_protocol(cfg):
     duration = np.asarray(cfg['frame_durations_min'], dtype=float)
     if duration.shape != t.shape or not np.isfinite(duration).all() or np.any(duration <= 0):
         raise ValueError('Supply one finite positive frame duration per measurement')
-    starts, ends = t-duration/2, t+duration/2
+    convention = cfg.get('simulation_mode', 'rk4')
+    if convention not in ('rk4', 'hpc_euler'):
+        raise ValueError('simulation_mode must be rk4 or hpc_euler')
+    midpoints = validate_times(cfg.get('prediction_t_meas', t), 'patient frame midpoints')
+    if midpoints.shape != t.shape:
+        raise ValueError('Patient and simulation time labels must have the same frame count')
+    if convention == 'rk4' and not np.allclose(midpoints,t,atol=1e-6,rtol=0):
+        raise ValueError('Separate patient time labels require the explicit hpc_euler convention')
+    if convention == 'hpc_euler' and (cfg.get('observation','midpoint') != 'midpoint' or cfg.get('aif_mode','measured') != 'measured'):
+        raise ValueError('HPC reproduction requires midpoint observations and measured AIFs; use RK4 for other protocols')
+    starts, ends = midpoints-duration/2, midpoints+duration/2
     if np.any(starts < -1e-8) or np.any(starts[1:] < ends[:-1]-1e-8):
         raise ValueError('Frames must start at/after zero and must not overlap; t_meas are frame midpoints')
     if cfg.get('observation', 'midpoint') not in ('midpoint', 'frame_average'):
@@ -84,6 +94,11 @@ def load_measured_inputs(cfg, end=None):
     aifs = frame.iloc[:, 1:].to_numpy(dtype=float).T
     if aifs.shape[0] < 1 or not np.isfinite(aifs).all() or np.any(aifs < 0):
         raise ValueError('AIF CSV requires at least one finite nonnegative activity column')
+    if cfg.get('simulation_mode') == 'hpc_euler':
+        expected = np.asarray(cfg['t_meas'])
+        if t.shape != expected.shape or not np.allclose(t,expected,atol=1e-10,rtol=0):
+            raise ValueError('HPC reproduction preserves original AIF samples: CSV times must equal simulation t_meas')
+        return t, aifs
     origin = cfg.get('aif_before_first', 'require_zero')
     tail = cfg.get('aif_after_last', 'require_coverage')
     if origin not in ('require_zero', 'zero_at_origin'):
@@ -151,6 +166,18 @@ def feng_curve(t, parameters):
     return (b1*u-b2-b3)*np.exp(-k1*u)+b2*np.exp(-k2*u)+b3*np.exp(-k3*u)
 
 
+def prediction_times(settings):
+    """Allowed recorded time labels, without changing any observed activity.
+
+    Only an explicitly saved HPC recipe may accept its separate patient labels.
+    All other models retain one exact schedule and duration check.
+    """
+    times = settings['t_meas']
+    if settings.get('simulation_mode') == 'hpc_euler' and settings.get('prediction_t_meas') is not None:
+        return {'simulation': times, 'patient': settings['prediction_t_meas']}
+    return times
+
+
 def read_prediction_input(path, parameter_dim, expected_times=None, expected_durations=None):
     """Read portable NPZ or legacy pandas HDF5, with an identical contract."""
     path = Path(path)
@@ -185,7 +212,8 @@ def read_prediction_input(path, parameter_dim, expected_times=None, expected_dur
     if truth is not None and (truth.shape != (len(tac), parameter_dim) or not np.isfinite(truth).all()):
         raise ValueError('truth must be finite [N, number of parameters]')
     for actual, expected, label in [(t, expected_times, 'time sampling schedule'), (duration, expected_durations, 'frame durations')]:
-        if expected is not None and (actual.shape != np.asarray(expected).shape or not np.allclose(actual, expected, atol=1e-6, rtol=0)):
+        choices = list(expected.values()) if isinstance(expected,dict) else [expected]
+        if expected is not None and not any(actual.shape == np.asarray(choice).shape and np.allclose(actual,choice,atol=1e-6,rtol=0) for choice in choices):
             raise ValueError(f'Prediction {label} differs from training; adapt to the new protocol first')
     return t, duration, np.concatenate([tac, aif], axis=1), columns, truth
 

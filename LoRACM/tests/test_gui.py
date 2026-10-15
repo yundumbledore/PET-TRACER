@@ -72,7 +72,7 @@ class GuiTests(unittest.TestCase):
         app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
         next(w for w in app.sidebar.checkbox if w.label=='Enable CM from scratch comparison').check().run()
         app.sidebar.radio[0].set_value('4 · Predict').run()
-        self.assertEqual(next(w for w in app.selectbox if w.label=='Model to use').options,['LoRACM · scenario1'])
+        self.assertIn('LoRACM · scenario1',next(w for w in app.selectbox if w.label=='Model to use').options)
         next(w for w in app.selectbox if w.label=='Prediction input').set_value('My own file').run()
         next(w for w in app.text_input if w.label=='Testing dataset').set_value(str(source)).run()
         with patch('gui.jobs.Jobs.start') as start:
@@ -211,10 +211,12 @@ class GuiTests(unittest.TestCase):
         from streamlit.testing.v1 import AppTest
         app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
         app.sidebar.radio[0].set_value('1 · Model & protocol').run()
+        next(w for w in app.selectbox if w.label=='Simulation convention').set_value('Custom protocol · RK4 and frame-duration noise').run()
         self.assertEqual(Path(next(w for w in app.text_input if w.label=='Measured AIF CSV').value).name,'UCDavis_1H35.csv')
-        self.assertTrue(next(w for w in app.checkbox if w.label.startswith('If the first AIF')).value)
+        next(w for w in app.checkbox if w.label.startswith('If the first AIF')).check().run()
         tail=next(w for w in app.selectbox if w.label=='After the final AIF sample')
-        self.assertEqual(tail.value,'hold_last')
+        tail.set_value('hold_last').run()
+        next(w for w in app.checkbox if w.label.startswith('If the first AIF')).check().run()
         tail.set_value('require_coverage').run()
         self.assertTrue(any('last measurement midpoint' in w.value for w in app.warning))
         next(w for w in app.button if w.label=='Save and validate protocol').click().run()
@@ -235,7 +237,7 @@ class GuiTests(unittest.TestCase):
         from ucdavis import defaults
         workspace=Path(self.workspace.name)/'my_project';workspace.mkdir()
         cfg,_=defaults(workspace,small=True)
-        cfg['aif_after_last']='require_coverage'
+        cfg.update(simulation_mode='rk4',t_meas=cfg.pop('prediction_t_meas'),aif_before_first='zero_at_origin',aif_after_last='require_coverage')
         (workspace/'protocol.json').write_text(json.dumps(cfg))
         app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
         app.sidebar.radio[0].set_value('2 · Dataset').run()
@@ -244,6 +246,27 @@ class GuiTests(unittest.TestCase):
             start.assert_not_called()
         self.assertFalse(list(app.exception))
         self.assertTrue(any('last measurement midpoint' in w.value for w in app.error))
+
+    def test_paper_checkpoint_is_available_without_dataset_or_training(self):
+        from streamlit.testing.v1 import AppTest
+        from common import file_sha256
+        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app.sidebar.radio[0].set_value('5 · Single TAC & NLS').run()
+        workspace=Path(self.workspace.name)/'my_project'
+        paper=workspace/'runs/paper_ucdavis'
+        self.assertTrue((paper/'best.pth').exists())
+        self.assertEqual(file_sha256(paper/'best.pth'),'f4eef814a56b78e639a4398fcf6eaa29f2526f3afb018b5fbd55b986ae04b420')
+        self.assertFalse((workspace/'dataset.npz').exists())
+        self.assertFalse((workspace/'train.json').exists())
+        self.assertEqual(Path(next(w for w in app.text_input if w.label=='Model run folder').value),paper)
+        app.sidebar.radio[0].set_value('4 · Predict').run()
+        next(w for w in app.button if w.label=='Validate input').click().run()
+        self.assertTrue(any('24237' in w.value for w in app.success))
+        app.sidebar.radio[0].set_value('3 · Fine-tune').run()
+        self.assertEqual(next(w for w in app.number_input if w.label=='Scheduler patience (epochs)').value,50)
+        next(w for w in app.button if w.label=='Use supplied paper checkpoint').click().run()
+        self.assertTrue(any('Paper checkpoint ready' in w.value for w in app.success))
+        self.assertFalse(list(app.exception))
 
     def test_all_pages_render(self):
         from streamlit.testing.v1 import AppTest

@@ -20,16 +20,16 @@ Use a new project name for independent settings. Returning to an existing name r
 
 | Scale | Training / validation / test pairs | Training epochs | Purpose |
 | :--- | :--- | :--- | :--- |
-| Full Scenario 1 | 50,000 / 100,000 / 100 | 5,000 | Research-sized starting settings |
+| Full Scenario 1 | 100,000 / 100,000 / 100 | 5,000 | Research-sized starting settings |
 | Quick installation check | 32 / 16 / 8 | 2 | Learn the interface with a short practice run |
 
 UC Davis uses rank 4 and alpha 8 at either scale. My own project starts with 100,000 / 10,000 / 1,000 pairs, rank 8 and alpha 16. Once you begin configuring the workflow, defaults are fixed for that project; all individual settings remain editable on their relevant pages. The tiny practice model is for checking software, not interpreting patient parameters.
 
 ## Measured input functions
 
-The UC Davis setup uses the original `data/aif/UCDavis_1H35.csv`. Step 1 previews its original samples and exposes both endpoint assumptions: zero activity at the origin, and holding the last measured value after the final sample. UC Davis enables both by default. Other projects require measured coverage after the last sample unless you explicitly choose **Hold the last measured AIF value**.
+The default UC Davis paper recipe reads the original `data/aif/UCDavis_1H35.csv`, retains its AIF values unchanged, and uses its CSV times for the original Euler solver and delta_t noise. Patient frame labels and durations are recorded separately; the GUI preserves the HPC frame-order pairing without resampling activities. Choose **Custom protocol · RK4 and frame-duration noise** for another model, schedule, Feng inputs or frame averaging; its endpoint controls use explicit zero-origin/last-value-hold assumptions. [Timing and simulation details](UCDAVIS.md#timing-forward-model-and-noise).
 
-The final AIF sample is at 57.48521667 minutes; the Sub001 schedule's last midpoint is at 57.5 minutes. Frame averaging instead requires coverage through 60 minutes. A coverage warning explains the missing interval before you save the protocol or launch simulation. See [input functions and endpoint policies](MODELS_AND_PROTOCOLS.md#use-measured-inputs) for terminal settings. Existing projects retain their earlier options: check the zero-origin option, choose the final-value hold and save step 1 before rerunning step 2.
+The model selectors in steps 4–6 include **Paper LoRACM · UC Davis · epoch 2755** without requiring a dataset or training. Step 3 also has **Use supplied paper checkpoint**. The original weights and normalization are copied into your project's `runs/paper_ucdavis`; fine-tuning creates a separate run. The **UC Davis demonstration** page predicts and exports a paper-style Ki map in one job.
 
 ## Training and early stopping
 

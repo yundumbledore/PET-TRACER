@@ -5,14 +5,17 @@ import json
 from pathlib import Path
 import numpy as np
 import pandas as pd
-import jax
-import jax.numpy as jnp
-from jax import random
-from simulation import generate_dataset, TwoTissueCompartment, get_central_priors
 from common import load_config, validate_dataset, PARAMETERS
 
 
 def main(cfg):
+    if cfg.get('simulation_mode'):
+        from simulate_protocol import main as simulate
+        return simulate(cfg)
+    import jax
+    import jax.numpy as jnp
+    from jax import random
+    from simulation import generate_dataset, TwoTissueCompartment, get_central_priors
     frame = pd.read_csv(cfg['aif_csv'])
     t = frame.iloc[:,0].to_numpy(dtype=float)
     aifs = frame.iloc[:,1:].to_numpy(dtype=float).T

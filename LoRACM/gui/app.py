@@ -90,7 +90,7 @@ with st.sidebar:
         preset = st.selectbox('Example setup',PRESETS,index=PRESETS.index(previous_preset) if previous_preset in PRESETS else 0,key='preset_'+project_name,disabled=locked,
             help='Initial values for a new project: the supplied UC Davis study, or generic settings for your own study. All settings can be edited in the workflow.')
         size = st.selectbox('Walkthrough scale',['Full Scenario 1','Quick installation check'],index=1 if previous_defaults.get('walkthrough_size')=='small' else 0,disabled=preset!=PRESETS[0] or locked,key='size_'+project_name,
-            help='Full: 50,000 training / 100,000 validation / 100 test pairs and 5,000 epochs. Quick: 32 / 16 / 8 pairs and 2 epochs. These are initial values, not limits.')
+            help='Full: 100,000 training / 100,000 validation / 100 test pairs and 5,000 epochs. Quick: 32 / 16 / 8 pairs and 2 epochs. These are initial values, not limits.')
         st.caption('Defaults initialise this project. Once you begin configuring it, use a new project name to choose fresh defaults. Edits in any workflow page are retained automatically.')
     small = preset==PRESETS[0] and size=='Quick installation check'
     profile=project_name
@@ -124,7 +124,7 @@ if st.session_state.get('active_run'):
 if page == 'Welcome':
     st.title('PET kinetic modelling for your study')
     st.write('Estimate kinetic parameter posteriors from tissue curves and input functions. Adapt the foundation model with LoRACM, or train a consistency model from scratch for comparison.')
-    st.info('**Start with the UC Davis walkthrough**\n\nFollow steps 1 → 6 with the supplied 2TC model, four AIFs, Sub001 frame schedule and coronal slice. Each step is editable when you are ready to use your own project. Choose Quick installation check for a short practice run.')
+    st.info('**Start with the UC Davis walkthrough**\n\nFor paper-model imaging, open UC Davis demonstration or use the supplied checkpoint in step 3. Follow steps 1 → 6 to learn simulation and retraining with the original HPC conventions. Each step is editable when you are ready to use your own project. Choose Quick installation check for a short practice run.')
     a,b = st.columns(2)
     a.info('**Simulate training pairs**\n\nDefine kinetics and timing → choose measured or Feng AIFs → generate labelled pairs → fine-tune → predict.')
     b.info('**Bring your own training pairs**\n\nOpen Dataset → validate your NPZ → fine-tune → predict. You can skip simulation.')
@@ -139,9 +139,13 @@ elif page == '1 · Model & protocol':
     st.title('1 · Define kinetics, input functions and timing')
     saved = json.loads(protocol_path.read_text(encoding='utf-8')) if protocol_path.exists() else default_protocol.copy()
     if preset==PRESETS[0] and (not protocol_path.exists() or saved.get('workflow_preset')==PRESETS[0]):
-        st.caption('UC Davis defaults: FDG 2TC, four original AIFs from UCDavis_1H35.csv, 35 Sub001 frames over 60 minutes and half-life 109.8 minutes. The simulator uses the original AIF time points with linear interpolation, zero at the origin and the last value held where needed.')
+        st.caption('UC Davis defaults: FDG 2TC, four original AIFs from UCDavis_1H35.csv, 35 Sub001 frames over 60 minutes and half-life 109.8 minutes. The simulator uses the original AIF time points with linear interpolation, original Euler observations and historical noise timing. AIF activity samples remain unchanged.')
     elif protocol_path.exists():
         st.caption('Using this project’s saved protocol. Choose a fresh project name to start from an unchanged template.')
+    conventions={'UC Davis paper · original HPC Euler':'hpc_euler','Custom protocol · RK4 and frame-duration noise':'rk4'}
+    convention=conventions[st.selectbox('Simulation convention',list(conventions),index=0 if saved.get('simulation_mode')=='hpc_euler' else 1)]
+    historical=convention=='hpc_euler'
+    if historical: st.info('Paper convention: original CSV AIF values, Euler grid and delta_t noise. The table shows the patient frame midpoints; the original CSV timestamps are retained separately for simulation. Choose Custom protocol for a different kinetic model, sampling schedule or Feng inputs.')
     model_choice = st.selectbox('Kinetic model',['2TC','custom'],index=0 if saved.get('model')=='2TC' else 1,key='model_'+profile)
     model_file = st.text_input('Custom model Python file',saved.get('model_file','examples/custom_1tc.py'),disabled=model_choice=='2TC')
     st.caption('Custom models run your local Python code. Use only code you trust. The working 1TC template documents the batched rhs/observe interface; multiple input channels are outside this GUI contract.')
@@ -154,7 +158,7 @@ elif page == '1 · Model & protocol':
         write_json(protocol_path,saved); st.rerun()
     names = st.text_input('Parameter names, in order',', '.join(saved['parameter_names']))
     prior_text = st.text_area('Parameter priors (uniform ranges)',json.dumps(saved['kinetic_priors'],indent=2),height=220,help='Keys must match the parameter names in the same order. Rates are per minute; Vb is a fraction.')
-    schedule_default = pd.DataFrame({'time_min':saved['t_meas'],'duration_min':saved['frame_durations_min']})
+    schedule_default = pd.DataFrame({'time_min':saved.get('prediction_t_meas',saved['t_meas']),'duration_min':saved['frame_durations_min']})
     st.subheader('Time sampling schedule')
     schedule_upload = st.file_uploader('Load a schedule CSV with time_min,duration_min',type=['csv'])
     if schedule_upload is not None:
@@ -187,16 +191,16 @@ elif page == '1 · Model & protocol':
             f = pd.read_csv(fits); st.line_chart(f.set_index('time_min'))
             st.dataframe(pd.read_csv(workspace/'feng.csv'))
     jitter = st.number_input('Feng log-space variation (0 = row resampling only)',min_value=0.,max_value=.5,value=float(saved.get('feng_log_jitter',.05)),disabled=aif_mode=='measured')
-    origin = st.checkbox('If the first AIF sample is after zero, assume zero activity at time zero',value=saved.get('aif_before_first')=='zero_at_origin',disabled=aif_mode!='measured')
+    origin = st.checkbox('If the first AIF sample is after zero, assume zero activity at time zero',value=saved.get('aif_before_first')=='zero_at_origin',disabled=aif_mode!='measured' or historical)
     tail_options = ['require_coverage', 'hold_last']
     tail_default = saved.get('aif_after_last',default_protocol.get('aif_after_last','require_coverage'))
     tail = st.selectbox('After the final AIF sample',tail_options,index=tail_options.index(tail_default) if tail_default in tail_options else 0,
                         format_func=lambda value: {'require_coverage':'Require measured AIF coverage', 'hold_last':'Hold the last measured AIF value'}[value],
-                        disabled=aif_mode!='measured',help='Midpoint observations need coverage through the last midpoint; frame averages need coverage through the last frame end. Holding the last value is an explicit approximation, saved in the protocol.')
+                        disabled=aif_mode!='measured' or historical,help='Midpoint observations need coverage through the last midpoint; frame averages need coverage through the last frame end. Holding the last value is an explicit approximation, saved in the protocol.')
     if aif_mode == 'measured':
         try:
-            load_measured_inputs(dict(saved,aif_csv=str(aif_source),t_meas=schedule['time_min'].tolist(),
-                                      frame_durations_min=schedule['duration_min'].tolist(),observation=observation,
+            load_measured_inputs(dict(saved,aif_csv=str(aif_source),t_meas=pd.read_csv(aif_source).iloc[:,0].tolist() if historical else schedule['time_min'].tolist(),
+                                      prediction_t_meas=schedule['time_min'].tolist(),simulation_mode=convention,frame_durations_min=schedule['duration_min'].tolist(),observation=observation,
                                       aif_before_first='zero_at_origin' if origin else 'require_zero',aif_after_last=tail))
         except (OSError,ValueError,KeyError,IndexError) as e:
             st.warning(str(e))
@@ -209,6 +213,12 @@ elif page == '1 · Model & protocol':
                        feng_parameters_csv=str(aif_source) if aif_mode=='feng_cohort' else saved.get('feng_parameters_csv'),
                        feng_log_jitter=jitter,aif_before_first='zero_at_origin' if origin else 'require_zero',aif_after_last=tail,output=str(dataset_path),
                        workflow_preset=preset,walkthrough_size=default_protocol['walkthrough_size'])
+            cfg['simulation_mode']=convention
+            if historical:
+                if model_choice!='2TC' or aif_mode!='measured' or observation!='midpoint': raise ValueError('Paper reproduction uses measured-input 2TC midpoint observations; choose Custom protocol for other settings')
+                cfg.update(t_meas=pd.read_csv(aif_source).iloc[:,0].tolist(),prediction_t_meas=schedule['time_min'].tolist(),aif_before_first='hpc_first_sample',ki_policy='hpc_floor_1e-4')
+            else:
+                cfg.pop('prediction_t_meas',None)
             cfg.pop('input_alignment',None)
             validate_protocol(cfg); load_model(cfg)
             if aif_mode == 'measured': load_measured_inputs(cfg)
@@ -266,51 +276,29 @@ elif page == 'User manual':
     st.markdown(re.sub(r'\[([^\]]+)\]\(([^)]+)\)',manual_link,content))
 
 elif page == 'UC Davis demonstration':
-    st.title('UC Davis · Learn the complete workflow')
-    st.info('The default UC Davis route is now available in numbered steps 1–6, including patient-slice prediction, parametric maps and voxel inspection. The shortcuts below retain the earlier AIF-grid example and matched simulated testing.')
-    st.write('The supplied four measured AIFs adapt the FDG 2TC foundation model to the uEXPLORER protocol. Choose an installation check or the original Scenario 1 settings.')
-    mode = st.radio('Demonstration',['Small CPU installation check','Original Scenario 1'])
-    is_smoke = mode.startswith('Small')
-    demo = workspace/('demo_smoke' if is_smoke else 'demo_scenario1')
-    demo_data = demo/'dataset.npz'; demo_run=demo/'runs'/'demo'
-    config_suffix = 'smoke' if is_smoke else 'scenario1'
-    st.table(pd.DataFrame({'Setting':['Training / validation / test pairs','LoRA rank / alpha','Epochs'],
-                           'Value':['32 / 16 / 8' if is_smoke else '50,000 / 100,000 / 100','4 / 8','2' if is_smoke else '5,000']}))
-    st.caption('These preserved demonstration settings differ from new-project defaults. The small run checks installation and produces no scientifically useful model.')
-    if st.button('1. Prepare supplied demonstration pairs'):
+    st.title('UC Davis · Reproduce the paper example')
+    st.write('Use the original epoch-2755 LoRACM checkpoint and normalization. The default example preserves the original measured AIF values, three reverse steps, 1,000 posterior draws, the HPC Ki transform and 2×2 median-filtered display.')
+    st.info('To learn dataset creation and retraining, follow numbered steps 1 → 6 in a fresh UC Davis project. To reproduce the paper model, use the supplied checkpoint here or in step 3.')
+    demo_device=st.selectbox('Paper-example compute device',['auto','cpu','cuda:0','mps'])
+    st.caption('Auto selects CUDA, Apple MPS, then CPU. Whole-slice CPU inference can take substantially longer.')
+    if st.button('Reproduce paper Ki map',type='primary',disabled=st.session_state.jobs.running()):
         try:
-            if demo_data.exists(): raise ValueError('Demo dataset exists; select a new project or use the next step')
-            cfg = json.loads((ROOT/f'configs/dataset_{config_suffix}.json').read_text(encoding='utf-8'))
-            demo.mkdir(parents=True,exist_ok=True)
-            with np.load(ROOT/'data/simulated/scenario1.npz',allow_pickle=False) as data:
-                subset={'t_meas':data['t_meas']}
-                for split in ('train','val','test'):
-                    for prefix in ('x','y','aif_index'):
-                        key=prefix+'_'+split
-                        if key in data: subset[key]=data[key][:cfg['n_'+split]]
-                np.savez_compressed(demo_data,**subset)
-            write_json(demo/'dataset.json',dict(cfg,source='Supplied Scenario 1 pairs; deterministic leading subset',output=str(demo_data)))
-            st.success('Demonstration dataset prepared without JAX. Continue to fine-tuning.')
-        except Exception as e: st.error(str(e))
-    if st.button('2. Fine-tune demonstration model',disabled=not demo_data.exists()):
-        cfg = json.loads((ROOT/f'configs/train_{config_suffix}.json').read_text(encoding='utf-8'))
-        cfg.update(pretrained=str(ROOT/cfg['pretrained']),dataset_dir=str(demo_data),save_dir=str(demo/'runs'),exp_name='demo')
-        write_json(demo/'train.json',cfg); launch('UC Davis fine-tuning',['train.py','--config',demo/'train.json'])
-    st.write('3. Test on held-out simulated pairs with the same schedule. This avoids the timing mismatch in the supplied patient-slice file.')
-    if st.button('3. Predict demonstration test set',disabled=not (demo_run/'last.pth').exists()):
-        try:
-            with np.load(demo_data,allow_pickle=False) as data:
-                t = data['t_meas']; y=data['y_test']; size=len(t)
-                # Duration is absent in the research NPZ; legacy inference does not use it.
-                test_file=demo/'testing.npz'
-                np.savez_compressed(test_file,tac=y[:,:size],aif=y[:,size:],t_meas=t,
-                                    frame_durations_min=np.r_[t[0],np.diff(t)],truth=data['x_test'][:,:5])
-            launch('UC Davis prediction',['infer.py','--run',demo_run,'--checkpoint','last.pth' if is_smoke else 'best.pth',
-                                          '--input',test_file,'--output',demo_run/'predictions.npz','--samples','8' if is_smoke else '1000',
-                                          '--batch-size','2' if is_smoke else '16','--sample-chunk','4' if is_smoke else '64','--device','cpu' if is_smoke else 'auto'])
-        except Exception as e: st.error(str(e))
-    st.warning('The released patient-slice time grid differs from the adaptation AIF grid. Clinical inference must pass the timing check after appropriate adaptation or verified resampling. The imaging notebook also requires author-verified voxel mapping and orientation.')
-    run_path = demo_run
+            from ucdavis import prepare_paper_run
+            from gui.prediction import remember_prediction,available_output
+            paper_run=prepare_paper_run(workspace)
+            destination=available_output(workspace/'paper_predictions.npz')
+            if launch('UC Davis paper reproduction',['reproduce_ucdavis.py','--workspace',workspace,'--device',demo_device],run=paper_run):
+                remember_prediction(workspace,paper_run,destination,ROOT/'data/real/Sub001_slice75_adjusted.h5','lora',
+                                    ROOT/'data/real/Sub001_slice75_geometry.npz',ROOT/'data/real/Sub001_slice75_geometry.json')
+        except Exception as error: st.error(str(error))
+    reference=ROOT/'paper/ucdavis/reference_ki.png'
+    if reference.exists():
+        with st.expander('Archived HPC reference map'):
+            st.image(str(reference),caption='Archived Ki summaries, rendered with the original 2×2 median filter and 0–0.06 scale. Fresh posterior sampling has Monte Carlo variation.')
+    maps=sorted(workspace.glob('paper_predictions*_Ki.png'))
+    if maps:
+        st.image(str(maps[-1]),caption='Completed paper-model prediction. Open step 6 for voxel inspection and other parameters.')
+
 
 
 @st.fragment(run_every=2)

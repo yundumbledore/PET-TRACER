@@ -1,4 +1,5 @@
 """Extract one voxel's TAC/AIF by identity and generate joint posterior samples."""
+from protocol import prediction_times
 import argparse
 import json
 from pathlib import Path
@@ -12,7 +13,7 @@ def inspect(run,input_file,voxel_id,output,samples=1000,checkpoint='best.pth',de
     run=Path(run);output=Path(output)
     cfg=json.loads((run/'model_params.json').read_text(encoding='utf-8'))
     scale=json.loads((run/'scaling_params.json').read_text(encoding='utf-8'))
-    t,d,y,ids,_=read_prediction_input(input_file,cfg['x_dim'],scale['t_meas'],scale.get('frame_durations_min'))
+    t,d,y,ids,_=read_prediction_input(input_file,cfg['x_dim'],prediction_times(scale),scale.get('frame_durations_min'))
     matches=np.flatnonzero(ids==str(voxel_id))
     if len(matches)!=1: raise ValueError('Selected voxel ID must appear exactly once in the input data')
     output.parent.mkdir(parents=True,exist_ok=True)

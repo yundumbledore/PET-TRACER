@@ -1,4 +1,5 @@
 """Separate model routes, reusable test files and preserved prediction attempts."""
+from protocol import prediction_times
 import json
 import hashlib
 from pathlib import Path
@@ -97,7 +98,7 @@ def render(root,workspace,launch,upload_or_path,default_run,preset,small,mode='l
         cfg=json.loads((run/'model_params.json').read_text(encoding='utf-8'))
         if cfg.get('training_mode','lora')!=mode: raise ValueError('Select a '+label+' run on this page. Use the other model’s prediction page for its runs.')
         scale=json.loads((run/'scaling_params.json').read_text(encoding='utf-8'))
-        payload=read_prediction_input(input_path,cfg['x_dim'],scale['t_meas'],scale.get('frame_durations_min'))
+        payload=read_prediction_input(input_path,cfg['x_dim'],prediction_times(scale),scale.get('frame_durations_min'))
         if mask_path is not None:
             if not verified: raise ValueError('Supply the corresponding mask and confirm the displayed voxel-mapping and display conventions')
             identity=hashlib.sha256(json.dumps([file_sha256(input_path),file_sha256(mask_path),file_sha256(mapping_csv) if mapping_csv else None,
@@ -109,7 +110,7 @@ def render(root,workspace,launch,upload_or_path,default_run,preset,small,mode='l
                 base=folder
                 while folder.exists():
                     folder=base.with_name(base.name+f'_{attempt:03d}');attempt+=1
-                geometry,geometry_metadata=prepare_scan(input_path,mask_path,folder,cfg['x_dim'],scale['t_meas'],scale.get('frame_durations_min'),
+                geometry,geometry_metadata=prepare_scan(input_path,mask_path,folder,cfg['x_dim'],prediction_times(scale),scale.get('frame_durations_min'),
                                                         verified=verified,mapping_csv=mapping_csv,origin=origin,aspect=aspect,axis=axis,index=index)
         elif route=='UC Davis patient slice':
             geometry=root/'data/real/Sub001_slice75_geometry.npz';geometry_metadata=root/'data/real/Sub001_slice75_geometry.json'

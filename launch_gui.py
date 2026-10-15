@@ -1,14 +1,18 @@
-"""Start the local GUI from any directory on macOS, Windows or Linux."""
+"""Launch this checkout with a reusable environment on all supported systems."""
 from pathlib import Path
 import subprocess
-import sys
+from pet_environment import find_gui_python
 
-root = Path(__file__).resolve().parent
-venv = root/'.venv'/('Scripts/python.exe' if sys.platform=='win32' else 'bin/python')
-python = str(venv) if venv.exists() else sys.executable
-check = subprocess.run([python,'-c','import streamlit'],capture_output=True,text=True)
-if check.returncode:
-    print('GUI dependencies are missing. Follow README.md installation, then run launch_gui.py again.')
-    raise SystemExit(1)
-raise SystemExit(subprocess.call([python,'-m','streamlit','run',str(root/'LoRACM/gui/app.py'),
-                                 '--server.address','127.0.0.1','--browser.gatherUsageStats','false'],cwd=root))
+def main():
+    root=Path(__file__).resolve().parent
+    try:
+        python=find_gui_python(root)
+    except (OSError,RuntimeError) as error:
+        print(str(error))
+        return 1
+    print('PET-TRACER Python:',python,flush=True)
+    return subprocess.call([str(python),'-m','streamlit','run',str(root/'LoRACM/gui/app.py'),
+                            '--server.address','127.0.0.1','--browser.gatherUsageStats','false'],cwd=root)
+
+
+if __name__=='__main__': raise SystemExit(main())

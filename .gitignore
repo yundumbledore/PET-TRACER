@@ -6,3 +6,6 @@ __pycache__/
 LoRACM/workspaces/
 LoRACM/runs/
 LoRACM/data/simulated/smoke.*
+
+# Local backups made by the reviewed update installer.
+.pet-tracer-update-backups/

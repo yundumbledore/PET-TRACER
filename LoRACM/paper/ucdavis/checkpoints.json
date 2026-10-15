@@ -1,0 +1,7 @@
+{
+  "best.pth": {
+    "epoch": 2755,
+    "val_loss": 0.00079129,
+    "train_loss": 0.00092387
+  }
+}

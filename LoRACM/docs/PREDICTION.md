@@ -77,7 +77,7 @@ The median forward curve is `forward_model(median(parameters))`. It is not the m
 
 **How to read the figure.** The histogram is the marginal distribution of samples from your adapted consistency model. The dashed line is a bounded NLS point estimate, not ground truth or an uncertainty interval. Agreement is useful, but both estimators depend on the forward model, input and data conventions. Inspect convergence, active bounds, residual fit, posterior tails and independent truth when available. No line is drawn for a nonconverged NLS fit.
 
-NLS uses three deterministic initializations and **unweighted** squared TAC residuals. Bounds default to the configured uniform kinetic-prior ranges. It uses the same plugin/built-in kinetics and observation mode as the protocol, with RK4 integration. Supplied sampled AIF values are linearly interpolated, with zero inserted at the origin and the last input held through the final frame. For frame-averaged AIFs, this is an explicit continuous-input approximation. The preserved research dataset used forward Euler; its NLS comparison is not an exact solver reproduction.
+NLS uses three deterministic initializations and **unweighted** squared TAC residuals. Bounds default to the configured uniform kinetic-prior ranges. It uses the same plugin/built-in kinetics and observation mode as the protocol: the original Euler scheme for the UC Davis paper recipe, or RK4 for custom protocols. Supplied sampled AIF values are linearly interpolated, with zero inserted at the origin and the last input held through the final frame. For frame-averaged AIFs, this is an explicit continuous-input approximation. UC Davis retains the original CSV sample values and Euler observation times for both NLS and the posterior-median forward overlay; its patient-label convention is documented in [the UC Davis guide](UCDAVIS.md).
 
 ### Terminal single-TAC analysis
 
@@ -116,6 +116,6 @@ Prediction NPZ contains `params_mean`, `params_median`, `params_std`, negative-d
 
 Single-TAC analysis also saves `forward.json` with the posterior medians, simulated curves and fit RMSE for each selected model, and `analysis.json` after all requested work finishes. The GUI exports a TAC-comparison CSV; `plot_tac.py` exports the same comparison as a scientific figure.
 
-For **built-in 2TC only**, Kᵢ is calculated for each joint draw as `K1*k3/(k2+k3)`, then summarized. No positivity clipping is applied; near-zero denominators are excluded and a valid fraction is recorded. Custom models do not automatically get a Kᵢ interpretation.
+For **built-in 2TC only**, Kᵢ is calculated for each joint draw as `K1*k3/(k2+k3)`, then summarized. The UC Davis paper recipe explicitly floors K1/k2/k3 to 1e-4 per draw first (`ki_policy=hpc_floor_1e-4`); general custom projects use the raw transform. Near-zero denominators in raw mode are excluded and a valid fraction is recorded. Custom models do not automatically get a Kᵢ interpretation.
 
 Spatial mapping needs verified voxel indices, ordering, orientation and spacing. The [UC Davis imaging notebook](UCDAVIS.md#4-make-parametric-images) handles the supplied coronal slice once its geometry is verified; it is not a general 3D image importer. A list of TACs or equal voxel count alone does not establish spatial correspondence.

@@ -1,49 +1,69 @@
-# Install PET-TRACER
+# Install PET-TRACER once, reuse it across downloads
 
 [Manual](../README.md) · [Project overview](../../README.md)
 
-Use **64-bit Python 3.11** for the documented workflow. Clone/download the repository with its data and checkpoints, open a terminal in `PET-TRACER/`, then create an isolated environment:
+Use **64-bit Python 3.11**. The recommended environment lives in your home folder, outside every repository checkout:
+
+- **macOS / Linux:** `~/.venvs/pet-tracer`
+- **Windows:** `%USERPROFILE%\.venvs\pet-tracer`
+
+Downloading a new PET-TRACER version does not remove or duplicate this environment. The launchers find it and run the code from the download you launched. Keep its base Python 3.11 installation available. This environment is reused on the same computer; it is not copied between operating systems. See the [Python virtual-environment documentation](https://docs.python.org/3/library/venv.html).
+
+## First installation
+
+Open a terminal in the downloaded repository root. On Apple Silicon macOS/Linux:
 
 ```bash
-python -m venv .venv
+python3.11 setup_environment.py
+python3 launch_gui.py
 ```
 
-On systems where Python is named `python3`, use `python3 -m venv .venv`. On Windows, `py -3.11 -m venv .venv` also selects an installed Python 3.11 interpreter.
+On Windows:
 
-| Operating system | Activate |
-| :--- | :--- |
-| macOS / Linux | `source .venv/bin/activate` |
-| Windows Command Prompt | `.venv\Scripts\activate.bat` |
-| Windows PowerShell | `.venv\Scripts\Activate.ps1` |
-
-If PowerShell blocks activation, use Command Prompt or call `.venv\Scripts\python.exe` directly; changing a machine-wide execution policy is unnecessary.
-
-Install the PyTorch build appropriate for your hardware using the [official selector](https://pytorch.org/get-started/locally/), then install the workflow dependencies:
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -r LoRACM/requirements-gui.txt
+```powershell
+py -3.11 setup_environment.py
+py -3.11 launch_gui.py
 ```
 
-Terminal-only users can install `LoRACM/requirements.txt` instead. The GUI adds Streamlit; both interfaces use the same simulation, fitting, training and prediction code. This is a dependency specification, not a frozen research environment. The original `environment_no_builds.yml` remains available for the legacy notebooks, with its original platform-specific package history.
+Setup creates or reuses the external environment, installs the GUI requirements and checks package dependencies. It records installed versions inside the environment. It never puts project source code inside the environment. For a terminal-only installation add `--terminal-only`.
 
-## Launch the GUI
+**NVIDIA users:** choose a CUDA-enabled PyTorch build using the [official selector](https://pytorch.org/get-started/locally/). To install that build before other dependencies, run `setup_environment.py --no-install`, invoke the selector's PyTorch installation command using the environment's Python below, then rerun `setup_environment.py`. Alternatively pass its official wheel index with `--pytorch-index`. Selecting `cuda:0` inside the GUI does not install CUDA-enabled PyTorch. The normal package-index installation remains a CPU fallback where that is the available build.
 
-From the root:
+## Next repo version: launch without reinstalling
 
-```bash
-python launch_gui.py
-```
-
-The launcher selects the root `.venv` when present and serves the app on **127.0.0.1**. Open the local URL printed in the terminal if the browser does not open automatically. Files and computation stay on your computer. Source-file auto-reloading is disabled for a stable desktop workflow; restart the launcher after code updates. See [Streamlit's run guide](https://docs.streamlit.io/develop/concepts/architecture/run-your-app).
-
-After the initial environment installation:
+Download/unzip the new version into its own folder and use its launcher:
 
 - **macOS:** double-click `Launch PET-TRACER.command`, or run `sh launch_gui.sh`.
 - **Windows:** double-click `Launch PET-TRACER.cmd`.
-- **Linux:** run `sh launch_gui.sh` from the repository.
+- **Linux:** run `sh launch_gui.sh`.
 
-These are launch scripts, not self-contained `.app`, `.exe` or package installers. Native installers would require per-platform packaging, distribution and signing. The local browser interface provides the common GUI now.
+Or run `python launch_gui.py` from the new download. No activation or reinstall is needed. The launcher checks the selected environment and serves the app on **127.0.0.1**. Restart it after code changes. These are launch scripts for the local browser GUI, not standalone desktop installers.
+
+If a release changes dependency requirements, rerun its setup command. It reuses the existing environment and installs dependencies needed by that release; it does not recreate the environment. Keep separate environments with `--prefix` if two releases require incompatible dependencies.
+
+## Terminal commands in the reusable environment
+
+Activation is optional. Use its Python directly from any downloaded `LoRACM` folder:
+
+```bash
+# macOS / Linux
+~/.venvs/pet-tracer/bin/python reproduce_ucdavis.py --device auto
+```
+
+```powershell
+# Windows PowerShell
+& "$env:USERPROFILE\.venvs\pet-tracer\Scripts\python.exe" reproduce_ucdavis.py --device auto
+```
+
+To activate, use `source ~/.venvs/pet-tracer/bin/activate` on macOS/Linux, `%USERPROFILE%\.venvs\pet-tracer\Scripts\activate.bat` in Command Prompt, or `& "$env:USERPROFILE\.venvs\pet-tracer\Scripts\Activate.ps1"` in PowerShell. If PowerShell blocks activation, calling the environment's Python directly avoids changing execution policy.
+
+## Existing environments and custom locations
+
+You can continue using an activated Conda/venv environment that already has the requirements. The launcher checks, in order: explicit **PET_TRACER_PYTHON**, activated virtual/Conda environments, the shared home-folder environment, the checkout's older `.venv`, and the invoking Python. Missing/incomplete automatic candidates are skipped; an explicit Python selection is respected and reports missing dependencies.
+
+Create another reusable environment with `python3.11 setup_environment.py --prefix /your/environment/path`. Activate it before launching, or set `PET_TRACER_PYTHON` to its full Python executable path. No global packages or administrator installation are needed.
+
+The environment is separate from your **projects**. Retain/copy the previous `LoRACM/workspaces` when migrating experiments, or set `PET_TRACER_WORKSPACES` to a stable external project folder before launching. New downloads do not automatically relocate existing project files.
 
 ## Hardware and platform support
 
@@ -71,7 +91,7 @@ If a job fails, use **Download job log** and **Download compute report**. Startu
 
 ## Optional legacy research generator
 
-The preserved `create_dataset.py` uses JAX; install it separately:
+The original unmarked research-config path in `create_dataset.py` uses JAX. The explicit UC Davis paper recipe and GUI use portable NumPy and need no JAX. For the old generator path, install JAX separately:
 
 ```bash
 python -m pip install -r LoRACM/requirements-legacy.txt

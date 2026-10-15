@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from protocol import validate_protocol, load_model, feng_curve, FENG_NAMES, load_protocol, load_measured_inputs as load_inputs
 from common import validate_dataset
+from hpc_compat import euler_observations, noise_standard_deviation
 from runtime import Progress, check_cancelled
 
 
@@ -52,6 +53,7 @@ def main(cfg):
         raise ValueError('Dataset output must end in .npz')
     if path.exists() or path.with_suffix('.json').exists():
         raise FileExistsError('Dataset or provenance file exists; choose a new output')
+    historical = cfg.get('simulation_mode') == 'hpc_euler'
     mode = cfg.get('observation', 'midpoint')
     end = t[-1]+duration[-1]/2 if mode == 'frame_average' else t[-1]
     grid = np.unique(np.r_[np.arange(0, end, cfg.get('integration_step_min', .01)),
@@ -75,6 +77,8 @@ def main(cfg):
     data = {'t_meas': t, 'frame_durations_min': duration,
             'parameter_names': np.asarray(cfg['parameter_names']),
             'observation': np.asarray(mode)}
+    if historical:
+        data.update(simulation_mode=np.asarray('hpc_euler'),prediction_t_meas=np.asarray(cfg.get('prediction_t_meas',t)))
     total_pairs = sum(cfg['n_'+split] for split in ('train','val','test'))
     progress = Progress('Dataset simulation',total_pairs,'pairs')
     completed = 0
@@ -98,13 +102,13 @@ def main(cfg):
                 if np.any(inputs < -1e-8):
                     raise ValueError('Sampled Feng curves became negative; inspect fitted curves or reduce jitter')
                 inputs = np.maximum(inputs,0)
-            clean = observe_frames(integrate(model,parameters,inputs,grid),grid,t,duration,mode)
+            clean = (euler_observations(model,parameters,pool[selected],t,cfg.get('integration_step_min',.01)) if historical
+                     else observe_frames(integrate(model,parameters,inputs,grid),grid,t,duration,mode))
             if np.any(clean < -1e-8):
                 raise ValueError('Clean simulated TAC is negative; check model and priors')
-            measured_input = observe_frames(inputs,grid,t,duration,mode)
+            measured_input = pool[selected] if historical else observe_frames(inputs,grid,t,duration,mode)
             noise = rng.uniform(cfg['noise_prior']['min'],cfg['noise_prior']['max'],(n,1))
-            decay = np.log(2)/cfg['half_life_min']
-            sigma = noise*np.sqrt(np.maximum(clean,1e-8)*np.exp(-decay*t)/duration)*np.exp(decay*t)
+            sigma = noise_standard_deviation(clean,noise,t,cfg['half_life_min'],None if historical else duration)
             noisy = clean+sigma*rng.normal(size=clean.shape)
             xs.append(np.column_stack([parameters,noise]))
             ys.append(np.column_stack([noisy,measured_input]))
@@ -123,6 +127,11 @@ def main(cfg):
                 'source_sha256':hashlib.sha256(Path(source_path).read_bytes()).hexdigest(),
                 'numpy_version':np.__version__, 'noise_timing':'Explicit frame durations; decay constant ln(2)/half_life_min',
                 'split_policy':'Independent parameter/noise draws, shared measured/fitted AIF pool; not subject-held-out'}
+    if historical:
+        metadata.update(solver='Original forward Euler; grid starts at first CSV time; first dt=t0; searchsorted observations',
+                        noise_timing='Historical delta_t=[t0,diff(t_meas)]; not frame durations',
+                        conditioning='Original measured AIF activity samples, unchanged',
+                        randomness='Portable NumPy streams; same forward/noise equations, not byte-identical to historical JAX samples')
     if cfg.get('model') == 'custom':
         metadata['model_sha256'] = hashlib.sha256(Path(cfg['model_file']).read_bytes()).hexdigest()
     if source == 'measured':

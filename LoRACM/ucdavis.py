@@ -3,9 +3,36 @@ import argparse
 import json
 from pathlib import Path
 import numpy as np
+import shutil
+from common import file_sha256
 
 ROOT = Path(__file__).resolve().parent
 PRESETS = ['UC Davis Scenario 1', 'My own project']
+
+
+def prepare_paper_run(workspace):
+    """Copy verified paper weights/scaling to a writable project run, unchanged."""
+    source=ROOT/'paper/ucdavis'
+    manifest=json.loads((source/'manifest.json').read_text(encoding='utf-8'))
+    for relative,item in manifest['assets'].items():
+        if file_sha256(ROOT/relative)!=item['sha256']:
+            raise ValueError('Paper asset checksum failed: '+relative)
+    run=Path(workspace).expanduser()/'runs/paper_ucdavis'
+    if run.exists():
+        if not (run/'paper_manifest.json').exists():
+            raise FileExistsError('paper_ucdavis already exists without paper provenance; choose another project')
+        for name in ('best.pth','scaling_params.json','model_params.json','checkpoints.json'):
+            if file_sha256(run/name)!=file_sha256(source/name):
+                raise ValueError('An existing paper run was changed; choose a fresh project')
+        return run
+    run.mkdir(parents=True)
+    for name in ('best.pth','scaling_params.json','model_params.json','checkpoints.json'):
+        shutil.copyfile(source/name,run/name)
+    protocol=json.loads((source/'protocol.json').read_text(encoding='utf-8'))
+    protocol.update(aif_csv=str(ROOT/'data/aif/UCDavis_1H35.csv'),output=str(run/'unused_dataset.npz'))
+    (run/'protocol.json').write_text(json.dumps(protocol,indent=2)+'\n',encoding='utf-8')
+    (run/'paper_manifest.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
+    return run
 
 
 def scratch_protocol(protocol,workspace,small=False):
@@ -52,6 +79,7 @@ def main():
     parser.add_argument('--workspace',default='workspaces/ucdavis_walkthrough')
     parser.add_argument('--size',choices=['full','small'],default='full')
     parser.add_argument('--with-cm',action='store_true',help='Also prepare a separate, larger scratch-CM dataset protocol and training configuration')
+    parser.add_argument('--paper-checkpoint',action='store_true',help='Also copy the supplied epoch-2755 paper checkpoint and original scaling into this project')
     args=parser.parse_args();workspace=Path(args.workspace).resolve()
     protocol,training=defaults(workspace,small=args.size=='small')
     targets=[workspace/'protocol.json',workspace/'train.json']
@@ -65,6 +93,8 @@ def main():
     workspace.mkdir(parents=True,exist_ok=True)
     for path,cfg in zip(targets,configs):
         path.write_text(json.dumps(cfg,indent=2)+'\n',encoding='utf-8')
+    if args.paper_checkpoint:
+        print('Paper checkpoint prepared:',prepare_paper_run(workspace))
     print(f'UC Davis settings prepared: {workspace}. Continue with simulate_protocol.py and train.py.')
 
 

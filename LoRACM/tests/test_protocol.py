@@ -19,6 +19,12 @@ def config():
     return json.loads((ROOT/'configs/dataset_custom.json').read_text())
 
 
+def rk4_ucdavis(workspace,small=True):
+    cfg,training=defaults(workspace,small=small)
+    cfg.update(simulation_mode='rk4',t_meas=cfg.pop('prediction_t_meas'),aif_before_first='zero_at_origin',aif_after_last='hold_last')
+    return cfg,training
+
+
 class ProtocolTests(unittest.TestCase):
     def test_overlapping_frames_rejected(self):
         cfg=config();cfg['frame_durations_min'][1]=3
@@ -92,7 +98,7 @@ class ProtocolTests(unittest.TestCase):
 
     def test_original_ucdavis_samples_preserved_with_explicit_boundaries(self):
         import pandas as pd
-        cfg,_=defaults(Path('workspaces/test_fixture'),small=True)
+        cfg,_=rk4_ucdavis(Path('workspaces/test_fixture'))
         raw=pd.read_csv(cfg['aif_csv'])
         for mode,end in [('midpoint',57.5),('frame_average',60.)]:
             with self.subTest(mode=mode):
@@ -105,7 +111,7 @@ class ProtocolTests(unittest.TestCase):
                 np.testing.assert_array_equal(pool[:,-1],raw.iloc[-1,1:])
 
     def test_missing_aif_coverage_reports_actual_observation_boundary(self):
-        cfg,_=defaults(Path('workspaces/test_fixture'),small=True)
+        cfg,_=rk4_ucdavis(Path('workspaces/test_fixture'))
         cfg['aif_after_last']='require_coverage'
         with self.assertRaisesRegex(ValueError,'last measurement midpoint is at 57.5 min'):
             load_measured_inputs(cfg)
@@ -129,7 +135,7 @@ class ProtocolTests(unittest.TestCase):
         import hashlib
         import pandas as pd
         with tempfile.TemporaryDirectory() as folder:
-            cfg,_=defaults(Path(folder),small=True)
+            cfg,_=rk4_ucdavis(Path(folder))
             source=Path(cfg['aif_csv']);original=source.read_bytes()
             raw=pd.read_csv(source)
             for mode in ('midpoint','frame_average'):

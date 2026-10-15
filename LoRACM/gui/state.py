@@ -144,8 +144,14 @@ def model_run_picker(workspace, default, label='Model to use', mode=None):
     runs = [p for p in sorted((Path(workspace)/'runs').glob('*')) if (p/'model_params.json').exists()]
     if mode is not None:
         runs=[p for p in runs if json.loads((p/'model_params.json').read_text(encoding='utf-8')).get('training_mode','lora')==mode]
-    if not runs: return Path(default)
     labels = {str(p):('LoRACM' if json.loads((p/'model_params.json').read_text(encoding='utf-8')).get('training_mode','lora')=='lora' else 'CM from scratch')+' · '+p.name for p in runs}
+    paper=Path(workspace)/'runs/paper_ucdavis'
+    if mode!='cm':
+        labels[str(paper)]='Paper LoRACM · UC Davis · epoch 2755'
+    if not labels: return Path(default)
     options = list(labels)
     selected = st.selectbox(label, options, index=options.index(str(default)) if str(default) in options else 0, format_func=lambda p:labels[p])
+    if selected==str(paper):
+        from ucdavis import prepare_paper_run
+        return prepare_paper_run(workspace)
     return Path(selected)

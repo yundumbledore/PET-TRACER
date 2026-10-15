@@ -10,6 +10,17 @@ PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsisten
 
 Team: **Yun Zhao and Steven Meikle** (The University of Sydney, Australia), **Andrew Reader** (King’s College London, UK), and **Yanan Fan** (CSIRO’s Data61, Australia). The [original framework page](docs/legacy-framework.md) contains the method introduction, figures, team information, and first-paper demonstrations.
 
+## Reproduce the UC Davis Ki example
+
+In the GUI, choose **UC Davis demonstration → Reproduce paper Ki map**. The original model, patient slice and verified geometry are included. Or, after installation, run:
+
+```bash
+cd LoRACM
+python reproduce_ucdavis.py --workspace workspaces/ucdavis_paper --device auto
+```
+
+This uses the original epoch-2755 weights, 1,000 joint draws and three reverse steps. Fresh sampling has Monte Carlo variation. Retraining with the supplied settings is a separate experiment and need not yield identical weights across devices. [Settings, six-step training guide and provenance](LoRACM/docs/UCDAVIS.md).
+
 ## Two ways to work
 
 | Local graphical interface | Terminal workflow |
@@ -23,8 +34,8 @@ The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and 
 
 ## Start here
 
-1. **[Install the environment](LoRACM/docs/INSTALLATION.md)** and launch the GUI or open a terminal.
-2. **[Follow UC Davis steps 1–6](LoRACM/docs/UCDAVIS.md)** with the default template, supplied data and foundation weights. Choose **Quick installation check** for an installation check.
+1. **[Install once outside the repo](LoRACM/docs/INSTALLATION.md)** with `setup_environment.py`, then launch the GUI or open a terminal. New downloads reuse the same environment.
+2. **[Reproduce the UC Davis paper example](LoRACM/docs/UCDAVIS.md)** using the supplied epoch-2755 checkpoint, or follow steps 1–6 to simulate and retrain. Choose **Quick installation check** only to check installation.
 3. Choose your data route:
    - **[Simulate labelled pairs](LoRACM/docs/MODELS_AND_PROTOCOLS.md)** using 2TC or your own kinetic model, measured AIFs or a fitted Feng cohort, and your frame schedule.
    - **[Prepare your own dataset](LoRACM/docs/PREPARE_DATA.md)** and validate its format before training.
@@ -32,7 +43,7 @@ The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and 
 5. **[Predict on your own project](LoRACM/docs/PREDICTION.md)** in batches, or analyse one TAC with parameter posterior histograms, an NLS comparison and forward TACs from posterior medians.
 6. **[Make parametric images](LoRACM/docs/PARAMETRIC_IMAGING.md)** of Kᵢ, fitted parameters or 95% credible-interval widths. Use the UC Davis example or your own patient's coronal TAC/AIF slice and corresponding mask. Click a voxel to view its TAC, input function and posterior KDE.
 
-UC Davis is the GUI's default template. It retains Scenario 1 priors and rank **4 / alpha 8** and uses the exact supplied patient's frame schedule for the complete imaging route. **My own project** retains the separate **100,000-pair / rank-8 / alpha-16** starting settings. Project settings, including unfinished edits, survive page navigation and browser refresh. A new project name creates an independent workspace. Scratch CM training is optional; enable it in the sidebar when you want a comparison.
+UC Davis is the GUI's default template. It preserves the original HPC parameter ranges, AIF conditioning, Euler/noise conventions, rank **4 / alpha 8**, scheduler patience **50**, and 2×2-filtered Ki display with scale **0–0.06**. The supplied paper checkpoint and original normalization support inference without retraining. **My own project** retains the separate **100,000-pair / rank-8 / alpha-16** starting settings. Project settings, including unfinished edits, survive page navigation and browser refresh. A new project name creates an independent workspace. Scratch CM training is optional; enable it in the sidebar when you want a comparison.
 
 ```mermaid
 flowchart LR
@@ -84,6 +95,7 @@ LoRACM's included research example adapts **FDG–2TCM from the Siemens Biograph
 PET-TRACER/
 ├── README.md                       Project overview and manual index
 ├── launch_gui.py                   Cross-platform local GUI launcher
+├── setup_environment.py            Reusable environment outside the checkout
 ├── Launch PET-TRACER.command        macOS launcher
 ├── Launch PET-TRACER.cmd            Windows launcher
 ├── launch_gui.sh                    Linux/macOS launcher
@@ -100,6 +112,8 @@ PET-TRACER/
     ├── infer.py, compare_models.py  Shared prediction and paired comparison
     ├── analyse_tac.py, plot_posteriors.py
     ├── ucdavis.py                   Default numbered demonstration settings
+    ├── reproduce_ucdavis.py         Original paper model → Ki image
+    ├── paper/ucdavis/               Paper checkpoint, scaling and reference map
     ├── parametric_imaging.py, inspect_voxel.py
     ├── create_dataset.py            Preserved UC Davis research generator
     ├── data/, checkpoints/, notebooks/

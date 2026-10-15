@@ -1,4 +1,5 @@
 """Interactive image on the left, identity-matched TAC and posterior on the right."""
+from protocol import prediction_times
 import base64
 import hashlib
 import io
@@ -10,7 +11,7 @@ import matplotlib.pyplot as plt
 import streamlit as st
 from streamlit.components.v1 import declare_component
 from common import file_sha256
-from parametric_imaging import load_image,plane,display_limits,map_figure,parameter_samples,density_figure,STATISTICS
+from parametric_imaging import load_image,plane,display_limits,display_plane,map_figure,parameter_samples,density_figure,STATISTICS
 from protocol import read_prediction_input
 from inspect_voxel import inspect
 from gui.state import model_run_picker
@@ -97,14 +98,18 @@ def render(root,workspace,run_default,input_default,upload_or_path,launch=None):
     axis=1;index=None
     if result['image'].ndim==3:
         a,b=st.columns(2);axis=a.selectbox('Volume slice axis',[0,1,2]);index=b.slider('Slice index',0,result['image'].shape[axis]-1,result['image'].shape[axis]//2)
-    values=plane(result['image'],axis,index);ids=plane(result['ids'],axis,index)
-    try: low,high=display_limits(values)
+    styles={'Paper display · 2×2 median filter':'ucdavis_hpc','Raw values · no spatial filtering':'raw'}
+    default_style=producer.get('map_display',result['metadata'].get('display_profile','raw'))
+    style=styles[st.selectbox('Image display',list(styles),index=0 if default_style=='ucdavis_hpc' else 1)]
+    try:
+        values,display=display_plane(result,axis,index,style);ids=plane(result['ids'],axis,index)
+        low,high=display['vmin'],display['vmax']
     except ValueError as e: st.info(str(e)+'. Choose another parameter or review posterior validity.');return
     with st.expander('Colour scale'):
-        a,b=st.columns(2);colourkey=identity+'_'+parameter+'_'+statistic
+        a,b=st.columns(2);colourkey=identity+'_'+parameter+'_'+statistic+'_'+style
         low=a.number_input('Colour minimum',value=low,format='%.6g',key=colourkey+'_low')
         high=b.number_input('Colour maximum',value=high,format='%.6g',key=colourkey+'_high')
-        st.caption('The initial scale uses the 2nd/98th percentiles. This changes colours only; no filtering or clipping is applied to exported values.')
+        st.caption('Paper display applies the original 2×2 median filter and uses 0–0.06 for Ki estimates. Other maps use percentile limits. Raw exported values and voxel posteriors remain unchanged.')
     if high<=low: st.error('Colour maximum must exceed minimum');return
     left,right=st.columns([.9,1.1],gap='large')
     context=identity+'_'+str(axis)+'_'+str(index)
@@ -112,15 +117,16 @@ def render(root,workspace,run_default,input_default,upload_or_path,launch=None):
         st.subheader(parameter+(' · 95% CI width' if statistic=='ci95_width' else ' · '+statistic))
         raster=values;click_ids=ids
         if result['metadata'].get('origin','lower')=='lower': raster=np.flipud(raster);click_ids=np.flipud(click_ids)
+        if style=='ucdavis_hpc': raster=np.where(np.isfinite(raster),raster,0.)
         image=io.BytesIO();plt.imsave(image,raster,cmap='inferno',vmin=low,vmax=high,format='png',origin='upper')
         colours=[plt.matplotlib.colors.to_hex(c) for c in plt.get_cmap('inferno')(np.linspace(0,1,32))]
         selected=picker(image='data:image/png;base64,'+base64.b64encode(image.getvalue()).decode(),
                         width=raster.shape[1],height=raster.shape[0],aspect=result['metadata'].get('pixel_aspect_ratio',1.),
                         ids=click_ids.ravel().tolist(),colours=colours,low=f'{low:.4g}',high=f'{high:.4g}',
                         context=context,key='voxel_picker_'+context,default=None)
-        fig=map_figure(result,axis,index,low,high);buffer=io.BytesIO();fig.savefig(buffer,format='png',dpi=180);plt.close(fig)
+        fig=map_figure(result,axis,index,low,high,style=style);buffer=io.BytesIO();fig.savefig(buffer,format='png',dpi=180);plt.close(fig)
         st.download_button('Download map figure',buffer.getvalue(),file_name=f'{parameter}_{statistic}.png')
-        buffer=io.BytesIO();np.savez_compressed(buffer,image=result['image'],voxel_ids=result['ids'],mask=result['mask'])
+        buffer=io.BytesIO();np.savez_compressed(buffer,image=result['image'],display_image=values,display_settings=json.dumps(display),voxel_ids=result['ids'],mask=result['mask'])
         st.download_button('Download map values',buffer.getvalue(),file_name=f'{parameter}_{statistic}_map.npz')
     with right:
         key='selected_voxel_'+context
@@ -140,7 +146,7 @@ def render(root,workspace,run_default,input_default,upload_or_path,launch=None):
             for field,path in [('input_sha256',source),('checkpoint_sha256',run/checkpoint)]:
                 if provenance.get(field) and checked_hash(path)!=provenance[field]:
                     raise ValueError('Use the same input data and model checkpoint that produced this map')
-            stat=source.stat();t,d,y,column_ids,_=input_curves(str(source),stat.st_mtime_ns,stat.st_size,cfg['x_dim'],scale['t_meas'],scale.get('frame_durations_min'))
+            stat=source.stat();t,d,y,column_ids,_=input_curves(str(source),stat.st_mtime_ns,stat.st_size,cfg['x_dim'],prediction_times(scale),scale.get('frame_durations_min'))
             matching=np.flatnonzero(column_ids==voxel)
             if len(matching)!=1: raise ValueError('Voxel identity is absent from the measured TAC file')
             i=int(matching[0]);fig,ax=plt.subplots(figsize=(6,2.7))
@@ -162,7 +168,7 @@ def render(root,workspace,run_default,input_default,upload_or_path,launch=None):
                     inspect(run,source,voxel,cache,draws,checkpoint,device,seed,steps)
                 marker.write_text(json.dumps({'filename':cache.name}),encoding='utf-8')
             with np.load(cache,allow_pickle=False) as data:
-                samples=parameter_samples(data['posterior_samples'][0],data['parameter_names'].tolist(),parameter)
+                samples=parameter_samples(data['posterior_samples'][0],data['parameter_names'].tolist(),parameter,producer.get('ki_policy','raw'))
                 fig=density_figure(samples,parameter);st.pyplot(fig);plt.close(fig)
                 lo,hi=np.quantile(samples,[.025,.975]);st.caption(f'Median {np.median(samples):.5g} · 95% interval [{lo:.5g}, {hi:.5g}] · width {hi-lo:.5g}')
                 st.download_button('Download selected voxel samples',cache.read_bytes(),file_name=f'voxel_{voxel}_posterior.npz')

@@ -1,5 +1,15 @@
 # Workflow validation
 
+## HPC reproduction and reusable environment — 15 October 2026
+
+**66/66 automated checks passed** on Apple Silicon macOS, Python 3.11, PyTorch 2.6.0 CPU. Tests include direct paper-checkpoint selection without training, patient/CSV time-label contracts, unchanged AIF conditioning, HPC solver/noise behavior, explicit Ki flooring, raw/display-map separation, and shared environment discovery for POSIX/Windows paths. Previous project-persistence, custom-model, CM comparison, voxel identity, logging and memory checks continue to pass.
+
+The portable Euler solver was compared directly with the original `Create_dataset.py` JAX `solve_ode` for four parameter vectors and all four measured AIFs. Maximum absolute clean-TAC difference was **7.28e-12**; applying the same JAX-generated noise gave a maximum difference of **1.82e-12**. This verifies the equations for tested inputs, not historical random draws or full retraining equivalence.
+
+The original checkpoint generated **1,000 samples for 16 real patient voxels**, with stored joint draws reproducing exported Ki summaries exactly under the recorded paper policy. A complete **24,237-voxel slice with eight draws per voxel** verified coverage, Ki/parameter/interval-width mapping and the 2×2/fixed-scale display. This low-draw whole-slice run checks operation, not the paper's 1,000-draw numerical result. A separate 32/16/8 dataset completed two full-width training epochs, predicted simulated and real-patient TACs with both explicit label conventions, and passed the posterior-median Euler forward overlay.
+
+A real external virtual environment was created and reused in a writable test folder with package installation skipped; the second setup retained it. Launcher discovery and shell syntax were checked. Dependencies were already available in the verification environment; a fresh network installation and Windows/CUDA/MPS execution were not run here. The environment is outside the source checkout and launch does not run pip.
+
 ## Separate CM data, repeated prediction and patient masks — 14 October 2026
 
 **57/57 automated checks passed** in the Python 3.11 / PyTorch 2.6.0 Apple Silicon CPU environment. The GUI now separates CM dataset preparation and prediction from LoRACM, keeps repeated prediction files and settings, and prepares verified geometry for a user-provided patient TAC slice plus mask. New checks cover independent dataset sizes/protocols/selections, model-type filtering, cleared pending prediction displays, original-file preservation, patient-specific Ki/parameter/interval-width maps, explicit voxel mappings, and rejection of another patient's geometry even with matching voxel IDs. GUI checks were repeated after the final model/geometry handoff changes. Source parsing, whitespace checks and 124 local documentation links passed.
@@ -32,7 +42,7 @@ The small UC Davis protocol generated 32 / 16 / 8 labelled pairs on the patient'
 
 Browser review confirmed a foreground image click selects the matching voxel ID and displays the TAC plus input function and posterior KDE beside the map. Switching from Kᵢ to K₁ and selecting 95% interval-width maps updates the image and corresponding posterior. Voxel samples are cached; whole-image draws are not stored. The author confirmed the supplied geometry's mapping and display convention.
 
-That earlier walkthrough validation used an intermediate resampled input file, actual frame durations and RK4. Current defaults read the original AIF CSV directly, as checked above; historical Euler-generated Scenario 1 files remain separate. The two-epoch weights and eight-draw maps are installation artifacts, not scientific results. Windows/Linux hosted CI, acceleration and full research training remain unverified on these local changes.
+That earlier walkthrough validation used an intermediate resampled input file, actual frame durations and RK4. Those intermediate defaults were superseded by the 15 October HPC reproduction recipe above; the earlier results are retained here as validation history. The two-epoch weights and eight-draw maps are installation artifacts, not scientific results. Windows/Linux hosted CI, acceleration and full research training remain unverified on these local changes.
 
 ## Local browser and terminal workflows — 13 October 2026
 

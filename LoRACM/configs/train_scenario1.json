@@ -1,7 +1,7 @@
 {
   "topic": "FDG-2TCM-UCDavis_1H35",
   "pretrained": "checkpoints/foundation.pth",
-  "dataset_dir": "data/simulated/scenario1.npz",
+  "dataset_dir": "workspaces/ucdavis_regenerated/dataset.npz",
   "x_dim": 5,
   "y_dim": 70,
   "embed_dim": 1024,
@@ -20,7 +20,7 @@
   "batch_size": 512,
   "epochs": 5000,
   "lr": 0.0001,
-  "lr_scheduler_patience": 25,
+  "lr_scheduler_patience": 50,
   "lr_factor": 0.75,
   "seed": 0,
   "loss_weights": [
@@ -33,5 +33,9 @@
   "save_dir": "runs",
   "exp_name": "scenario1",
   "checkpoint_start_epoch": 151,
-  "device": "auto"
+  "device": "auto",
+  "simulation_protocol": "configs/protocol_ucdavis.json",
+  "ki_policy": "hpc_floor_1e-4",
+  "map_display": "ucdavis_hpc",
+  "recipe_version": "ucdavis-hpc-v1"
 }

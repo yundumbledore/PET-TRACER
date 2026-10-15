@@ -1,0 +1,45 @@
+{
+  "recipe": "ucdavis-hpc-v1",
+  "training_examples": 100000,
+  "training_count_source": "Author confirmation, 2026-10-15",
+  "checkpoint_original_name": "valbest_epoch2755_trainloss0.00092387_valloss0.00079129.pth",
+  "checkpoint_epoch": 2755,
+  "checkpoint_scaling": "Original HPC x/y means and standard deviations unchanged",
+  "ki_policy": "hpc_floor_1e-4 from original selected-voxel code; archived whole-map NPZ has no transform provenance",
+  "reference_provenance": "Saved HPC Ki summaries used by original Parametric imaging viewer.ipynb; checkpoint association follows author recollection and current inference source",
+  "retraining": "Same equations/settings; regenerated NumPy draws and hardware training are not bitwise replicas of historical JAX/CUDA run",
+  "assets": {
+    "paper/ucdavis/README.md": {
+      "sha256": "92f536f227e776a9c2ddb2d02932cb578cdf5441efe1fcefe28ec2740de99f14",
+      "bytes": 1594
+    },
+    "paper/ucdavis/best.pth": {
+      "sha256": "f4eef814a56b78e639a4398fcf6eaa29f2526f3afb018b5fbd55b986ae04b420",
+      "bytes": 8805824
+    },
+    "paper/ucdavis/checkpoints.json": {
+      "sha256": "9fda628d5e2ea9dbd2ba0d162e0c07728583593f3c89b6f56c494c716618c17d",
+      "bytes": 100
+    },
+    "paper/ucdavis/model_params.json": {
+      "sha256": "215dec11034555a5d60ff8b4e5e015db2756af0a38531ff79cf8c34c72852fb7",
+      "bytes": 935
+    },
+    "paper/ucdavis/protocol.json": {
+      "sha256": "5ffbe358a7003c696a735e327704a14f378fb1184faf98618c0e612a66104aa8",
+      "bytes": 2971
+    },
+    "paper/ucdavis/reference_ki.npz": {
+      "sha256": "220fe1fe50bbed9b22a17b0da4f92844c0f93b939c464210781545aca9c624e3",
+      "bytes": 234620
+    },
+    "paper/ucdavis/reference_ki.png": {
+      "sha256": "97a6a8d2c3eba08b1a9d2f12ea90f6955b3e4cfe63b84baa5201d7644fb1cbb9",
+      "bytes": 90033
+    },
+    "paper/ucdavis/scaling_params.json": {
+      "sha256": "5780b70489d5b70b26e41997aeee2b067b562cce50b973f34a9e1a39826d5f0c",
+      "bytes": 2049
+    }
+  }
+}

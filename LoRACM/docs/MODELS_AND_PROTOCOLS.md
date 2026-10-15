@@ -25,7 +25,7 @@ A complete working 1TC example is in [`examples/custom_1tc.py`](../examples/cust
 
 Validate the configuration before generation with `python protocol.py --config configs/dataset_custom.json`.
 
-The simulation uses zero initial states, one input channel, fixed-grid RK4 and linear input interpolation. Test a custom model against analytical solutions or a validated independent implementation, and check convergence at smaller step sizes. Delay equations, multiple independent inputs and state-dependent discontinuities need an extension of this contract; the old dual-input/SRTM research classes are not automatically exposed as GUI plugins. No AATH scenario is claimed as validated by this update.
+Custom-protocol simulation uses zero initial states, one input channel, fixed-grid RK4 and linear input interpolation. The separate default UC Davis paper recipe preserves the original HPC Euler and noise conventions described in [its guide](UCDAVIS.md). Test a custom model against analytical solutions or a validated independent implementation, and check convergence at smaller step sizes. Delay equations, multiple independent inputs and state-dependent discontinuities need an extension of this contract; the old dual-input/SRTM research classes are not automatically exposed as GUI plugins. No AATH scenario is claimed as validated by this update.
 
 **Transfer limits.** Compatible foundation backbone weights transfer. Changed parameter names/order or any custom model resets and trains the parameter encoder/decoder, even if the number of parameters remains five. Changed frame counts train resized conditioning weights. LoRA and optional normalization weights train alongside these layers. The original pretrained model represents FDG–2TC; using a new tracer or model does not establish posterior accuracy or calibration. Review `transfer_report.json` and validate on held-out labels or an independent estimator.
 
@@ -56,7 +56,7 @@ Set endpoint assumptions in **1 · Model & protocol**, or in the terminal protoc
 
 Midpoint observations need input coverage through the **last measurement midpoint**; frame averages need coverage through the **end of the last frame**. Holding the final value is an approximation, so choose it deliberately or provide additional measured samples. GUI preview, protocol validation and dataset generation check the same rules. The saved dataset provenance records both policies and the source-file checksum.
 
-**UC Davis defaults use the original `data/aif/UCDavis_1H35.csv`**, with `zero_at_origin` and `hold_last`. Its last sample is at 57.48521667 minutes; the Sub001 schedule requires 57.5 minutes for midpoint observations or 60 minutes for frame averages. The default policies handle those boundaries without changing the source file.
+**UC Davis paper defaults use the original `data/aif/UCDavis_1H35.csv`** unchanged, with the original first Euler update and CSV observation times. Its explicit recorded patient time labels permit the matching Sub001 file without activity resampling. The endpoint options above apply to custom RK4 simulation; they do not change the HPC recipe.
 
 A small AIF pool is acceptable, but repeated use does not create new independent subjects. Input units, tracer metabolite correction, plasma/blood treatment and delay/dispersion conventions must agree between simulation and testing.
 
@@ -87,6 +87,6 @@ Set `aif_mode="feng_cohort"` and `feng_parameters_csv` in the protocol. Whole pa
 
 Midpoints/durations define nonoverlapping frames starting at or after zero; gaps are allowed. `frame_average` numerically integrates activity over each frame. In `midpoint` mode the model samples the curve at its midpoint. Noise uses **actual durations**, not distances between midpoints. Activity is treated as decay-corrected by this noise equation; use consistent correction conventions throughout your project.
 
-The portable simulator uses new RK4/random-stream conventions and does **not** reproduce the earlier forward-Euler research samples. The original generator and configs retain their old behaviour for access to the earlier example. Both generators share the training array contract.
+The simulator selects the original HPC Euler/noise convention for UC Davis and RK4/frame-duration noise for custom protocols. Its NumPy random streams are not byte-identical to historical JAX-generated pairs. Use the supplied epoch-2755 checkpoint and original scaling for paper-model prediction. Both simulation modes share the training array contract.
 
 Use [the schedule CSV](../examples/schedule.csv) as a format example. Its five-minute schedule and the default FDG half-life of 109.8 min are illustrative; replace them for your tracer and scan. Config units are minutes, including Feng rates/delay and kinetic rates.

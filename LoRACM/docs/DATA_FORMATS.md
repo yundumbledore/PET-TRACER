@@ -2,7 +2,7 @@
 
 [Portable training-data format](PREPARE_DATA.md) · [Portable prediction inputs and posterior samples](PREDICTION.md) · [Explicit simulation protocols](MODELS_AND_PROTOCOLS.md)
 
-The tables below document the **preserved Scenario 1 assets**. New-project datasets may have another parameter count/frame schedule and include parameter names, actual frame durations and an observation mode. The portable RK4 generator uses explicit durations, while the historical generator retains its original timing convention.
+The tables below document the **preserved Scenario 1 assets**. New-project datasets may have another parameter count/frame schedule and include parameter names, actual frame durations and an observation mode. Custom RK4 generation uses explicit durations. The default UC Davis paper recipe uses original Euler observations and delta_t noise; its explicit `prediction_t_meas` stores the corresponding patient labels alongside the original simulation `t_meas`.
 
 ## AIF CSV
 

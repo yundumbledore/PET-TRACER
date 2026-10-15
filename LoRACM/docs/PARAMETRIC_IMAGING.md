@@ -22,7 +22,7 @@ Select **Model for parametric imaging**: LoRACM or a trained scratch CM. A map b
 
 The app generates and caches joint samples only for the selected voxel, using the model/checkpoint and measured data that generated the image. It verifies voxel identities, schedule and file checksums. These fresh Monte Carlo draws can differ slightly from the bulk map summaries. A KDE is a smoothed display of samples; interval limits are empirical percentiles.
 
-The initial colour scale uses the 2nd and 98th percentiles of finite image values. You can change its bounds. Colour scaling does not alter, clip, smooth or filter exported map values. A tiny two-epoch walkthrough model and eight draws per voxel demonstrate the interface; they do not establish posterior calibration or useful research estimates.
+UC Davis initially uses **Paper display**: the original 2×2 median filter, with a fixed 0–0.06 scale for Ki mean/median. Select **Raw values** to disable filtering. Other maps use 2nd/98th percentile limits. Numeric exports preserve the raw `image` and separately include `display_image`; the displayed plane is not a new voxel posterior. A tiny two-epoch walkthrough model and eight draws per voxel demonstrate the interface; they do not establish posterior calibration or useful research estimates.
 
 ## What uncertainty means here
 
@@ -36,7 +36,7 @@ width = upper - lower
 
 Width is in the parameter's units. It is **not** its posterior standard deviation or the uncertainty of its posterior mean. Wider intervals describe more spread in the model's samples; assess calibration separately.
 
-For built-in 2TC, Kᵢ is calculated for every joint draw as `K1*k3/(k2+k3)`, then its percentiles are calculated. The code does not substitute mean parameters into that equation. Draws with `abs(k2+k3) <= 1e-12` are excluded and `Ki_valid_fraction` reports the retained fraction. Negative draws are not silently clipped. Custom models expose their predicted parameters; this 2TC-specific Kᵢ transform is not imposed on them.
+For built-in 2TC, Kᵢ is calculated for every joint draw as `K1*k3/(k2+k3)`, then its percentiles are calculated. The code does not substitute mean parameters into that equation. Draws with `abs(k2+k3) <= 1e-12` are excluded and `Ki_valid_fraction` reports the retained fraction. The UC Davis paper recipe explicitly floors K1, k2 and k3 to 1e-4 before the joint-draw Ki transformation, matching the HPC selected-voxel code. Custom projects use raw draws. The selected policy is recorded in prediction metadata; parameter draws themselves are unchanged. Custom models expose their predicted parameters; this 2TC-specific Kᵢ transform is not imposed on them.
 
 New prediction files contain `params_ci95_low`, `params_ci95_high`, `params_ci95_width`, and corresponding `Ki_*` arrays where applicable. Older files can display available mean/median maps, but need updated inference to obtain interval-width maps. Keeping all whole-image draws is unnecessary: exact percentiles are calculated within each inference batch.
 

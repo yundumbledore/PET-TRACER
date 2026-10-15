@@ -1,4 +1,5 @@
 """Bounded nonlinear least-squares comparator for a single TAC."""
+from protocol import prediction_times
 import argparse
 import json
 from pathlib import Path
@@ -17,6 +18,11 @@ def predict_curve(parameters, t, durations, aif, cfg, model=None):
     approximation to a continuous input, not an exact recovery of that input.
     """
     model = load_model(cfg) if model is None else model
+    if cfg.get('simulation_mode') == 'hpc_euler':
+        from hpc_compat import euler_observations
+        simulation_t=np.asarray(cfg['t_meas'])
+        if len(aif)!=len(simulation_t): raise ValueError('HPC forward simulation needs the recorded AIF sample count')
+        return euler_observations(model,np.asarray(parameters)[None,:],np.asarray(aif)[None,:],simulation_t,cfg.get('integration_step_min',.01))[0]
     mode = cfg.get('observation','midpoint')
     end = t[-1]+durations[-1]/2 if mode=='frame_average' else t[-1]
     grid = np.unique(np.r_[np.arange(0,end,cfg.get('integration_step_min',.01)),
@@ -84,14 +90,14 @@ def main(args):
                 raise ValueError('Comparison kinetic model/parameter names must match')
             if first_cfg and model_cfg.get('training_mode')!='cm': raise ValueError('Select a scratch CM for the optional comparison')
             first_cfg=model_cfg
-            t,duration,y,_,_=read_prediction_input(args.input,model_cfg['x_dim'],scaling['t_meas'],scaling.get('frame_durations_min'))
+            t,duration,y,_,_=read_prediction_input(args.input,model_cfg['x_dim'],prediction_times(scaling),scaling.get('frame_durations_min'))
             if len(y)!=1: raise ValueError('Single-TAC analysis requires exactly one curve')
             if cfg:
                 if cfg['parameter_names']!=model_cfg.get('parameter_names',['K1','k2','k3','k4','Vb']) or cfg['model']!=model_cfg.get('kinetic_model','2TC'):
                     raise ValueError('Forward simulation and CM kinetic model/parameter names must match')
                 if cfg.get('observation','midpoint')!=scaling.get('observation','midpoint'):
                     raise ValueError('Forward simulation observation mode differs from the trained model')
-                read_prediction_input(args.input,len(cfg['parameter_names']),cfg['t_meas'],cfg['frame_durations_min'])
+                read_prediction_input(args.input,len(cfg['parameter_names']),prediction_times(cfg),cfg['frame_durations_min'])
             if not (run/checkpoint).is_file(): raise ValueError('Selected checkpoint does not exist')
             if posterior.exists(): raise FileExistsError('Posterior result exists; choose a new output')
         for run,checkpoint,posterior in models:
@@ -101,7 +107,7 @@ def main(args):
                   allow_time_mismatch=False,save_samples=True))
     result=None
     if cfg:
-        t,duration,y,_,_=read_prediction_input(args.input,len(cfg['parameter_names']),cfg['t_meas'],cfg['frame_durations_min'])
+        t,duration,y,_,_=read_prediction_input(args.input,len(cfg['parameter_names']),prediction_times(cfg),cfg['frame_durations_min'])
         if len(y)!=1: raise ValueError('Single-TAC analysis accepts exactly one TAC')
         if models:
             forwards=[]

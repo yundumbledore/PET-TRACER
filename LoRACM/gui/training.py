@@ -20,7 +20,17 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
     title='Fine-tune with LoRACM' if is_lora else 'Train a CM from scratch'
     st.title(title)
     st.caption('Adapt the foundation model with LoRA and selected trainable layers.' if is_lora else 'Initialize a new consistency model randomly and train all learnable weights.')
-    settings_path=workspace/('train.json' if is_lora else 'train_cm.json')
+    if is_lora and defaults.get('workflow_preset')=='UC Davis Scenario 1':
+        st.info('To reproduce the paper example, use its supplied epoch-2755 checkpoint and original normalization. Fine-tuning below is a separate retraining experiment; device and random-stream differences can change the selected model.')
+        if st.button('Use supplied paper checkpoint',key='prepare_paper_'+workspace.name):
+            try:
+                from ucdavis import prepare_paper_run
+                run=prepare_paper_run(workspace)
+                st.session_state.active_run=str(run)
+                st.success('Paper checkpoint ready. Continue to 4 · Predict, then 6 · Parametric imaging.')
+                return run
+            except Exception as error: st.error(str(error))
+    settings_path=workspace/('train.json'  if is_lora else 'train_cm.json')
     previous=json.loads(settings_path.read_text(encoding='utf-8')) if settings_path.exists() else dict(defaults)
     if not settings_path.exists(): previous.pop('simulation_protocol',None)
     if not is_lora:

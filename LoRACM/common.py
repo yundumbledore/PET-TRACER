@@ -51,7 +51,18 @@ def validate_dataset(data, x_dim=5, y_dim=70):
         if duration.shape != t.shape or not np.isfinite(duration).all() or np.any(duration <= 0):
             raise ValueError('frame_durations_min must be finite positive [T]')
 
-def summarize_samples(samples, parameter_names=None, calculate_ki=True):
+def ki_samples(samples, policy='raw'):
+    """Transform joint draws; paper policy floors K1/k2/k3 as in HPC code."""
+    rates = np.asarray(samples)[..., :3]
+    if policy == 'hpc_floor_1e-4': rates = np.maximum(rates,1e-4)
+    elif policy != 'raw': raise ValueError('ki_policy must be raw or hpc_floor_1e-4')
+    denominator = rates[...,1] + rates[...,2]
+    result = np.full(denominator.shape,np.nan,dtype=float)
+    np.divide(rates[...,0]*rates[...,2],denominator,out=result,where=np.abs(denominator)>1e-12)
+    return result
+
+
+def summarize_samples(samples, parameter_names=None, calculate_ki=True, ki_policy='raw'):
     """Summarize joint samples before discarding them; never derive Ki from medians."""
     samples = np.asarray(samples)
     if samples.ndim != 3 or samples.shape[-1] < 1 or samples.shape[1] < 2:
@@ -66,10 +77,8 @@ def summarize_samples(samples, parameter_names=None, calculate_ki=True):
         names = PARAMETERS if parameter_names is None else list(parameter_names)
         if names != PARAMETERS or samples.shape[-1] != 5:
             raise ValueError('Ki is only defined here for the ordered 2TC parameter set')
-        denom = samples[..., 1] + samples[..., 2]
-        valid = np.abs(denom) > 1e-12
-        ki = np.full_like(denom, np.nan)
-        np.divide(samples[..., 0]*samples[..., 2], denom, out=ki, where=valid)
+        ki = ki_samples(samples,ki_policy)
+        valid = np.isfinite(ki)
         result.update({f'Ki_{name}':fun(ki,axis=1) for name,fun in
                        [('mean',np.nanmean),('median',np.nanmedian),('std',np.nanstd)]})
         result['Ki_valid_fraction'] = valid.mean(axis=1)

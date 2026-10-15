@@ -1,175 +1,82 @@
-# UC Davis demonstration · Scenario 1
+# UC Davis · Reproduce the paper example
 
-[User manual](../README.md) · [Installation](INSTALLATION.md) · [Prediction guide](PREDICTION.md)
+[User manual](../README.md) · [Installation](INSTALLATION.md) · [Parametric imaging](PARAMETRIC_IMAGING.md)
 
-## Default six-step walkthrough (all three platforms)
+The default GUI example follows the original **HPC training and inference conventions**. It includes the epoch-2755 paper LoRACM checkpoint, its original normalization, the four measured AIFs, the Sub001 slice and its verified mask/mapping. No retraining is needed to use the paper model.
 
-Launch the GUI and choose a fresh project name. **UC Davis Scenario 1** is the default example setup. Choose **Quick installation check** to learn quickly, or retain **Full Scenario 1** for the research-sized settings. Settings are editable at every numbered step; unfinished edits and saved settings are retained when you revisit any step. The sidebar’s **Project defaults** describes both scales; these initialise the project and never reset it during navigation.
+## Reproduce the Ki image in the GUI
 
-| Step | Action | UC Davis default |
+1. Start `python launch_gui.py` from the repository root and choose a **new project name**.
+2. Retain **UC Davis Scenario 1**. Open **UC Davis demonstration**, then **Reproduce paper Ki map**. Auto selects CUDA, Apple MPS, then CPU.
+3. Follow the dynamic job progress. The command samples 1,000 joint draws per voxel with three reverse steps and writes a Ki figure and numeric maps in your project folder.
+4. Open **6 · Parametric imaging** for the completed result. Choose Ki, another kinetic parameter, or a 95% credible-interval width. Click a voxel to inspect its TAC, input function and posterior.
+
+Alternatively, choose **Use supplied paper checkpoint** in **3 · Fine-tune**, then run **4 · Predict → UC Davis patient slice** and open step 6. This uses the original model without creating a new training dataset. Predictions and selected-voxel samples have Monte Carlo variation across seeds, batch/chunk settings, PyTorch versions and devices; they are not promised to be pixel-identical to the archived image.
+
+The expandable **Archived HPC reference map** shows the original saved Ki summaries rendered with the original display convention. Its arrays are in `paper/ucdavis/reference_ki.npz`. The checkpoint/normalization and source-asset hashes are recorded in `paper/ucdavis/manifest.json`. The reference archive has no posterior draws or exact Ki-transform provenance; the release explicitly uses the flooring convention present in the original HPC selected-voxel inference code.
+
+## Learn simulation and fine-tuning in steps 1–6
+
+| Step | Default GUI action | HPC convention |
 | :--- | :--- | :--- |
-| **1 · Model & protocol** | Review and save the model, AIFs, priors and schedule | FDG 2TC, original `UCDavis_1H35.csv`, 35 Sub001 frames over 60 minutes, half-life 109.8 min |
-| **2 · Dataset** | Generate, then validate/select the labelled NPZ | Full: 50,000 / 100,000 / 100 pairs; small: 32 / 16 / 8 |
-| **3 · Fine-tune** | Review settings and train | Rank 4, alpha 8; full: 5,000 epochs; small: two CPU epochs |
-| **4 · Predict** | Predict the supplied patient slice | All 24,237 foreground TACs; full: 1,000 draws; small: eight draws per voxel |
-| **5 · Single TAC & NLS** | Choose one patient TAC, inspect its posterior and optional NLS fit | Same input data and saved forward-model protocol |
-| **6 · Parametric imaging** | Display Kᵢ or a parameter/interval-width map; click voxels for TAC and posterior KDE | Supplied author-confirmed coronal geometry, Kᵢ mean selected initially |
+| **1 · Model & protocol** | Review the supplied FDG 2TC recipe | Original `UCDavis_1H35.csv`, five parameters, half-life 109.8 min |
+| **2 · Dataset** | Generate and validate labelled pairs | 100,000 train / 100,000 validation / 100 test; seed 42 |
+| **3 · Fine-tune** | Select **Use supplied paper checkpoint**, or train a new adaptation | Rank 4, alpha 8, dropout 0.05; batch 512; 5,000 epochs; LR 0.0001; scheduler patience **50**, factor 0.75 |
+| **4 · Predict** | Use the supplied Sub001 patient slice | 1,000 draws, three reverse steps at 1, 2/3, 1/3; all 24,237 foreground TACs |
+| **5 · Single TAC & NLS** | Select a voxel, sample its posterior, optionally fit NLS | Same Euler forward model; posterior-median forward TAC and NLS comparison |
+| **6 · Parametric imaging** | Choose parameter/statistic and inspect voxels | Ki mean initially; **2×2 median filter**, fixed **0–0.06** Ki estimate scale |
 
-The small model and low draw count check installation; they do not produce scientifically useful estimates. It is reasonable to inspect a few TACs before running whole-slice prediction. The [imaging guide](PARAMETRIC_IMAGING.md) explains voxel interaction and uncertainty.
+Full-run prior ranges:
 
-The default input file is the original **`data/aif/UCDavis_1H35.csv`**. The simulator reads all four AIFs at their original time points and linearly interpolates on the integration grid; it does not create a resampled CSV. The output TAC/AIF pairs use the **patient's exact frame midpoints and durations**, so the trained model can accept the supplied Sub001 prediction file.
-
-The first AIF sample is after zero and the last is at **57.48521667 minutes**, slightly before the patient's final midpoint at **57.5 minutes**. UC Davis defaults therefore select **assume zero activity at time zero** and **After the final AIF sample → Hold the last measured AIF value**. These explicit assumptions are recorded as `aif_before_first="zero_at_origin"` and `aif_after_last="hold_last"` in `configs/protocol_ucdavis.json`. If you choose frame averages, the final value is held through the last frame end at **60 minutes**. The source CSV is unchanged.
-
-For an existing project, return to step 1, select the original CSV and both endpoint options, then **Save and validate protocol** before generating data in step 2. Existing project drafts are retained; new defaults do not reset earlier choices. The portable RK4 simulator uses explicit durations and midpoint observations by default; it is not an exact numerical reproduction of the historical Euler simulation. Historical configs remain unchanged.
-
-Training/validation share the four-AIF pool; test kinetic priors use the central 50% of each range. These are not subject-held-out splits. New custom projects retain the separate 100,000-pair / rank-8 / alpha-16 defaults.
-
-### Numbered terminal walkthrough
-
-Run from `PET-TRACER/LoRACM` after [installation](INSTALLATION.md). Choose a fresh workspace:
-
-```bash
-# 1. Export the default UC Davis model and training settings.
-python ucdavis.py --workspace workspaces/ucdavis_walkthrough --size small
-# 2. Simulate labelled pairs on the measured patient's schedule.
-python simulate_protocol.py --config workspaces/ucdavis_walkthrough/protocol.json
-python protocol.py workspaces/ucdavis_walkthrough/dataset.npz
-# 3. Fine-tune and follow the reported training/validation losses.
-python train.py --config workspaces/ucdavis_walkthrough/train.json
-# 4. Predict every foreground voxel, including 95% intervals.
-python infer.py --run workspaces/ucdavis_walkthrough/runs/scenario1_small --input data/real/Sub001_slice75_adjusted.h5 --output workspaces/ucdavis_walkthrough/runs/scenario1_small/predictions.npz --samples 8 --batch-size 64 --sample-chunk 8 --device cpu
-# 5. Save and inspect one voxel's joint posterior samples.
-python inspect_voxel.py --run workspaces/ucdavis_walkthrough/runs/scenario1_small --input data/real/Sub001_slice75_adjusted.h5 --voxel-id 33449 --output workspaces/ucdavis_walkthrough/voxel_33449.npz --samples 1000 --device cpu
-python analyse_tac.py --protocol workspaces/ucdavis_walkthrough/runs/scenario1_small/protocol.json --input workspaces/ucdavis_walkthrough/voxel_33449.input.npz --output workspaces/ucdavis_walkthrough/voxel_33449_nls.json
-python plot_posteriors.py --posterior workspaces/ucdavis_walkthrough/voxel_33449.npz --nls workspaces/ucdavis_walkthrough/voxel_33449_nls.json --output workspaces/ucdavis_walkthrough/voxel_33449_posteriors.png
-# 6. Export parameter and uncertainty images.
-python parametric_imaging.py --predictions workspaces/ucdavis_walkthrough/runs/scenario1_small/predictions.npz --parameter Ki --output workspaces/ucdavis_walkthrough/Ki_mean.png
-python parametric_imaging.py --predictions workspaces/ucdavis_walkthrough/runs/scenario1_small/predictions.npz --parameter Ki --statistic ci95_width --output workspaces/ucdavis_walkthrough/Ki_ci95_width.png
-```
-
-For a full run, omit `--size small`; the generated run name is `scenario1`. Use a larger posterior sample count and an appropriate compute device. The **UC Davis demonstration** shortcut page retains the earlier supplied-data/AIF-grid example; the numbered pages are the end-to-end patient-imaging route.
-
-## Historical Scenario 1 workflow
-
-The terminal instructions below retain the historical JAX generation conventions. Install the optional legacy requirements to regenerate pairs, or use the distributed `data/simulated/scenario1.npz` and skip generation.
-
-Adapt a pretrained PET-TRACER consistency model to **FDG–2TCM on the UC Davis uEXPLORER protocol**, then estimate voxel posteriors and display a coronal parametric image.
-
-## 0. Set up
-
-Run all commands below from **`PET-TRACER/LoRACM`**. Paths in configuration files are relative to that working directory.
-
-```bash
-cd PET-TRACER/LoRACM
-python -m venv .venv
-```
-
-Activate the environment with `source .venv/bin/activate` on macOS/Linux, or `.venv\Scripts\Activate.ps1` in Windows PowerShell. Then install the supporting packages:
-
-```bash
-python -m pip install -r requirements-legacy.txt
-```
-
-Install a PyTorch build suitable for your hardware using the [official installation selector](https://pytorch.org/get-started/locally/). The generator uses JAX with 64-bit precision; CPU generation is sufficient for the included dataset. Training supports CPU, CUDA and an optional MPS path. CUDA is recommended for full training; multi-GPU inference uses PyTorch DataParallel on a **single node**, not distributed multi-node execution. Hardware memory requirements depend on batch size and sample count.
-
-Files needed for the complete demo:
-
-| Asset | Location |
+| Parameter | Uniform range |
 | :--- | :--- |
-| Four measured AIFs | `data/aif/UCDavis_1H35.csv` |
-| Foundation checkpoint | `checkpoints/foundation.pth` |
-| Pre-generated adaptation pairs | `data/simulated/scenario1.npz` |
-| Real coronal-slice TACs | `data/real/Sub001_slice75_adjusted.h5` |
-| Mask, column mapping and display metadata | `data/real/Sub001_slice75_geometry.npz` and `.json` |
+| K1 | 0.0001–1.5 |
+| k2 | 0.0001–1.5 |
+| k3 | 0.0001–0.5 |
+| k4 | 0.0001–0.05 |
+| Vb | 0.001–1 |
+| Noise amplitude | 0.1–7 |
 
-This repository checkout includes all five asset groups above, including the generated Scenario 1 dataset and foundation weights. File checksums are recorded in the root `MANIFEST.json`. For a separately archived research release, retain the same assets and record their permanent identifiers.
+The prior ranges follow the archived training distribution and saved HPC normalization. The author confirmed that fine-tuning used 100,000 examples. The archive currently contains more rows, and today's original generator has since-edited defaults; neither overrides that confirmed training count. The old bundled `data/simulated/scenario1.npz` has wider priors and **is not the paper reproduction dataset**. It remains accessible for earlier workflows.
 
-## 1. Generate adaptation pairs
+**Quick installation check** uses 32 / 16 / 8 pairs, two CPU epochs and a small posterior sample count. It checks software operation and cannot reproduce a useful research map. Retraining with matching settings can still select different weights: the portable simulator uses NumPy random streams, whereas the historical run used JAX; CUDA/MPS training also need not follow the same numerical trajectory. Use the supplied checkpoint for paper-model prediction.
 
-Either use the supplied pre-generated NPZ or generate a new one:
+## Timing, forward model and noise
 
-```bash
-python create_dataset.py --config configs/dataset_scenario1.json
-```
+The original generator reads the CSV's first column as `t_meas`, linearly interpolates inputs **inside the Euler solver**, and saves the original AIF activity values unchanged in each conditioning vector. The first Euler update has `dt=t_meas[0]`; subsequent updates use the dense-grid differences with nominal step 0.01 min. Observations use the original `searchsorted` grid indexing. There is no added zero-at-origin sample in this recipe.
 
-If the NPZ already exists, move it aside or change `output` in the configuration; the generator refuses to overwrite it. Each sample combines a simulated tissue curve with one measured AIF. Training and validation use broad parameter priors; the supplied research script narrows test priors to the central 50% of each range. Train/validation/test pairs share the same four-AIF pool and are **not subject-held-out splits**.
+The CSV and HDF5 carry matching activity samples in frame order but slightly different recorded time labels: their second labels are 0.110216667 and 0.125 minutes. The protocol explicitly stores **CSV simulation times** in `t_meas` and **patient frame midpoints** in `prediction_t_meas`, with the measured frame durations separately. The trained model receives TAC values followed by AIF values, without timestamp inputs. The explicit HPC recipe accepts those two recorded label conventions without interpolating any patient activity. Other schedules and durations are rejected. Custom RK4 projects retain the normal strict one-grid contract.
 
-| Setting | Scenario 1 |
-| :--- | :--- |
-| Training / validation / test pairs | 50,000 / 100,000 / 100 |
-| Kinetic parameters | K₁, k₂, k₃, k₄, Vᵦ |
-| Conditioning | 35 TAC values followed by 35 AIF values |
-| Noise amplitude | Uniform [0.1, 7] |
-| Half-life | 109.8 minutes |
-| Seed | 42 |
-| Simulation chunk size | 256 |
+Noise uses the original equation with `delta_t=[t_meas[0], diff(t_meas)]`, **not** the frame durations. Half-life is 109.8 min and decay constant is `ln(2)/half_life`. Training and validation share the four-AIF pool; test kinetic priors use the central 50% of each range. These are not subject-held-out splits.
 
-The generator writes `scenario1.npz` and a provenance JSON. It preserves the supplied forward-model and noise equations. Chunked generation uses new, explicitly recorded random streams, so its samples are **not byte-identical to the original research run**.
+For Ki, the paper recipe floors K1, k2 and k3 at **1e-4 for each joint posterior draw**, computes `Ki=K1*k3/(k2+k3)`, then calculates means, medians and empirical intervals. The transform is recorded in prediction metadata as `ki_policy=hpc_floor_1e-4`. General custom projects retain the separately documented raw transform. Parameter posterior samples themselves are preserved unchanged.
 
-## 2. Fine-tune
+The 2×2 spatial filter affects the **display image**. Numeric exports preserve the raw map under `image` and include the displayed plane under `display_image`. Voxel selection always identifies the original measured TAC and posterior, not a spatially filtered posterior. Select **Raw values · no spatial filtering** to inspect unsmoothed estimates. Other parameter/uncertainty maps use percentile colour limits; the fixed 0–0.06 scale applies to Ki mean/median maps.
+
+## Terminal equivalents
+
+Run from `PET-TRACER/LoRACM` after installation:
 
 ```bash
-python train.py --config configs/train_scenario1.json
+# Original checkpoint → posterior prediction → paper-style Ki map.
+python reproduce_ucdavis.py --workspace workspaces/ucdavis_paper --device auto
+
+# Or prepare the original model, then use the individual modules.
+python reproduce_ucdavis.py --workspace workspaces/ucdavis_model --prepare-only
+python infer.py --run workspaces/ucdavis_model/runs/paper_ucdavis --input data/real/Sub001_slice75_adjusted.h5 --output workspaces/ucdavis_model/predictions.npz --samples 1000 --steps 3 --device auto
+python parametric_imaging.py --predictions workspaces/ucdavis_model/predictions.npz --parameter Ki --display ucdavis_hpc --output workspaces/ucdavis_model/Ki.png
 ```
 
-The configuration retains rank **4**, alpha **8**, dropout **0.05**, batch size **512**, initial learning rate **0.0001**, and **5,000 epochs**. Normalization parameters and LoRA weights are trainable. The model builder transfers compatible foundation weights and trains missing or resized parameters.
-
-Outputs appear under `runs/scenario1/`:
-
-- `model_params.json`: resolved model and training configuration.
-- `scaling_params.json`: training-set normalization and time grid.
-- `best.pth`: EMA checkpoint with the lowest validation loss across every completed epoch. The historical research script used epoch 151 eligibility; the current workflow deliberately saves from epoch 1 so an early-stopped run remains usable.
-- `last.pth`: final EMA checkpoint, including for short runs.
-- `tb/`: TensorBoard logs.
-
-Keep the checkpoint, model configuration and scaling file together. Checkpoints contain the **full adapted model**, not just LoRA matrices. They are inference checkpoints, not complete optimizer/RNG snapshots for exact training resumption. Change `exp_name` for independent runs; training refuses to overwrite an existing run directory.
-
-## 3. Predict voxel posteriors
-
-The distributed real slice has a different time grid from the adaptation AIF CSV. Standard inference now rejects that mismatch. Adapt to the measured schedule or supply a validated, appropriately resampled input before running the command below. The override is only for installation checks.
-
-After training and aligning your input protocol, run
+For the editable six-step retraining route:
 
 ```bash
-python infer.py --run runs/scenario1 --samples 1000 --batch-size 16 --sample-chunk 64
+python ucdavis.py --workspace workspaces/ucdavis_retrain
+python simulate_protocol.py --config workspaces/ucdavis_retrain/protocol.json
+python protocol.py workspaces/ucdavis_retrain/dataset.npz
+python train.py --config workspaces/ucdavis_retrain/train.json
+python infer.py --run workspaces/ucdavis_retrain/runs/scenario1 --input data/real/Sub001_slice75_adjusted.h5 --output workspaces/ucdavis_retrain/predictions.npz --samples 1000 --steps 3
+python inspect_voxel.py --run workspaces/ucdavis_retrain/runs/scenario1 --input data/real/Sub001_slice75_adjusted.h5 --voxel-id 33449 --output workspaces/ucdavis_retrain/voxel.npz --samples 1000
+python parametric_imaging.py --predictions workspaces/ucdavis_retrain/predictions.npz --parameter Ki --output workspaces/ucdavis_retrain/Ki.png
 ```
 
-Posterior draws are generated in small GPU chunks. A voxel batch's samples are retained on CPU to calculate exact medians. Reduce `--batch-size` or `--sample-chunk` if memory is limited. To enable specific GPUs, for example Mac mps, use the command
-
-```bash
-python infer.py --run runs/scenario1 --device mps --samples 100 --batch-size 16 --sample-chunk 64
-```
-
-For multiple GPUs on one node, expose the allocated GPUs with your cluster's scheduler and add:
-
-```bash
-python infer.py --run runs/scenario1 --multi-gpu --samples 1000 --batch-size 32 --sample-chunk 128
-```
-
-The output `runs/scenario1/predictions.npz` contains correctly named parameter means, medians and standard deviations, and the corresponding Kᵢ statistics. Kᵢ is calculated **for every joint posterior draw**, then summarised. No silent positivity clipping is applied. Nearly zero denominators are excluded and `Ki_valid_fraction` records their effect. Check the negative-draw fractions and Kᵢ tails before interpreting maps.
-
-## 4. Make parametric images
-
-```bash
-jupyter lab notebooks/01_parametric_imaging.ipynb
-```
-
-The original notebook remains available. For identity-checked mapping, selectable parameters, 95% interval widths and interactive voxel inspection, use the new [GUI/terminal imaging module](PARAMETRIC_IMAGING.md). The author has confirmed the supplied mask mapping and display convention; a matching voxel count alone still does not establish correspondence for other datasets.
-
-## Quick installation smoke test
-
-This tiny run checks the plumbing. It does not produce scientifically useful adapted weights.
-
-```bash
-python create_dataset.py --config configs/dataset_smoke.json
-python train.py --config configs/train_smoke.json
-python infer.py --run runs/smoke --checkpoint last.pth --output runs/smoke/predictions.npz --samples 8 --batch-size 2 --sample-chunk 4 --max-voxels 4 --allow-time-mismatch --device cpu
-python -m unittest discover -s tests -v
-```
-
-If a generated smoke dataset, run directory or prediction file already exists, move it aside before repeating the command. The viewer's partial-voxel support is for debugging only; a four-voxel smoke output is not a total-body map.
-
-## Further reading
-
-[Custom input functions](CUSTOM_DATA.md) · [Data formats](DATA_FORMATS.md) · [Scientific/release review](RELEASE_REVIEW.md) · [Provenance](DATA_PROVENANCE.md) · [Validation report](VALIDATION.md)
+Use `--size small` with `ucdavis.py` for an installation check; its run is named `scenario1_small`. Use `--with-cm` to prepare separate scratch-CM dataset/training configs. Existing GUI projects and datasets are not reset or migrated automatically: choose a new project for the updated defaults. The [single-TAC guide](PREDICTION.md) explains NLS and posterior-median TAC overlays; the [imaging guide](PARAMETRIC_IMAGING.md) covers your own patients and masks.

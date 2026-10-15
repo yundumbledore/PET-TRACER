@@ -1,4 +1,5 @@
 """Predict voxel posterior summaries on CPU, one GPU, or multiple GPUs on one node."""
+from protocol import prediction_times
 import argparse
 import json
 from pathlib import Path
@@ -67,12 +68,16 @@ def main(args):
         raise ValueError('Invalid parameter_names in run configuration')
     observed_times, durations, y, columns, truth = read_prediction_input(
         args.input, cfg['x_dim'],
-        None if args.allow_time_mismatch else scaling['t_meas'],
+        None if args.allow_time_mismatch else prediction_times(scaling),
         None if args.allow_time_mismatch else scaling.get('frame_durations_min'))
-    expected=np.asarray(scaling['t_meas'])
+    training_times=np.asarray(scaling['t_meas'])
+    expected=observed_times
+    time_label_difference=not np.allclose(observed_times,training_times,atol=1e-6,rtol=0)
     if y.shape[1] != cfg['y_dim']:
         raise ValueError('Prediction frame count differs from model conditioning width')
-    mismatch=not np.allclose(observed_times,expected,atol=1e-6,rtol=0)
+    contract=prediction_times(scaling)
+    choices=list(contract.values()) if isinstance(contract,dict) else [contract]
+    mismatch=not any(np.shape(choice)==observed_times.shape and np.allclose(observed_times,choice,atol=1e-6,rtol=0) for choice in choices)
     if args.max_voxels is not None:
         if args.max_voxels<1: raise ValueError('max-voxels must be positive')
         y=y[:args.max_voxels];columns=columns[:args.max_voxels]
@@ -110,6 +115,7 @@ def main(args):
     times=np.linspace(1.,0.,num=args.steps,endpoint=False)
     if getattr(args, 'save_samples', False) and len(y)*args.samples*cfg['x_dim'] > 2_000_000:
         raise ValueError('Saving posterior draws is limited to 2 million values; use fewer curves/samples')
+    ki_policy=cfg.get('ki_policy','raw')
     outputs={}
     saved_draws=[]
     progress=Progress('Posterior prediction',len(y)*args.samples,'draws')
@@ -127,7 +133,7 @@ def main(args):
         if getattr(args, 'save_samples', False):
             saved_draws.append(np.concatenate(draws,axis=1))
         # Retain only one voxel batch of samples in CPU memory for exact medians.
-        for key,value in summarize_samples(np.concatenate(draws,axis=1), names, calculate_ki=(names == PARAMETERS and cfg.get('kinetic_model', '2TC') == '2TC')).items():
+        for key,value in summarize_samples(np.concatenate(draws,axis=1), names, calculate_ki=(names == PARAMETERS and cfg.get('kinetic_model', '2TC') == '2TC'),ki_policy=ki_policy).items():
             outputs.setdefault(key,[]).append(value)
     output.parent.mkdir(parents=True,exist_ok=True)
     if output.exists(): raise FileExistsError(f'Refusing to overwrite {output}')
@@ -141,7 +147,8 @@ def main(args):
         'random_noise_device':'cpu' if device.type=='mps' else str(device),
         'sampling_times':times.tolist(),'time_mismatch_allowed':bool(args.allow_time_mismatch), 'time_mismatch_detected':bool(mismatch), 'observed_frame_durations_min':durations.tolist(),'torch_version':str(torch.__version__),
         'device':str(device),'multi_gpu':args.multi_gpu,
-        'Ki_policy':('K1*k3/(k2+k3) for each joint draw; no clipping; |denominator|<=1e-12 excluded' if names == PARAMETERS and cfg.get('kinetic_model', '2TC') == '2TC' else 'Not calculated for this kinetic model'),
+        'ki_policy':ki_policy,'training_t_meas':training_times.tolist(),'recorded_time_label_difference':bool(time_label_difference),
+        'Ki_policy':(('K1,k2,k3 floored to 1e-4 per joint draw before Ki' if ki_policy=='hpc_floor_1e-4' else 'K1*k3/(k2+k3) for each joint draw; no clipping; |denominator|<=1e-12 excluded') if names == PARAMETERS and cfg.get('kinetic_model', '2TC') == '2TC' else 'Not calculated for this kinetic model'),
         'parameter_order':names,'std_ddof':0}
     if truth is not None:
         means = np.concatenate(outputs['params_mean'])
