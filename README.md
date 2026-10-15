@@ -4,7 +4,7 @@
 
 Latest Release: Adapt a pretrained consistency model to your tracer, time sampling schedule, and acquisition protocol.
 
-[User manual](LoRACM/README.md) · [GUI guide](LoRACM/docs/WORKBENCH.md) · [Installation](LoRACM/docs/INSTALLATION.md) · [UC Davis steps 1–6](LoRACM/docs/UCDAVIS.md) · [Parametric imaging](LoRACM/docs/PARAMETRIC_IMAGING.md) · [Original framework](docs/legacy-framework.md)
+[User manual](LoRACM/README.md) · [GUI guide](LoRACM/docs/WORKBENCH.md) · [Installation](LoRACM/docs/INSTALLATION.md) · [UC Davis example steps 1–6](LoRACM/docs/UCDAVIS.md) · [Parametric imaging](LoRACM/docs/PARAMETRIC_IMAGING.md) · [Original framework](docs/legacy-framework.md)
 
 PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) estimates kinetic parameter posteriors from tissue time–activity curves (TACs) and input functions. **LoRACM** adds low-rank adaptation: fine-tune the pretrained consistency model with labelled examples from your application, then predict on your own curves. A separate **CM from scratch** module trains a random-initialization baseline for comparison on shared held-out data.
 
