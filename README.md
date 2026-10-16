@@ -10,17 +10,6 @@ PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsisten
 
 Team: **Yun Zhao and Steven Meikle** (The University of Sydney, Australia), **Andrew Reader** (King’s College London, UK), and **Yanan Fan** (CSIRO’s Data61, Australia). The [original framework page](docs/legacy-framework.md) contains the method introduction, figures, team information, and first-paper demonstrations.
 
-## Reproduce the UC Davis example (Scenario 1 in our paper)
-
-In the GUI, choose **UC Davis demonstration → Reproduce paper Ki map**. The original model, patient slice and verified geometry are included. Or, after installation, run:
-
-```bash
-cd LoRACM
-python reproduce_ucdavis.py --workspace workspaces/ucdavis_paper --device auto
-```
-
-This uses the original epoch-2755 weights, 1,000 joint draws and three reverse steps. Fresh sampling has Monte Carlo variation. Retraining with the supplied settings is a separate experiment and need not yield identical weights across devices. [Settings, six-step training guide and provenance](LoRACM/docs/UCDAVIS.md).
-
 ## Two ways to work
 
 | Local graphical interface | Terminal workflow |
@@ -44,6 +33,17 @@ The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and 
 6. **[Make parametric images](LoRACM/docs/PARAMETRIC_IMAGING.md)** of Kᵢ, fitted parameters or 95% credible-interval widths. Use the UC Davis example or your own patient's coronal TAC/AIF slice and corresponding mask. Click a voxel to view its TAC, input function and posterior KDE.
 
 UC Davis is the GUI's default template. It uses the parameter ranges in the supplied HPC `Create_dataset.py`, unchanged AIF conditioning, Euler/noise conventions, rank **4 / alpha 8**, scheduler patience **50**, and 2×2-filtered Ki display with scale **0–0.06**. The supplied paper checkpoint and original normalization support inference without retraining. **My own project** retains the separate **100,000-pair / rank-8 / alpha-16** starting settings. Project settings, including unfinished edits, survive page navigation and browser refresh. A new project name creates an independent workspace. Scratch CM training is optional; enable it in the sidebar when you want a comparison.
+
+## Reproduce the UC Davis example (Scenario 1 in our paper)
+
+In the GUI, choose **UC Davis demonstration → Reproduce paper Ki map**. The original model, patient slice and verified geometry are included. Or, after installation, run:
+
+```bash
+cd LoRACM
+python reproduce_ucdavis.py --workspace workspaces/ucdavis_paper --device auto
+```
+
+This uses the original epoch-2755 weights, 1,000 joint draws and three reverse steps. Fresh sampling has Monte Carlo variation. Retraining with the supplied settings is a separate experiment and need not yield identical weights across devices. [Settings, six-step training guide and provenance](LoRACM/docs/UCDAVIS.md).
 
 ```mermaid
 flowchart LR
