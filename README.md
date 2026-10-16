@@ -32,8 +32,6 @@ The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and 
 5. **[Predict on your own project](LoRACM/docs/PREDICTION.md)** in batches, or analyse one TAC with parameter posterior histograms, an NLS comparison and forward TACs from posterior medians.
 6. **[Make parametric images](LoRACM/docs/PARAMETRIC_IMAGING.md)** of Kᵢ, fitted parameters or 95% credible-interval widths. Use the UC Davis example or your own patient's coronal TAC/AIF slice and corresponding mask. Click a voxel to view its TAC, input function and posterior KDE.
 
-UC Davis is the GUI's default template. It uses the parameter ranges in the supplied HPC `Create_dataset.py`, unchanged AIF conditioning, Euler/noise conventions, rank **4 / alpha 8**, scheduler patience **50**, and 2×2-filtered Ki display with scale **0–0.06**. The supplied paper checkpoint and original normalization support inference without retraining. **My own project** retains the separate **100,000-pair / rank-8 / alpha-16** starting settings. Project settings, including unfinished edits, survive page navigation and browser refresh. A new project name creates an independent workspace. Scratch CM training is optional; enable it in the sidebar when you want a comparison.
-
 ## Reproduce the UC Davis example (Scenario 1 in our paper)
 
 In the GUI, choose **UC Davis demonstration → Reproduce paper Ki map**. The original model, patient slice and verified geometry are included. Or, after installation, run:
