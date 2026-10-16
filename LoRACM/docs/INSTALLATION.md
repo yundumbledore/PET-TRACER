@@ -22,7 +22,7 @@ python3 launch_gui.py
 
 Optional Windows PowerShell alternative, after installing Python 3.11 and opening PowerShell in the extracted repo root:
 
-Choose **NVIDIA GPU** (including RTX 5060):
+Choose **NVIDIA GPU**:
 
 ```powershell
 py -3.11 .\setup_environment.py --pytorch-index https://download.pytorch.org/whl/cu128
@@ -96,7 +96,7 @@ Simulation and NLS run on CPU. Dataset generation uses CPU JAX for the original 
 
 ### Windows NVIDIA setup and diagnostics
 
-The [Windows installer](WINDOWS.md#double-click-setup) includes the RTX 5060 setup path and runs a device calculation/gradient check. For another build, use the [official PyTorch selector](https://pytorch.org/get-started/locally/). The PyTorch CUDA build, GPU architecture and NVIDIA driver must be compatible; selecting `cuda:0` inside the app does not install GPU support.
+The [Windows installer](WINDOWS.md#double-click-setup) includes the setup path and runs a device calculation/gradient check. For another build, use the [official PyTorch selector](https://pytorch.org/get-started/locally/). The PyTorch CUDA build, GPU architecture and NVIDIA driver must be compatible; selecting `cuda:0` inside the app does not install GPU support.
 
 On either training page, select `cuda:0` and choose **Check compute setup**. Its report includes the actual Python interpreter, PyTorch version, CUDA build, GPU and a kernel/gradient test. The terminal equivalent, from `LoRACM/`, is:
 
