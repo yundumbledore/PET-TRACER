@@ -10,7 +10,7 @@ PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsisten
 
 Team: **Yun Zhao and Steven Meikle** (The University of Sydney, Australia), **Andrew Reader** (King’s College London, UK), and **Yanan Fan** (CSIRO’s Data61, Australia). The [original framework page](docs/legacy-framework.md) contains the method introduction, figures, team information, and first-paper demonstrations.
 
-## Reproduce the UC Davis Ki example
+## Reproduce the UC Davis example (Scenario 1 in our paper)
 
 In the GUI, choose **UC Davis demonstration → Reproduce paper Ki map**. The original model, patient slice and verified geometry are included. Or, after installation, run:
 
