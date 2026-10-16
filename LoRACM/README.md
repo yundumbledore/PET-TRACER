@@ -19,7 +19,7 @@
 
 ## 1. Install and start
 
-Follow the [Windows/Apple Silicon macOS/Linux installation guide](docs/INSTALLATION.md). Install once with root `setup_environment.py`; the shared environment lives outside the checkout and is reused by new downloads. Start the GUI from the repository root:
+On Windows, double-click **Setup PET-TRACER.cmd** in the extracted repo root, choose NVIDIA GPU or CPU, then open **Launch PET-TRACER.cmd** when setup completes. The [Windows guide](docs/WINDOWS.md) covers installation and troubleshooting. For Apple Silicon macOS/Linux, follow the [installation guide](docs/INSTALLATION.md). The shared environment lives outside the checkout and is reused by new downloads. The Windows installer and root `setup_environment.py` create the same environment. Start the GUI from the repository root:
 
 ```bash
 python launch_gui.py
@@ -33,7 +33,7 @@ Terminal users run the following workflow commands from **`PET-TRACER/LoRACM`**.
 
 ## 2. Define the model and protocol
 
-GUI: **1 · Model & protocol**. Select built-in 2TC or a custom ODE, edit priors, load/edit the frame schedule, choose half-life and observation mode, and supply measured or fitted Feng input functions. Save the validated protocol.
+GUI: **1 · Model & protocol**. Select built-in 2TC or a custom ODE, edit priors, load/edit the frame schedule, set the isotope half-life, and supply measured or fitted Feng input functions. Save the validated protocol.
 
 Read [models, AIFs and protocols](docs/MODELS_AND_PROTOCOLS.md) before changing tracers. `configs/dataset_custom.json` is an editable starting point with a **five-minute illustrative schedule**, not a recommended clinical protocol. Replace its timings, durations, units assumptions, priors and input functions for your study.
 

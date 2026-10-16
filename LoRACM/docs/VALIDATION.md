@@ -1,5 +1,11 @@
 # Workflow validation
 
+## Windows double-click installer — 16 October 2026
+
+`Setup PET-TRACER.cmd` invokes a Windows PowerShell 5.1 helper that detects or prepares 64-bit Python 3.11, offers CPU/NVIDIA installation, calls the existing reusable-environment setup, imports the installed packages and runs the selected device's calculation/gradient check. Setup writes logs outside the checkout and leaves project datasets and model files alone. The launcher keeps the window open and preserves its exit status.
+
+The existing **70 automated checks passed** locally on Apple Silicon CPU. A new Windows-only check is included in the existing Windows CI matrix; it was **skipped locally** because Windows PowerShell is unavailable. It parses the installer, exercises real native argument passing with spaces/Unicode, rejects failed/missing interpreters and child errors, and checks both setup choices, verification, bootstrap dispatch and cancellation with installation commands mocked. It does not download/install Python or packages. Documentation links and launcher line endings were checked locally. **Actual Windows execution, Python bootstrap downloads, fresh package installation and NVIDIA verification have not been run in this session.** Hosted CI has not yet run on these changes.
+
 ## Dataset and trainer parity — 15 October 2026
 
 **70/70 automated checks passed** in the Apple Silicon Python 3.11 / PyTorch 2.6.0 CPU environment, with JAX/jaxlib 0.10.2, x64 enabled and `jax_threefry_partitionable=true`. Step 1 no longer exposes simulation-convention, observation-mode or endpoint controls. GUI tests check midpoint defaults, unchanged UC Davis AIF conditioning, edited-schedule handling and persistence. Custom 1TC and Feng-cohort Euler datasets also generate and validate.

@@ -26,15 +26,15 @@ This uses the original epoch-2755 weights, 1,000 joint draws and three reverse s
 | Local graphical interface | Terminal workflow |
 | :--- | :--- |
 | Guided pages for protocol setup, data validation, training, and prediction. Runs locally in your browser. | The same workflow through Python commands and editable configuration files. Suitable for servers and batch jobs. |
-| [Launch the GUI](LoRACM/docs/INSTALLATION.md#launch-the-gui) | [Terminal quick start](LoRACM/README.md#terminal-quick-start) |
+| [Launch the GUI](LoRACM/docs/INSTALLATION.md#next-repo-version-launch-without-reinstalling) | [Terminal quick start](LoRACM/README.md#terminal-quick-start) |
 
-The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and Linux** with Python 3.11. CPU is the common baseline; PyTorch can use a supported CUDA GPU or Apple MPS device. Standard installation includes CPU JAX for dataset generation. See the [platform and acceleration guide](LoRACM/docs/INSTALLATION.md#hardware-and-platform-support).
+The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and Linux** with Python 3.11. CPU is the common baseline; PyTorch can use a supported CUDA GPU or Apple MPS device. Standard installation includes CPU JAX for dataset generation. See the [platform and acceleration guide](LoRACM/docs/INSTALLATION.md#hardware-and-platform-support). Windows users: double-click **Setup PET-TRACER.cmd**, choose NVIDIA GPU or CPU, then open **Launch PET-TRACER.cmd** when setup completes. [Windows guide](LoRACM/docs/WINDOWS.md).
 
 ![PET-TRACER local workbench with LoRACM, scratch CM and shared prediction workflows](Assets/LoRACM_Workbench.png)
 
 ## Start here
 
-1. **[Install once outside the repo](LoRACM/docs/INSTALLATION.md)** with `setup_environment.py`, then launch the GUI or open a terminal. New downloads reuse the same environment.
+1. **[Install once outside the repo](LoRACM/docs/INSTALLATION.md)**: Windows users double-click **Setup PET-TRACER.cmd**; macOS/Linux users run `setup_environment.py`. Then launch the GUI or open a terminal. New downloads reuse the same environment.
 2. **[Reproduce the UC Davis paper example](LoRACM/docs/UCDAVIS.md)** using the supplied epoch-2755 checkpoint, or follow steps 1–6 to simulate and retrain. Choose **Quick installation check** only to check installation.
 3. Choose your data route:
    - **[Simulate labelled pairs](LoRACM/docs/MODELS_AND_PROTOCOLS.md)** using 2TC or your own kinetic model, measured AIFs or a fitted Feng cohort, and your frame schedule.
@@ -96,6 +96,8 @@ PET-TRACER/
 ├── README.md                       Project overview and manual index
 ├── launch_gui.py                   Cross-platform local GUI launcher
 ├── setup_environment.py            Reusable environment outside the checkout
+├── Setup PET-TRACER.cmd            Windows environment installer
+├── setup_windows.ps1               Python bootstrap and device verification
 ├── Launch PET-TRACER.command        macOS launcher
 ├── Launch PET-TRACER.cmd            Windows launcher
 ├── launch_gui.sh                    Linux/macOS launcher

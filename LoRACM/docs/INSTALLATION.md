@@ -1,6 +1,6 @@
 # Install PET-TRACER once, reuse it across downloads
 
-[Manual](../README.md) · [Project overview](../../README.md)
+[Manual](../README.md) · [Project overview](../../README.md) · [Windows double-click setup](WINDOWS.md)
 
 Use **64-bit Python 3.11**. The recommended environment lives in your home folder, outside every repository checkout:
 
@@ -11,19 +11,36 @@ Downloading a new PET-TRACER version does not remove or duplicate this environme
 
 ## First installation
 
-Open a terminal in the downloaded repository root. On Apple Silicon macOS/Linux:
+**Windows users:** extract the ZIP and double-click **`Setup PET-TRACER.cmd`**. Choose NVIDIA GPU or CPU, wait for **SETUP COMPLETE**, then double-click **`Launch PET-TRACER.cmd`**. The installer prepares Python if needed, creates or updates the reusable environment and checks the selected device. [Windows setup and troubleshooting](WINDOWS.md).
+
+On Apple Silicon macOS/Linux, open a terminal in the downloaded repository root:
 
 ```bash
 python3.11 setup_environment.py
 python3 launch_gui.py
 ```
 
-On Windows:
+Optional Windows PowerShell alternative, after installing Python 3.11 and opening PowerShell in the extracted repo root:
+
+Choose **NVIDIA GPU** (including RTX 5060):
 
 ```powershell
-py -3.11 setup_environment.py
-py -3.11 launch_gui.py
+py -3.11 .\setup_environment.py --pytorch-index https://download.pytorch.org/whl/cu128
 ```
+
+Or choose **CPU**:
+
+```powershell
+py -3.11 .\setup_environment.py
+```
+
+Then launch using the environment that setup created:
+
+```powershell
+& "$env:USERPROFILE\.venvs\pet-tracer\Scripts\python.exe" .\launch_gui.py
+```
+
+The shared Windows environment is `C:\Users\YOUR_WINDOWS_USERNAME\.venvs\pet-tracer`. Setup creates it automatically. No manual activation is needed; later launches can use **Launch PET-TRACER.cmd**. [Verify the CPU/GPU installation](WINDOWS.md#4-verify-the-selected-device) before training.
 
 Setup creates or reuses the external environment, installs the GUI requirements and checks package dependencies. It records installed versions inside the environment. It never puts project source code inside the environment. For a terminal-only installation add `--terminal-only`.
 
@@ -79,7 +96,7 @@ Simulation and NLS run on CPU. Dataset generation uses CPU JAX for the original 
 
 ### Windows NVIDIA setup and diagnostics
 
-For an RTX 50-series GPU, choose a current CUDA PyTorch build supporting Blackwell with the [official installation selector](https://pytorch.org/get-started/locally/). Older CUDA builds can lack kernels for these cards; current packaging guidance is described in the [PyTorch release notes](https://pytorch.org/blog/pytorch-2-12-release-blog/). The CUDA version embedded in the PyTorch wheel, the GPU architecture and the NVIDIA driver must be compatible; merely selecting `cuda:0` does not install GPU support.
+The [Windows installer](WINDOWS.md#double-click-setup) includes the RTX 5060 setup path and runs a device calculation/gradient check. For another build, use the [official PyTorch selector](https://pytorch.org/get-started/locally/). The PyTorch CUDA build, GPU architecture and NVIDIA driver must be compatible; selecting `cuda:0` inside the app does not install GPU support.
 
 On either training page, select `cuda:0` and choose **Check compute setup**. Its report includes the actual Python interpreter, PyTorch version, CUDA build, GPU and a kernel/gradient test. The terminal equivalent, from `LoRACM/`, is:
 
@@ -91,7 +108,7 @@ If a job fails, use **Download job log** and **Download compute report**. Startu
 
 ## Update an existing environment
 
-This update adds CPU JAX to reproduce the original dataset generator’s random sampling. Rerun `setup_environment.py` from the repository root using the command for your platform above. It installs missing dependencies in the same external environment; your projects and model files stay in place.
+CPU JAX is included to reproduce the original dataset generator’s random sampling. On Windows, double-click **Setup PET-TRACER.cmd** to update dependencies. On macOS/Linux, rerun `setup_environment.py` from the repository root using the command above. It installs missing dependencies in the same external environment; your projects and model files stay in place.
 
 The preserved research generator also uses JAX. CPU wheels are available for Apple Silicon macOS, Linux and Windows x86-64; Windows wheel support is currently experimental. See the [official JAX installation guide](https://docs.jax.dev/en/latest/installation.html) for platform requirements. JAX is imported only for dataset generation; using an existing checkpoint for prediction does not require it.
 
