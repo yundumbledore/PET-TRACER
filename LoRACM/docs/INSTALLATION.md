@@ -2,16 +2,9 @@
 
 [Manual](../README.md) · [Project overview](../../README.md) · [Windows double-click setup](WINDOWS.md)
 
-Use **64-bit Python 3.11**. The recommended environment lives in your home folder, outside every repository checkout:
-
-- **macOS / Linux:** `~/.venvs/pet-tracer`
-- **Windows:** `%USERPROFILE%\.venvs\pet-tracer`
-
-Downloading a new PET-TRACER version does not remove or duplicate this environment. The launchers find it and run the code from the download you launched. Keep its base Python 3.11 installation available. This environment is reused on the same computer; it is not copied between operating systems. See the [Python virtual-environment documentation](https://docs.python.org/3/library/venv.html).
-
 ## First installation
 
-**Windows users:** extract the ZIP and double-click **`Setup PET-TRACER.cmd`**. Choose NVIDIA GPU or CPU, wait for **SETUP COMPLETE**, then double-click **`Launch PET-TRACER.cmd`**. The installer prepares Python if needed, creates or updates the reusable environment and checks the selected device. [Windows setup and troubleshooting](WINDOWS.md).
+**Windows users:** extract the ZIP and double-click **`Setup PET-TRACER.cmd`**. Choose NVIDIA GPU or CPU, wait for **SETUP COMPLETE**, then double-click **`Launch PET-TRACER.cmd`**. The installer prepares Python if needed, creates or updates the reusable environment and checks the selected device. [Windows setup and troubleshooting](WINDOWS.md). To run these .cmd files, you might need to disable Windows Smart App Control in your Windows Settings.
 
 On Apple Silicon macOS/Linux, open a terminal in the downloaded repository root:
 
