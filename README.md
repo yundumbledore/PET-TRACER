@@ -43,28 +43,6 @@ python reproduce_ucdavis.py --workspace workspaces/ucdavis_paper --device auto
 
 This uses the original epoch-2755 weights, 1,000 joint draws and three reverse steps. Fresh sampling has Monte Carlo variation. Retraining with the supplied settings is a separate experiment and need not yield identical weights across devices. [Settings, six-step training guide and provenance](LoRACM/docs/UCDAVIS.md).
 
-```mermaid
-flowchart LR
-    A[Your kinetic model + input functions + protocol] --> B[Simulated labelled pairs]
-    C[Your own labelled dataset] --> D[Validate data]
-    B --> D
-    D --> E[LoRACM fine-tuning]
-    A --> S[Separate scratch-CM dataset]
-    S --> M[Validate and train CM from scratch]
-    F[Pretrained consistency model] --> E
-    E --> G[Adapted model]
-    H[Your testing TACs + input functions] --> I[Posterior prediction]
-    G --> I
-    M --> I
-    I --> J[Parameter samples + summaries]
-    H --> K[Nonlinear least squares]
-    J --> L[Single-TAC comparison]
-    K --> L
-    J --> N[Parameter and 95% interval-width images]
-    P[Corresponding patient mask + voxel mapping] --> N
-    N --> O[Click voxel: TAC + AIF + posterior]
-```
-
 ## What you can do
 
 | Feature | Guide |
