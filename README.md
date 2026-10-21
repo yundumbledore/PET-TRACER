@@ -10,6 +10,7 @@ PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsisten
 
 Team: **Yun Zhao and Steven Meikle** (The University of Sydney, Australia), **Andrew Reader** (King’s College London, UK), and **Yanan Fan** (CSIRO’s Data61, Australia). The [original framework page](docs/legacy-framework.md) contains the method introduction, figures, team information, and first-paper demonstrations.
 
+<<<<<<< HEAD
 ## Choose your module
 
 | Module | Workflow and defaults |
@@ -33,6 +34,8 @@ python reproduce_ucdavis.py --workspace workspaces/ucdavis_paper --device auto
 
 This uses the original epoch-2755 weights, 1,000 joint draws and three reverse steps. Fresh sampling has Monte Carlo variation. Retraining with the supplied settings is a separate experiment and need not yield identical weights across devices. [Settings, six-step training guide and provenance](LoRACM/docs/UCDAVIS.md).
 
+=======
+>>>>>>> c720f0b280ecc7aa4fd82b42e4cef55ca16c3f22
 ## Two ways to work
 
 | Local graphical interface | Terminal workflow |
@@ -55,36 +58,27 @@ The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and 
 5. **[Predict on your own project](LoRACM/docs/PREDICTION.md)** in batches, or analyse one TAC with parameter posterior histograms, an NLS comparison and forward TACs from posterior medians.
 6. **[Make parametric images](LoRACM/docs/PARAMETRIC_IMAGING.md)** of Kᵢ, fitted parameters or 95% credible-interval widths. Use the UC Davis example or your own patient's coronal TAC/AIF slice and corresponding mask. Click a voxel to view its TAC, input function and posterior KDE.
 
+<<<<<<< HEAD
 UC Davis is the GUI's default template. It uses the parameter ranges in the supplied HPC `Create_dataset.py`, unchanged AIF conditioning, Euler/noise conventions, rank **4 / alpha 8**, scheduler patience **50**, and 2×2-filtered Ki display with scale **0–0.06**. The supplied paper checkpoint and original normalization support inference without retraining. **My own project** retains the separate **100,000-pair / rank-8 / alpha-16** starting settings. Project settings, including unfinished edits, survive page navigation and browser refresh. A new project name creates an independent workspace. Open **CM Posterior Estimation** from the welcome page to use scratch training. Its project files are independent of LoRACM.
+=======
+## Reproduce the UC Davis example (Scenario 1 in our paper)
+>>>>>>> c720f0b280ecc7aa4fd82b42e4cef55ca16c3f22
 
-```mermaid
-flowchart LR
-    A[Your kinetic model + input functions + protocol] --> B[Simulated labelled pairs]
-    C[Your own labelled dataset] --> D[Validate data]
-    B --> D
-    D --> E[LoRACM fine-tuning]
-    A --> S[Separate scratch-CM dataset]
-    S --> M[Validate and train CM from scratch]
-    F[Pretrained consistency model] --> E
-    E --> G[Adapted model]
-    H[Your testing TACs + input functions] --> I[Posterior prediction]
-    G --> I
-    M --> I
-    I --> J[Parameter samples + summaries]
-    H --> K[Nonlinear least squares]
-    J --> L[Single-TAC comparison]
-    K --> L
-    J --> N[Parameter and 95% interval-width images]
-    P[Corresponding patient mask + voxel mapping] --> N
-    N --> O[Click voxel: TAC + AIF + posterior]
+In the GUI, choose **UC Davis demonstration → Reproduce paper Ki map**. The original model, patient slice and verified geometry are included. Or, after installation, run:
+
+```bash
+cd LoRACM
+python reproduce_ucdavis.py --workspace workspaces/ucdavis_paper --device auto
 ```
+
+This uses the original epoch-2755 weights, 1,000 joint draws and three reverse steps. Fresh sampling has Monte Carlo variation. Retraining with the supplied settings is a separate experiment and need not yield identical weights across devices. [Settings, six-step training guide and provenance](LoRACM/docs/UCDAVIS.md).
 
 ## What you can do
 
 | Feature | Guide |
 | :--- | :--- |
-| Choose 2TC or define a custom single-input ODE with a different parameter set | [Kinetic models and transfer limits](LoRACM/docs/MODELS_AND_PROTOCOLS.md#kinetic-models) |
-| Use measured AIFs, fit a cohort with Feng, and simulate new inputs | [Input functions](LoRACM/docs/MODELS_AND_PROTOCOLS.md#input-functions) |
+| Choose 2TC or define a custom ODE with a different parameter set | [Kinetic models and transfer limits](LoRACM/docs/MODELS_AND_PROTOCOLS.md#kinetic-models) |
+| Use measured AIFs, fit a cohort with Feng Model, and simulate new inputs | [Input functions](LoRACM/docs/MODELS_AND_PROTOCOLS.md#input-functions) |
 | Set isotope half-life/decay, frame midpoints, durations, noise, and observation convention | [Acquisition protocol](LoRACM/docs/MODELS_AND_PROTOCOLS.md#acquisition-protocol) |
 | Check your labelled training/validation/test file | [Dataset preparation](LoRACM/docs/PREPARE_DATA.md) |
 | Select dataset size, LoRA rank/alpha, and training settings | [Fine-tuning](LoRACM/docs/FINE_TUNING.md) |
@@ -138,7 +132,7 @@ PET-TRACER/
 
 ## Research, support, and licence
 
-- **Original paper:** *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET*. [IEEE Transactions on Medical Imaging](https://ieeexplore.ieee.org/abstract/document/11517565).
+- **CM:** *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET*. [IEEE Transactions on Medical Imaging](https://ieeexplore.ieee.org/abstract/document/11517565).
 - **LoRACM:** *A General-Purpose Adaptable Foundation Model for Total-Body PET Kinetic Modelling*. The repository describes the manuscript as in preparation; public citation metadata will be added when available.
 
 Please cite the original framework and the adaptation paper when its public reference is available. For help, [open an issue](https://github.com/yundumbledore/PET-TRACER/issues) or contact **yun.zhao@sydney.edu.au** / **steven.meikle@sydney.edu.au**.
