@@ -7,6 +7,8 @@ import os
 import numpy as np
 import pandas as pd
 import streamlit as st
+import matplotlib
+matplotlib.use('Agg')  # Browser rendering must not open native GUI windows.
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
@@ -19,7 +21,7 @@ from ucdavis import defaults as workflow_defaults, PRESETS, testing_from_dataset
 
 project_state.install()
 st.session_state['_draft_context'] = None
-st.set_page_config(page_title='PET-TRACER · LoRACM',page_icon='◈',layout='wide')
+st.set_page_config(page_title='PET-TRACER',page_icon='◈',layout='wide')
 st.markdown('''<style>
 .stApp {background: #f7fafc;}
 h1,h2,h3 {color:#143c50; letter-spacing:-0.025em;}
@@ -31,6 +33,19 @@ h1 {font-size:2.25rem !important;} h2 {font-size:1.45rem !important;}
 [data-testid="stMainBlockContainer"] {max-width:1280px; padding-top:3rem;}
 
 </style>''',unsafe_allow_html=True)
+
+
+from gui.navigation import MODULES,WORKFLOW_PAGES,CM_LABELS,go,home,module_overview,workspace_base,project_folder
+if 'jobs' not in st.session_state:
+    st.session_state.jobs=Jobs(ROOT)
+module=st.query_params.get('module','home')
+if module not in MODULES:
+    home(ROOT)
+    st.stop()
+if module=='selection':
+    from gui.model_selection import render as render_model_selection
+    render_model_selection(ROOT,st.session_state.jobs)
+    st.stop()
 
 
 def path(value):
@@ -74,12 +89,15 @@ def upload_or_path(label, default, suffixes, key):
 
 with st.sidebar:
     st.title('PET-TRACER')
-    st.caption('Adapt a consistency model to your PET protocol')
-    project_name = st.text_input('Project name',st.query_params.get('project','my_project'),key='_project_name',help='Saved under LoRACM/workspaces/. Use a new name for an independent experiment.')
+    st.caption(MODULES[module])
+    if st.button('← All modules',key='module_home'):go('home')
+    project_name = st.text_input('Project name',st.query_params.get('project','my_project'),key='_project_name',help='Saved outside new downloads by default. Use a new name for an independent experiment.')
     if not re.fullmatch(r'[A-Za-z0-9_-]+',project_name):
         st.error('Use letters, numbers, underscores or hyphens.'); st.stop()
     st.query_params['project']=project_name
-    workspace = Path(os.environ.get('PET_TRACER_WORKSPACES',str(ROOT/'workspaces')))/project_name
+    workspace = project_folder(workspace_base(ROOT),project_name,module)
+    from gui.release import sync_release
+    sync_release(ROOT,workspace)
     project_state.context(workspace, 'Project')
     with st.expander('Project defaults',expanded=not (workspace/'protocol.json').exists()):
         previous_defaults={}
@@ -94,15 +112,12 @@ with st.sidebar:
         st.caption('Defaults initialise this project. Once you begin configuring it, use a new project name to choose fresh defaults. Edits in any workflow page are retained automatically.')
     small = preset==PRESETS[0] and size=='Quick installation check'
     profile=project_name
-    enable_cm=st.checkbox('Enable CM from scratch comparison',value=False,help='Optional: prepare separate CM training data, train from scratch, predict on the CM page, compare in step 5, and select either model for imaging.')
-    pages=['Welcome','1 · Model & protocol','2 · Dataset','3 · Fine-tune']
-    pages+=['4 · Predict','5 · Single TAC & NLS','6 · Parametric imaging']
-    if enable_cm: pages+=['CM · Dataset','CM from scratch','CM · Predict','Compare models']
-    pages+=['UC Davis demonstration','User manual']
+    enable_cm=False
+    pages=WORKFLOW_PAGES[module]
     # Navigation is session-local; project settings live independently of widgets.
     st.session_state['_draft_context']=None
     if st.session_state.get('workflow_page') not in pages: st.session_state['workflow_page']=pages[0]
-    page = st.radio('Your workflow',pages,key='workflow_page')
+    page = st.radio('Your workflow',pages,key='workflow_page',format_func=lambda p:CM_LABELS.get(p,p) if module=='cm' else ('Overview' if p=='Welcome' else p))
     with st.expander('Project folder'):
         st.code(str(workspace),language='text')
     st.markdown('[User manual](https://github.com/yundumbledore/PET-TRACER/blob/main/LoRACM/README.md) · [Legacy framework](https://github.com/yundumbledore/PET-TRACER/blob/main/docs/legacy-framework.md)')
@@ -116,24 +131,17 @@ default_protocol,default_training=workflow_defaults(workspace,preset,small)
 run_path = workspace/'runs'/default_training['exp_name']
 if (workspace/'train.json').exists():
     run_path=workspace/'runs'/json.loads((workspace/'train.json').read_text(encoding='utf-8'))['exp_name']
+if module=='cm':
+    cm_settings=workspace/'train_cm.json'
+    cm_name=json.loads(cm_settings.read_text(encoding='utf-8'))['exp_name'] if cm_settings.exists() else 'cm_scratch'
+    run_path=workspace/'runs'/cm_name
 input_default=str(ROOT/'data/real/Sub001_slice75_adjusted.h5') if preset==PRESETS[0] else str(workspace/'testing.npz')
 if st.session_state.get('active_run'):
     active_run=Path(st.session_state.active_run)
     if workspace in active_run.parents: run_path=active_run
 
 if page == 'Welcome':
-    st.title('PET kinetic modelling for your study')
-    st.write('Estimate kinetic parameter posteriors from tissue curves and input functions. Adapt the foundation model with LoRACM, or train a consistency model from scratch for comparison.')
-    st.info('**Start with the UC Davis walkthrough**\n\nFor paper-model imaging, open UC Davis demonstration or use the supplied checkpoint in step 3. Follow steps 1 → 6 to learn simulation and fine-tuning. Each step is editable when you are ready to use your own project. Choose Quick installation check for a short practice run.')
-    a,b = st.columns(2)
-    a.info('**Simulate training pairs**\n\nDefine kinetics and timing → choose measured or Feng AIFs → generate labelled pairs → fine-tune → predict.')
-    b.info('**Bring your own training pairs**\n\nOpen Dataset → validate your NPZ → fine-tune → predict. You can skip simulation.')
-    with st.container(border=True):
-        st.markdown('**Two training routes, one prediction workflow**')
-        st.write('LoRACM transfers pretrained weights. CM from scratch learns from random initialization. Use the same dataset and held-out curves to compare them.')
-    st.subheader('Start with a small check')
-    st.write('UC Davis uses Scenario 1 priors and rank 4 / alpha 8. My own project keeps defaults of 100,000 training pairs, rank 8 and alpha 16. Dataset size counts training pairs; validation and testing are additional.')
-    st.caption('This application runs locally. Computation uses your Python environment and hardware. Stopping the application can interrupt jobs; retain project configs and run outputs.')
+    module_overview(module)
 
 elif page == '1 · Model & protocol':
     st.title('1 · Define kinetics, input functions and timing')
@@ -242,21 +250,23 @@ elif page in ('4 · Predict','CM · Predict'):
 
 elif page == '5 · Single TAC & NLS':
     from gui.single_tac import render
-    run_path = render(ROOT,workspace,launch,default_run=run_path,default_input=input_default,enable_cm=enable_cm)
+    run_path = render(ROOT,workspace,launch,default_run=run_path,default_input=input_default,enable_cm=False,mode=module)
 
 elif page == '6 · Parametric imaging':
     from gui.imaging import render as render_imaging
-    render_imaging(ROOT,workspace,run_path,st.session_state.get('prediction_input_'+str(workspace),input_default),upload_or_path,launch=launch)
+    render_imaging(ROOT,workspace,run_path,st.session_state.get('prediction_input_'+str(workspace),input_default),upload_or_path,launch=launch,mode=module)
 
 elif page == 'Compare models':
     from gui.comparison import render as render_comparison
     render_comparison(ROOT,workspace,launch,upload_or_path)
 
 elif page == 'User manual':
-    st.title('LoRACM user manual')
+    st.title(MODULES[module]+' user manual')
     sections={'Overview':'README.md','GUI and project settings':'docs/WORKBENCH.md','Installation':'docs/INSTALLATION.md','Models, inputs and protocols':'docs/MODELS_AND_PROTOCOLS.md',
               'Prepare your dataset':'docs/PREPARE_DATA.md','Fine-tuning':'docs/FINE_TUNING.md','CM from scratch and comparison':'docs/TRAIN_CM.md','Prediction and single-TAC NLS':'docs/PREDICTION.md',
               'Parametric imaging':'docs/PARAMETRIC_IMAGING.md','UC Davis demonstration':'docs/UCDAVIS.md'}
+    if module=='cm':
+        sections={'CM training workflow':'docs/TRAIN_CM.md',**{k:v for k,v in sections.items() if k not in ('Fine-tuning','UC Davis demonstration')}}
     section=st.selectbox('Manual section',list(sections))
     document = ROOT/sections[section]
     content = document.read_text(encoding='utf-8')

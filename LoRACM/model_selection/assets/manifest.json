@@ -1,0 +1,34 @@
+{
+  "experiment": "PriorV8TD_DataSize14e6_realAIF_embed_dim256_embedyLinear_OldSigmaMax_1DUnet_v1",
+  "checkpoint_epoch": 1169,
+  "subject": "P001",
+  "tracer": "FDG",
+  "slice_axis": 1,
+  "slice_index": 116,
+  "voxel_spacing_mm": [
+    3.3,
+    1.645
+  ],
+  "files": {
+    "preview.png": {
+      "sha256": "7560438358031ea96d427165c5572788507267566631f046fd2f8058c53d5eaf",
+      "bytes": 387199
+    },
+    "P001_slice116_mask.npy": {
+      "sha256": "8b2dcac8560ed96948ca3579375a02e1808e0106a9d31bbdfa691da96396888a",
+      "bytes": 142028
+    },
+    "P001_slice116.h5": {
+      "sha256": "68b83240f4995263de9b4acbbfe2e2b6225b9edabd1a01e3d2b8572d6f5626a9",
+      "bytes": 21883916
+    },
+    "config.json": {
+      "sha256": "a253fef9cc00a782a78128398ec188c49a9845ea5af513dce156f829ac546ecc",
+      "bytes": 5796
+    },
+    "epoch1169.pth": {
+      "sha256": "f9d82ec36b045ded6b5a40cd4b32883e657b9a0911f76082f04d444ad534aa1c",
+      "bytes": 2242980
+    }
+  }
+}

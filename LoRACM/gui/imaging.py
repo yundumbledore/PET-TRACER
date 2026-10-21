@@ -33,10 +33,10 @@ def input_curves(filename,modified,size,dim,t,d):
     return read_prediction_input(filename,dim,t,d)
 
 
-def render(root,workspace,run_default,input_default,upload_or_path,launch=None):
+def render(root,workspace,run_default,input_default,upload_or_path,launch=None,mode=None):
     st.title('6 · Total-body parametric imaging')
     st.caption('Choose a parameter or its 95% credible-interval width. Click a voxel to inspect its measured curve and posterior.')
-    run_default=model_run_picker(workspace,run_default,'Model for parametric imaging')
+    run_default=model_run_picker(workspace,run_default,'Model for parametric imaging',mode=mode)
     prediction_default=str(run_default/'predictions.npz')
     latest=st.session_state.get('prediction_'+str(workspace))
     if latest and Path(latest).parent==run_default: prediction_default=latest

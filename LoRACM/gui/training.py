@@ -64,7 +64,7 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
     devices=['auto','cpu','cuda:0','mps']
     device=a.selectbox('Compute device',devices,index=devices.index(previous.get('device','auto')),key=prefix+'_device')
     name=b.text_input('Run name',previous.get('exp_name','adaptation' if is_lora else 'cm_scratch'),key=prefix+'_name',help='Use a new name for each experiment.')
-    if not is_lora: st.caption('Prepare a larger, separate dataset on CM · Dataset, or explicitly select an existing labelled NPZ.')
+    if not is_lora: st.caption('Prepare your training dataset in step 2, or select an existing labelled NPZ.')
     if st.button('Check compute setup',key=prefix+'_compute_check'):
         launch('Compute environment check',['check_environment.py','--device',device,'--output',workspace/'environment-check.json'])
     diagnostic=workspace/'environment-check.json'

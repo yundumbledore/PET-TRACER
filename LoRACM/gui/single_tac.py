@@ -20,13 +20,13 @@ def prediction_payload(filename,modified,size,dim,times,durations):
     return read_prediction_input(filename,dim,times,durations)
 
 
-def render(root, workspace, launch, default_run=None, default_input=None,enable_cm=False):
+def render(root, workspace, launch, default_run=None, default_input=None,enable_cm=False,mode=None):
     st.title('5 · One TAC, full posterior, and an NLS comparison')
     st.write('Load a tissue time–activity curve and its input function. The trained consistency model returns joint posterior samples; nonlinear least squares supplies a bounded point estimate from the same kinetic model.')
     default_run=default_run or workspace/'runs'/'adaptation'
     if st.session_state.get('active_run') and workspace in Path(st.session_state.active_run).parents:
         default_run=Path(st.session_state.active_run)
-    default_run=model_run_picker(workspace,default_run)
+    default_run=model_run_picker(workspace,default_run,mode=mode)
     run = Path(st.text_input('Model run folder',str(default_run),key='single_run_'+str(default_run))).expanduser()
     if not run.is_absolute(): run=root/run
     source = st.text_input('Single-TAC CSV or prediction NPZ/HDF5',project_state.get('single_file',str(default_input or workspace/'single_tac.csv')),key='single_source_'+workspace.name)
@@ -178,5 +178,5 @@ def render(root, workspace, launch, default_run=None, default_input=None,enable_
             st.caption('Saved result for TAC '+str(data['voxel_columns'][0]))
         if comparison_draws is not None: summary['Scratch CM median']=np.median(comparison_draws,axis=0)
         st.dataframe(summary,hide_index=True)
-        st.caption('Dashed lines are NLS point estimates, not ground truth. Posterior quantiles describe the adapted model’s samples; validate calibration and fit quality on independent data before interpretation.')
+        st.caption('Dashed lines are NLS point estimates, not ground truth. Posterior quantiles describe the selected model’s samples; validate calibration and fit quality on independent data before interpretation.')
     return run

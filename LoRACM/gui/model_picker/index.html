@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;background:transparent;color:#17344d;font:14px system-ui,sans-serif}
+h3{font-size:16px;margin:0 0 12px} .chart{height:180px;display:flex;gap:4px;align-items:stretch;border-bottom:1px solid #cfd9e0}
+button{background:none;border:0;padding:0;flex:1;min-width:0;color:inherit;font:inherit;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+button:focus-visible{outline:2px solid #287fb5;outline-offset:2px} .bar{width:75%;min-height:2px;opacity:.75;border-radius:3px 3px 0 0}.selected .bar{opacity:1;outline:2px solid #17344d}
+.value{font-size:12px;margin-bottom:6px}.labels{display:flex;gap:4px;margin-top:7px}.labels span{flex:1;min-width:0;text-align:center;font-size:11px;overflow-wrap:anywhere}
+p{font-size:12px;color:#62737e;margin:10px 0 0}
+</style></head><body>
+<h3>Model posterior probability</h3><div id="chart" class="chart" role="group" aria-label="Select a kinetic model"></div><div id="labels" class="labels"></div><p>Click a bar to inspect that model.</p>
+<script>
+const send=(type,data={})=>window.parent.postMessage({isStreamlitMessage:true,type,...data},'*');let args=null;
+function render(){
+ const chart=document.getElementById('chart'),labels=document.getElementById('labels');chart.replaceChildren();labels.replaceChildren();
+ args.labels.forEach((name,i)=>{
+  const button=document.createElement('button');button.type='button';button.className=i===args.selected?'selected':'';
+  button.setAttribute('aria-label',name+', probability '+(args.probabilities[i]*100).toFixed(1)+' percent');button.setAttribute('aria-pressed',i===args.selected?'true':'false');
+  const value=document.createElement('span');value.className='value';value.textContent=(args.probabilities[i]*100).toFixed(1)+'%';
+  const bar=document.createElement('span');bar.className='bar';bar.style.height=Math.max(2,args.probabilities[i]*145)+'px';bar.style.background=args.colours[i];
+  button.append(value,bar);button.onclick=()=>{args.selected=i;render();send('streamlit:setComponentValue',{dataType:'json',value:{model:i,context:args.context,event:Date.now()}})};
+  chart.append(button);const label=document.createElement('span');label.textContent=name;labels.append(label);
+ });send('streamlit:setFrameHeight',{height:290});
+}
+window.addEventListener('message',event=>{if(event.source!==window.parent||event.data.type!=='streamlit:render')return;args=event.data.args;render()});
+send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:290});
+</script></body></html>

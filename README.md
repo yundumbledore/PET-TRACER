@@ -2,17 +2,29 @@
 
 **Bayesian kinetic modelling for dynamic total-body PET**
 
-Latest Release: Adapt a pretrained consistency model to your tracer, time sampling schedule, and acquisition protocol.
+Three independent modules: **CM Posterior Estimation**, **LoRACM Adaptation**, and **Bayesian Model Selection**. The local browser GUI opens with a module chooser and a separate workflow menu for each module.
 
 [User manual](LoRACM/README.md) · [GUI guide](LoRACM/docs/WORKBENCH.md) · [Installation](LoRACM/docs/INSTALLATION.md) · [UC Davis example steps 1–6](LoRACM/docs/UCDAVIS.md) · [Parametric imaging](LoRACM/docs/PARAMETRIC_IMAGING.md) · [Original framework](docs/legacy-framework.md)
 
-PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) estimates kinetic parameter posteriors from tissue time–activity curves (TACs) and input functions. **LoRACM** adds low-rank adaptation: fine-tune the pretrained consistency model with labelled examples from your application, then predict on your own curves. A separate **CM from scratch** module trains a random-initialization baseline for comparison on shared held-out data.
+PET-TRACER (**PET** **T**otal-body Paramet**R**ic **A**nalysis via **C**onsistency **E**stimation for **R**adiotracers) estimates kinetic parameter posteriors from tissue time–activity curves (TACs) and input functions. **LoRACM** adds low-rank adaptation: fine-tune the pretrained consistency model with labelled examples from your application, then predict on your own curves. The **CM Posterior Estimation** module trains a consistency model from scratch. **Bayesian Model Selection** adds pretrained seven-model FDG inference and an interactive voxel/posterior viewer for P001 coronal slice 116. Model-selection training will be released later.
 
 Team: **Yun Zhao and Steven Meikle** (The University of Sydney, Australia), **Andrew Reader** (King’s College London, UK), and **Yanan Fan** (CSIRO’s Data61, Australia). The [original framework page](docs/legacy-framework.md) contains the method introduction, figures, team information, and first-paper demonstrations.
 
+## Choose your module
+
+| Module | Workflow and defaults |
+| :--- | :--- |
+| **CM Posterior Estimation** | Define kinetics and timing, simulate/upload labelled pairs, configure a U-Net and train from scratch, predict, compare one TAC with NLS, and make parametric images. UC Davis is the default example. |
+| **LoRACM Adaptation** | Define your study, simulate/upload data, fine-tune the pretrained CM with LoRA, predict, inspect TACs/posteriors and make parametric images. UC Davis remains the default. |
+| **Bayesian Model Selection** | Configure inference, run the supplied V8TD epoch-1169 model on P001 slice 116, and inspect model probabilities, model-conditional kinetic posteriors and forward TACs including time delay. Training/additional subjects are planned. |
+
+Each module has its own left-hand workflow menu. The first two support custom kinetic models and users' own data; they are no longer mixed by a comparison toggle. New CM projects and model-selection projects are stored separately from LoRACM projects.
+
+[Model-selection guide and terminal inference](LoRACM/docs/MODEL_SELECTION.md)
+
 ## Reproduce the UC Davis Ki example
 
-In the GUI, choose **UC Davis demonstration → Reproduce paper Ki map**. The original model, patient slice and verified geometry are included. Or, after installation, run:
+In the GUI, open **LoRACM Adaptation**, then choose **UC Davis demonstration → Reproduce paper Ki map**. The original model, patient slice and verified geometry are included. Or, after installation, run:
 
 ```bash
 cd LoRACM
@@ -30,12 +42,12 @@ This uses the original epoch-2755 weights, 1,000 joint draws and three reverse s
 
 The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and Linux** with Python 3.11. CPU is the common baseline; PyTorch can use a supported CUDA GPU or Apple MPS device. Standard installation includes CPU JAX for dataset generation. See the [platform and acceleration guide](LoRACM/docs/INSTALLATION.md#hardware-and-platform-support). Windows users: double-click **Setup PET-TRACER.cmd**, choose NVIDIA GPU or CPU, then open **Launch PET-TRACER.cmd** when setup completes. [Windows guide](LoRACM/docs/WINDOWS.md).
 
-![PET-TRACER local workbench with LoRACM, scratch CM and shared prediction workflows](Assets/LoRACM_Workbench.png)
+![Example of the LoRACM workflow and posterior-inspection tools](Assets/LoRACM_Workbench.png)
 
 ## Start here
 
-1. **[Install once outside the repo](LoRACM/docs/INSTALLATION.md)**: Windows users double-click **Setup PET-TRACER.cmd**; macOS/Linux users run `setup_environment.py`. Then launch the GUI or open a terminal. New downloads reuse the same environment.
-2. **[Reproduce the UC Davis paper example](LoRACM/docs/UCDAVIS.md)** using the supplied epoch-2755 checkpoint, or follow steps 1–6 to simulate and retrain. Choose **Quick installation check** only to check installation.
+1. **[Install once outside the repo](LoRACM/docs/INSTALLATION.md)**: Windows users double-click **Setup PET-TRACER.cmd**; macOS/Linux users run `setup_environment.py`. Then launch the GUI or open a terminal. New downloads reuse the same environment. New GUI projects use the stable `~/.pet-tracer/workspaces` folder; `PET_TRACER_WORKSPACES` can select another location.
+2. **[Reproduce the UC Davis paper example](LoRACM/docs/UCDAVIS.md)** using the supplied epoch-2755 checkpoint, or follow steps 1–6 to simulate and retrain. Choose **Quick installation check** only to check installation. Both training modules retain the supplied UC Davis protocol and defaults.
 3. Choose your data route:
    - **[Simulate labelled pairs](LoRACM/docs/MODELS_AND_PROTOCOLS.md)** using 2TC or your own kinetic model, measured AIFs or a fitted Feng cohort, and your frame schedule.
    - **[Prepare your own dataset](LoRACM/docs/PREPARE_DATA.md)** and validate its format before training.
@@ -43,7 +55,7 @@ The new workflow is designed for **Windows, Apple Silicon macOS (M-series), and 
 5. **[Predict on your own project](LoRACM/docs/PREDICTION.md)** in batches, or analyse one TAC with parameter posterior histograms, an NLS comparison and forward TACs from posterior medians.
 6. **[Make parametric images](LoRACM/docs/PARAMETRIC_IMAGING.md)** of Kᵢ, fitted parameters or 95% credible-interval widths. Use the UC Davis example or your own patient's coronal TAC/AIF slice and corresponding mask. Click a voxel to view its TAC, input function and posterior KDE.
 
-UC Davis is the GUI's default template. It uses the parameter ranges in the supplied HPC `Create_dataset.py`, unchanged AIF conditioning, Euler/noise conventions, rank **4 / alpha 8**, scheduler patience **50**, and 2×2-filtered Ki display with scale **0–0.06**. The supplied paper checkpoint and original normalization support inference without retraining. **My own project** retains the separate **100,000-pair / rank-8 / alpha-16** starting settings. Project settings, including unfinished edits, survive page navigation and browser refresh. A new project name creates an independent workspace. Scratch CM training is optional; enable it in the sidebar when you want a comparison.
+UC Davis is the GUI's default template. It uses the parameter ranges in the supplied HPC `Create_dataset.py`, unchanged AIF conditioning, Euler/noise conventions, rank **4 / alpha 8**, scheduler patience **50**, and 2×2-filtered Ki display with scale **0–0.06**. The supplied paper checkpoint and original normalization support inference without retraining. **My own project** retains the separate **100,000-pair / rank-8 / alpha-16** starting settings. Project settings, including unfinished edits, survive page navigation and browser refresh. A new project name creates an independent workspace. Open **CM Posterior Estimation** from the welcome page to use scratch training. Its project files are independent of LoRACM.
 
 ```mermaid
 flowchart LR
@@ -106,7 +118,8 @@ PET-TRACER/
 ├── Single_TAC_Demo.ipynb, Total_Body_Parametric_Imaging_Demo.ipynb
 └── LoRACM/
     ├── README.md                   Step-by-step user manual
-    ├── gui/                        Guided local interface
+    ├── gui/                        Three independent local GUI modules
+    ├── model_selection/            Inference-only V8TD checkpoint, P001 slice and forward models
     ├── configs/, examples/         Editable configs, schedule and custom model
     ├── protocol.py                 Dataset/protocol validation
     ├── fit_feng.py, simulate_protocol.py
@@ -120,7 +133,7 @@ PET-TRACER/
     ├── create_dataset.py            Preserved UC Davis research generator
     ├── data/, checkpoints/, notebooks/
     ├── docs/, tests/
-    └── workspaces/                 Your projects and outputs (Git-ignored)
+    └── workspaces/                 Existing checkout-local projects (still supported)
 ```
 
 ## Research, support, and licence

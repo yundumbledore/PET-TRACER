@@ -73,7 +73,13 @@ You can continue using an activated Conda/venv environment that already has the 
 
 Create another reusable environment with `python3.11 setup_environment.py --prefix /your/environment/path`. Activate it before launching, or set `PET_TRACER_PYTHON` to its full Python executable path. No global packages or administrator installation are needed.
 
-The environment is separate from your **projects**. Retain/copy the previous `LoRACM/workspaces` when migrating experiments, or set `PET_TRACER_WORKSPACES` to a stable external project folder before launching. New downloads do not automatically relocate existing project files.
+The environment is separate from your **projects**. New GUI installations store projects at `~/.pet-tracer/workspaces`, which survives downloading a new checkout. Set `PET_TRACER_WORKSPACES` to use another stable external folder. CM projects use its `cm/` subfolder, model-selection projects use `model_selection/`, and LoRACM retains its original project layout.
+
+If an existing checkout already contains projects under `LoRACM/workspaces`, that checkout keeps using them. Before replacing it, copy that folder to a stable external location and set `PET_TRACER_WORKSPACES` to that location. Keep the previous download until you have reopened and checked your projects. No installer deletes or moves existing projects.
+
+When a saved training project opens in a new checkout, references to bundled input/checkpoint/example files are reconnected only when their contents match the recorded hashes. A changed custom model is not silently substituted. User data and result files stay where you placed them. Review references to your own files before deleting an old checkout.
+
+The welcome page includes an installation/upgrade guide. No new scientific dependencies are required by the Bayesian model-selection module; the supplied checkpoint and P001 slice are included in the repository download.
 
 ## Hardware and platform support
 

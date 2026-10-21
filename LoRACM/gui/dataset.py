@@ -14,9 +14,9 @@ def render(root,workspace,launch,upload_or_path,mode='lora',small=False):
     base_protocol=protocol_path if protocol_path.exists() else workspace/'protocol.json'
     dataset_path=workspace/('cm_dataset.npz' if scratch else 'dataset.npz')
     selection=workspace/('cm_dataset_selection.json' if scratch else 'dataset_selection.json')
-    st.title('CM · Prepare a separate training dataset' if scratch else '2 · Prepare your fine-tuning dataset')
+    st.title('2 · Prepare your CM training dataset' if scratch else '2 · Prepare your fine-tuning dataset')
     if scratch:
-        st.caption('Train from random weights with an independently sized dataset. Use step 1’s kinetic model, AIFs and timing; CM data and simulation settings are saved separately from LoRACM.')
+        st.caption('Use step 1’s kinetic model, AIFs and timing to simulate training pairs, or upload your own labelled dataset. This module trains a CM from random initialisation.')
         st.info('Starting size: 1,000,000 training pairs, 100,000 validation pairs and 1,000 test pairs. Adjust to your study and memory. The quick installation check uses 32 / 16 / 8. For a comparison at equal data size, you may explicitly import the same NPZ into both routes.')
     route=st.radio('Where will training pairs come from?',['Simulate my protocol','Use my own NPZ dataset'])
     if route=='Simulate my protocol':

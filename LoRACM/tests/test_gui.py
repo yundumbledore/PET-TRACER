@@ -20,8 +20,14 @@ class GuiTests(unittest.TestCase):
         self.environment.stop()
         self.workspace.cleanup()
 
+    def open_app(self,module='lora',file=None):
+        from streamlit.testing.v1 import AppTest
+        app=AppTest.from_file(file or str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45)
+        app.query_params['module']=module
+        return app.run()
+
     def prediction_fixture(self,mode='lora',name='scenario1'):
-        workspace=Path(self.workspace.name)/'my_project'
+        workspace=Path(self.workspace.name)/('cm' if mode=='cm' else '')/'my_project'
         run=workspace/'runs'/name;run.mkdir(parents=True,exist_ok=True)
         cfg={'training_mode':mode,'x_dim':5,'y_dim':4,'parameter_names':['K1','k2','k3','k4','Vb'],'kinetic_model':'2TC'}
         (run/'model_params.json').write_text(json.dumps(cfg))
@@ -39,29 +45,29 @@ class GuiTests(unittest.TestCase):
         output.with_suffix('.json').write_text(json.dumps(meta))
 
     def test_scratch_dataset_has_independent_size_protocol_and_training_selection(self):
-        from streamlit.testing.v1 import AppTest
-        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
-        next(w for w in app.sidebar.checkbox if w.label=='Enable CM from scratch comparison').check().run()
+        lora=self.open_app()
+        lora.sidebar.radio[0].set_value('1 · Model & protocol').run()
+        next(w for w in lora.button if w.label=='Save and validate protocol').click().run()
+        workspace=Path(self.workspace.name)/'my_project';original=(workspace/'protocol.json').read_bytes()
+        lora.sidebar.radio[0].set_value('2 · Dataset').run()
+        next(w for w in lora.number_input if w.label=='Training pairs').set_value(1234).run()
+        app=self.open_app('cm')
+        self.assertNotIn('3 · Fine-tune',app.sidebar.radio[0].options)
         app.sidebar.radio[0].set_value('1 · Model & protocol').run()
         next(w for w in app.button if w.label=='Save and validate protocol').click().run()
-        workspace=Path(self.workspace.name)/'my_project';original=(workspace/'protocol.json').read_bytes()
-        app.sidebar.radio[0].set_value('2 · Dataset').run()
-        next(w for w in app.number_input if w.label=='Training pairs').set_value(1234).run()
         app.sidebar.radio[0].set_value('CM · Dataset').run()
         self.assertEqual(next(w for w in app.number_input if w.label=='Training pairs').value,1000000)
         next(w for w in app.number_input if w.label=='Training pairs').set_value(9).run()
         with patch('gui.jobs.Jobs.start') as start:
             next(w for w in app.button if w.label=='Generate CM dataset').click().run()
             self.assertTrue(start.called)
-        cfg=json.loads((workspace/'cm_protocol.json').read_text())
+        cfg=json.loads((Path(self.workspace.name)/'cm/my_project/cm_protocol.json').read_text())
         self.assertEqual(cfg['n_train'],9);self.assertEqual(Path(cfg['output']).name,'cm_dataset.npz')
         self.assertEqual((workspace/'protocol.json').read_bytes(),original)
-        app.sidebar.radio[0].set_value('2 · Dataset').run()
-        self.assertEqual(next(w for w in app.number_input if w.label=='Training pairs').value,1234)
         app.sidebar.radio[0].set_value('CM from scratch').run()
         self.assertEqual(Path(next(w for w in app.text_input if w.label=='Labelled dataset (.npz)').value).name,'cm_dataset.npz')
-        app.sidebar.radio[0].set_value('3 · Fine-tune').run()
-        self.assertEqual(Path(next(w for w in app.text_input if w.label=='Labelled dataset (.npz)').value).name,'dataset.npz')
+        lora.sidebar.radio[0].set_value('2 · Dataset').run()
+        self.assertEqual(next(w for w in lora.number_input if w.label=='Training pairs').value,1234)
         self.assertFalse(list(app.exception))
 
     def test_repeated_gui_predictions_preserve_files_and_cm_route_filters_models(self):
@@ -69,8 +75,7 @@ class GuiTests(unittest.TestCase):
         workspace,run,source,cfg=self.prediction_fixture()
         _,cm,_,_=self.prediction_fixture('cm','cm_scratch')
         old=run/'predictions.npz';self.saved_prediction(old,source,cfg);original=old.read_bytes()
-        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
-        next(w for w in app.sidebar.checkbox if w.label=='Enable CM from scratch comparison').check().run()
+        app=self.open_app()
         app.sidebar.radio[0].set_value('4 · Predict').run()
         self.assertIn('LoRACM · scenario1',next(w for w in app.selectbox if w.label=='Model to use').options)
         next(w for w in app.selectbox if w.label=='Prediction input').set_value('My own file').run()
@@ -86,6 +91,7 @@ class GuiTests(unittest.TestCase):
             args=start.call_args.args[1]
             self.assertEqual(Path(args[args.index('--output')+1]).name,'predictions_003.npz')
         self.assertEqual(old.read_bytes(),original)
+        app=self.open_app('cm')
         app.sidebar.radio[0].set_value('CM · Predict').run()
         self.assertEqual(next(w for w in app.selectbox if w.label=='Model to use').options,['CM from scratch · cm_scratch'])
         self.assertTrue(any(w.value=='CM · Predict with your scratch model' for w in app.title))
@@ -95,7 +101,7 @@ class GuiTests(unittest.TestCase):
         from streamlit.testing.v1 import AppTest
         workspace,run,source,cfg=self.prediction_fixture()
         mask=workspace/'patient_mask.npy';np.save(mask,np.array([[0,1],[1,1]]))
-        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app=self.open_app()
         app.sidebar.radio[0].set_value('4 · Predict').run()
         next(w for w in app.selectbox if w.label=='Prediction input').set_value('My own patient scan').run()
         next(w for w in app.text_input if w.label=='Testing dataset').set_value(str(source)).run()
@@ -120,7 +126,7 @@ class GuiTests(unittest.TestCase):
     def test_drafts_survive_arbitrary_navigation_and_project_switches(self):
         from streamlit.testing.v1 import AppTest
         file=str(Path(__file__).resolve().parents[1]/'gui/app.py')
-        app=AppTest.from_file(file,default_timeout=45).run()
+        app=self.open_app(file=file)
         def page(name):
             app.sidebar.radio[0].set_value(name).run()
             self.assertFalse(list(app.exception))
@@ -147,7 +153,7 @@ class GuiTests(unittest.TestCase):
         app.sidebar.text_input[0].set_value('my_project').run()
         self.assertEqual(next(w for w in app.number_input if w.label=='Epochs').value,7)
         # A new browser session restores the project-owned draft from disk.
-        fresh=AppTest.from_file(file,default_timeout=45).run()
+        fresh=self.open_app(file=file)
         fresh.sidebar.radio[0].set_value('3 · Fine-tune').run()
         self.assertEqual(next(w for w in fresh.number_input if w.label=='Epochs').value,7)
         self.assertFalse(list(fresh.exception))
@@ -161,7 +167,7 @@ class GuiTests(unittest.TestCase):
                 arrays['x_'+split]=np.array([[.1,.2,.3,0],[.2,.3,.4,0]])
                 arrays['y_'+split]=np.array([[1,2,3,4],[2,3,4,5]])
             np.savez_compressed(path,**arrays)
-            app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+            app=self.open_app()
             app.sidebar.text_input[0].set_value('gui_import_fixture').run()
             app.sidebar.radio[0].set_value('3 · Fine-tune').run()
             next(w for w in app.text_input if w.label=='Labelled dataset (.npz)').set_value(str(path)).run()
@@ -174,7 +180,7 @@ class GuiTests(unittest.TestCase):
 
     def test_pending_voxel_never_falls_back_to_an_older_result(self):
         from streamlit.testing.v1 import AppTest
-        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app=self.open_app()
         workspace=Path(self.workspace.name)/'my_project'
         old=workspace/'analyses/old';old.mkdir(parents=True)
         draws=np.random.default_rng(42).uniform(.01,.5,(1,16,5))
@@ -199,7 +205,7 @@ class GuiTests(unittest.TestCase):
 
     def test_ucdavis_is_default_and_sixth_page_is_available(self):
         from streamlit.testing.v1 import AppTest
-        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app=self.open_app()
         self.assertEqual(next(w for w in app.sidebar.selectbox if w.label=='Example setup').value,'UC Davis Scenario 1')
         self.assertIn('6 · Parametric imaging',app.sidebar.radio[0].options)
         app.sidebar.radio[0].set_value('3 · Fine-tune').run()
@@ -209,7 +215,7 @@ class GuiTests(unittest.TestCase):
 
     def test_corrected_ucdavis_prior_defaults_and_project_edits_persist(self):
         from streamlit.testing.v1 import AppTest
-        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app=self.open_app()
         app.sidebar.radio[0].set_value('1 · Model & protocol').run()
         prior=next(w for w in app.text_area if w.label=='Parameter priors (uniform ranges)')
         expected=json.loads(prior.value)
@@ -230,7 +236,7 @@ class GuiTests(unittest.TestCase):
 
     def test_protocol_page_uses_midpoints_without_convention_controls(self):
         from streamlit.testing.v1 import AppTest
-        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app=self.open_app()
         app.sidebar.radio[0].set_value('1 · Model & protocol').run()
         self.assertEqual(Path(next(w for w in app.text_input if w.label=='Measured AIF CSV').value).name,'UCDavis_1H35.csv')
         labels=[w.label for w in app.selectbox]
@@ -253,7 +259,7 @@ class GuiTests(unittest.TestCase):
 
     def test_custom_schedule_is_saved_without_hidden_ucdavis_override(self):
         from streamlit.testing.v1 import AppTest
-        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app=self.open_app()
         app.sidebar.radio[0].set_value('1 · Model & protocol').run()
         # Restore an edited schedule draft, as on return from another page.
         drafts=app.session_state['_project_drafts_'+str(Path(self.workspace.name)/'my_project')]
@@ -275,7 +281,7 @@ class GuiTests(unittest.TestCase):
         cfg,_=defaults(workspace,small=True)
         cfg.update(simulation_mode='rk4',t_meas=cfg.pop('prediction_t_meas'),aif_before_first='zero_at_origin',aif_after_last='require_coverage')
         (workspace/'protocol.json').write_text(json.dumps(cfg))
-        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app=self.open_app()
         app.sidebar.radio[0].set_value('2 · Dataset').run()
         with patch('gui.jobs.Jobs.start') as start:
             next(w for w in app.button if w.label=='Generate dataset').click().run()
@@ -286,7 +292,7 @@ class GuiTests(unittest.TestCase):
     def test_paper_checkpoint_is_available_without_dataset_or_training(self):
         from streamlit.testing.v1 import AppTest
         from common import file_sha256
-        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
+        app=self.open_app()
         app.sidebar.radio[0].set_value('5 · Single TAC & NLS').run()
         workspace=Path(self.workspace.name)/'my_project'
         paper=workspace/'runs/paper_ucdavis'
@@ -306,10 +312,10 @@ class GuiTests(unittest.TestCase):
 
     def test_all_pages_render(self):
         from streamlit.testing.v1 import AppTest
-        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
-        next(w for w in app.sidebar.checkbox if w.label=='Enable CM from scratch comparison').check().run()
+        app=self.open_app()
         self.assertFalse(list(app.exception))
-        for page in app.sidebar.radio[0].options:
+        from gui.navigation import WORKFLOW_PAGES
+        for page in WORKFLOW_PAGES['lora']:
             app.sidebar.radio[0].set_value(page).run()
             self.assertFalse(list(app.exception),page)
 
@@ -323,8 +329,7 @@ class GuiTests(unittest.TestCase):
                 arrays['x_'+split]=np.array([[.1,.2,.3,.4,.1,0],[.2,.3,.4,.5,.2,0]])
                 arrays['y_'+split]=np.array([[1,2,3,4],[2,3,4,5]])
             np.savez_compressed(path,**arrays)
-            app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'gui/app.py'),default_timeout=45).run()
-            next(w for w in app.sidebar.checkbox if w.label=='Enable CM from scratch comparison').check().run()
+            app=self.open_app('cm')
             app.sidebar.radio[0].set_value('CM from scratch').run()
             source=next(w for w in app.text_input if w.label=='Labelled dataset (.npz)')
             source.set_value(str(path)).run()

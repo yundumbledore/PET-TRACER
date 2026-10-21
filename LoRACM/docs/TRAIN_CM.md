@@ -18,13 +18,13 @@ Both use the same dataset contract, training-only normalization, consistency obj
 ## GUI workflow
 
 1. Save the kinetic model, AIFs and timing in **1 · Model & protocol**.
-2. Enable **CM from scratch comparison**, then open **CM · Dataset**. Generate a separate dataset, or import and validate a labelled NPZ. Starting sizes are **1,000,000 training / 100,000 validation / 1,000 test pairs**; the quick check uses **32 / 16 / 8**. These are editable starting values, not evidence of sufficient training data.
+2. Open **CM Posterior Estimation** from the welcome page, then choose **2 · Dataset**. Generate a separate dataset, or import and validate a labelled NPZ. Starting sizes are **1,000,000 training / 100,000 validation / 1,000 test pairs**; the quick check uses **32 / 16 / 8**. These are editable starting values, not evidence of sufficient training data.
 3. Open **CM from scratch**. The selected CM dataset and its dimensions appear automatically.
 4. Choose the run name, epochs, learning rate, batch size and device. **Check compute setup** tests the selected device before a full job.
 5. Open **Advanced settings** when you need architecture, optimizer, scheduler, consistency intervals, loss weights, seed or checkpoint controls.
 6. Choose **Review configuration**, then **Start CM training**.
 7. Open **CM · Predict**. It lists scratch-CM runs; **4 · Predict** lists LoRACM runs. Both accept a different testing file or **My own patient scan** with its corresponding mask.
-8. Use **5 · Single TAC & NLS** for either model, enable the scratch posterior overlay for a paired voxel comparison, or open **Compare models** for shared held-out curves. In step 6, select either model and its own predictions.
+8. Use **5 · Single TAC & NLS** in the CM module to inspect its posteriors against NLS, then step 6 for parametric images. For a paired LoRACM/scratch comparison on shared held-out curves, use the terminal `compare_models.py` workflow below.
 
 Both routes support graceful early stopping and the [same best/last/epoch checkpoint selection](FINE_TUNING.md#interrupted-jobs-and-memory-limits).
 
