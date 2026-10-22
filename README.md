@@ -1,5 +1,7 @@
 # PET-TRACER
 
+<img src="Assets/PET-TRACER_logo.png" alt="PET-TRACER logo" width="480">
+
 **Bayesian kinetic modelling for dynamic total-body PET**
 
 PET-TRACER uses consistency models (CMs) to estimate kinetic parameter posteriors, create parametric images, and perform Bayesian kinetic model selection from dynamic PET time–activity curves (TACs) and input functions.

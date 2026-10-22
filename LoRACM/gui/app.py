@@ -35,7 +35,7 @@ h1 {font-size:2.25rem !important;} h2 {font-size:1.45rem !important;}
 </style>''',unsafe_allow_html=True)
 
 
-from gui.navigation import MODULES,WORKFLOW_PAGES,CM_LABELS,go,home,module_overview,workspace_base,project_folder
+from gui.navigation import MODULES,WORKFLOW_PAGES,CM_LABELS,go,home,module_overview,workspace_base,project_folder,sidebar_logo
 if 'jobs' not in st.session_state:
     st.session_state.jobs=Jobs(ROOT)
 module=st.query_params.get('module','home')
@@ -88,7 +88,7 @@ def upload_or_path(label, default, suffixes, key):
 
 
 with st.sidebar:
-    st.title('PET-TRACER')
+    sidebar_logo(ROOT)
     st.caption(MODULES[module])
     if st.button('← All modules',key='module_home'):go('home')
     project_name = st.text_input('Project name',st.query_params.get('project','my_project'),key='_project_name',help='Saved outside new downloads by default. Use a new name for an independent experiment.')

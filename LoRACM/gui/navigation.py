@@ -46,10 +46,14 @@ def installation_help(root):
     st.markdown('[Installation and updates](https://github.com/yundumbledore/PET-TRACER/blob/main/LoRACM/docs/INSTALLATION.md)')
 
 
+def sidebar_logo(root):
+    st.image(str(Path(root).parent/'Assets/PET-TRACER_logo.png'),width=240)
+
+
 def home(root):
     root=Path(root)
     with st.sidebar:
-        st.title('PET-TRACER')
+        sidebar_logo(root)
         st.caption('Bayesian kinetic modelling for dynamic PET')
         st.markdown('Choose a module to open its workflow.')
         st.markdown('[User manual](https://github.com/yundumbledore/PET-TRACER)')
@@ -57,7 +61,7 @@ def home(root):
     st.subheader('Bayesian kinetic modelling for dynamic PET')
     st.write('Estimate kinetic parameter posteriors, adapt a pretrained consistency model, or explore Bayesian kinetic model selection.')
     st.markdown('''<style>
-[data-testid="stImage"] img {height:180px;object-fit:contain}
+[data-testid="stMainBlockContainer"] [data-testid="stImage"] img {height:180px;object-fit:contain}
 /* Stretch the welcome cards to the tallest module and anchor their buttons. */
 [data-testid="stHorizontalBlock"]:has([data-testid="stImage"]) > [data-testid="stColumn"] {
     align-self:stretch;display:flex;flex-direction:column;

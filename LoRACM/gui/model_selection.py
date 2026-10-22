@@ -13,7 +13,7 @@ from scipy.stats import gaussian_kde
 import streamlit as st
 from streamlit.components.v1 import declare_component
 from gui.imaging import picker
-from gui.navigation import go,workspace_base,project_folder,WORKFLOW_PAGES
+from gui.navigation import go,workspace_base,project_folder,WORKFLOW_PAGES,sidebar_logo
 from gui import state as project_state
 from runtime import write_json_atomic
 from model_selection.core import ASSETS,MODELS,COLORS,PARAMETERS,TITLES,ACTIVE,load_demo,load_result,conditional_samples,forward_posterior
@@ -190,7 +190,7 @@ def explore(workspace):
 
 def render(root,jobs):
     with st.sidebar:
-        st.title('PET-TRACER');st.caption('Bayesian Model Selection')
+        sidebar_logo(root);st.caption('Bayesian Model Selection')
         if st.button('← All modules',key='selection_home'):go('home')
         name=st.text_input('Project name',st.query_params.get('project','my_project'),key='_selection_project_name')
         if not re.fullmatch(r'[A-Za-z0-9_-]+',name):st.error('Use letters, digits, underscores or hyphens.');st.stop()
