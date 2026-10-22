@@ -24,12 +24,11 @@ python launch_gui.py
 
 ## Research, support, and licence
 
-- **CM:** *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET*. [IEEE Transactions on Medical Imaging](https://ieeexplore.ieee.org/abstract/document/11517565).
-- **LoRACM:** *A General-Purpose Adaptable Foundation Model for Total-Body PET Kinetic Modelling*. Manuscript in preparation; public citation details will be added when available.
+- *Generative Consistency Models for Estimation of Kinetic Parametric Image Posteriors in Total-Body PET*. [IEEE Transactions on Medical Imaging](https://ieeexplore.ieee.org/abstract/document/11517565).
+- *A General-Purpose Adaptable Foundation Model for Total-Body PET Kinetic Modelling*. Manuscript in preparation;
+- *Generative Consistency Models for Bayesian Kinetic Model Selection in PET*. Manuscript in preparation;
 
-Please cite the original framework and the adaptation paper when its public reference is available.
-
-**Team:** Yun Zhao and Steven Meikle (The University of Sydney), Andrew Reader (King’s College London), and Yanan Fan (CSIRO’s Data61).
+**Team:** Yun Zhao and Steven Meikle (The University of Sydney, Australia), Andrew Reader (King’s College London, UK), and Yanan Fan (CSIRO Technology, Australia).
 
 For support, [open an issue](https://github.com/yundumbledore/PET-TRACER/issues) or contact [yun.zhao@sydney.edu.au](mailto:yun.zhao@sydney.edu.au) / [steven.meikle@sydney.edu.au](mailto:steven.meikle@sydney.edu.au).
 
