@@ -9,8 +9,8 @@
   "half_life_min": 109.8,
   "noise_prior": {
     "type": "uniform",
-    "min": 0.1,
-    "max": 7
+    "min": 3.0,
+    "max": 7.0
   },
   "kinetic_priors": {
     "K1": {
@@ -169,5 +169,8 @@
   ],
   "recipe_version": "ucdavis-hpc-v1",
   "random_stream": "jax_hpc",
-  "aif_sampling": "source_samples"
+  "aif_sampling": "source_samples",
+  "noise_model": "lognormal",
+  "noise_timing": "frame_duration",
+  "noise_epsilon": 1e-08
 }

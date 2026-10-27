@@ -25,7 +25,7 @@ A complete working 1TC example is in [`examples/custom_1tc.py`](../examples/cust
 
 Validate the configuration before generation with `python protocol.py --config configs/dataset_custom.json`.
 
-GUI simulation uses zero initial states, one input channel, midpoint observations and fixed-step Euler integration. Test a custom model against analytical solutions or a validated independent implementation, and check convergence at smaller step sizes. Delay equations, multiple independent inputs and state-dependent discontinuities need an extension of this contract; the old dual-input/SRTM research classes are not automatically exposed as GUI plugins. No AATH scenario is claimed as validated by this update. Existing terminal RK4 protocols remain readable. See [the UC Davis guide](UCDAVIS.md#timing-forward-model-and-noise) for the original observation/noise equations.
+GUI simulation uses zero initial states, one input channel, midpoint observations and fixed-step Euler integration. Test a custom model against analytical solutions or a validated independent implementation, and check convergence at smaller step sizes. Delay equations, multiple independent inputs and state-dependent discontinuities need an extension of this contract; the old dual-input/SRTM research classes are not automatically exposed as GUI plugins. No AATH scenario is claimed as validated by this update. Existing terminal RK4 protocols remain readable. See [the UC Davis guide](UCDAVIS.md#timing-forward-model-and-noise) for the original observation equations and [measurement noise](MEASUREMENT_NOISE.md) for the new log-normal defaults.
 
 **Transfer limits.** Compatible foundation backbone weights transfer. Changed parameter names/order or any custom model resets and trains the parameter encoder/decoder, even if the number of parameters remains five. Changed frame counts train resized conditioning weights. LoRA and optional normalization weights train alongside these layers. The original pretrained model represents FDG–2TC; using a new tracer or model does not establish posterior accuracy or calibration. Review `transfer_report.json` and validate on held-out labels or an independent estimator.
 
@@ -73,10 +73,13 @@ Set `aif_mode="feng_cohort"` and `feng_parameters_csv` in the protocol. Whole pa
 | `half_life_min` | Isotope half-life; noise decay constant is `ln(2)/half_life_min` |
 | `integration_step_min` | Integration step (default 0.01 min); check convergence |
 | `kinetic_priors` | Ordered uniform ranges, one per predicted parameter |
-| `noise_prior` | Uniform nonnegative noise-amplitude range |
+| `noise_model` | New templates: `lognormal`; `gaussian` for historical comparisons |
+| `noise_timing` | New templates: `frame_duration` (actual acquisition durations) |
+| `noise_epsilon` | Positive clean-activity floor for noise calculations, default `1e-8` |
+| `noise_prior` | Uniform nonnegative noise-amplitude range; new default 3–7 |
 | `seed`, `chunk_size` | Reproducibility and bounded simulation working memory |
 
-Midpoints/durations define nonoverlapping frames starting at or after zero; gaps are allowed. GUI simulation uses midpoint observations and noise with `delta_t=[t_meas[0], diff(t_meas)]`. Activity is treated as decay-corrected by this noise equation; use consistent correction conventions throughout your project. The UC Davis recipe stores its original CSV observation labels separately from patient frame midpoints. Legacy terminal RK4/frame-average protocols retain duration-based noise.
+Midpoints/durations define nonoverlapping frames starting at or after zero; gaps are allowed. New GUI/terminal simulations use midpoint observations and [log-normal noise](MEASUREMENT_NOISE.md) scaled by actual frame durations; these durations are not inferred from neighbouring midpoints. Activity is treated as decay-corrected by this noise equation; use consistent correction conventions throughout your project. The UC Davis recipe stores its original CSV observation labels separately from patient frame midpoints. Legacy saved protocols retain Gaussian noise and their original timing unless explicitly changed.
 
 Dataset generation uses CPU JAX for the original split-key/random-shape sequence, then integrates in bounded chunks. The seed, all three split sizes, priors, JAX version and PRNG settings determine the draws; changing chunk size does not change them. The dataset JSON records these settings. The original unmarked research-config path in `create_dataset.py` retains its older behavior; use `simulate_protocol.py` for the current protocol workflow. Use the supplied epoch-2755 checkpoint and original scaling for paper-model prediction.
 

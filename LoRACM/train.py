@@ -23,6 +23,7 @@ def main(cfg, training_mode="lora"):
         raise ValueError('Specify dataset_dir for your labelled NPZ file')
     report = validate_file(cfg['dataset_dir'])
     cfg = resolve_training_config(cfg, report, training_mode)
+    cfg['measurement_noise'] = report['measurement_noise']
     if (Path(cfg["save_dir"]) / cfg["exp_name"]).exists():
         raise FileExistsError("Run directory already exists; choose a new exp_name or move the old run")
     names = cfg['parameter_names']
@@ -39,6 +40,10 @@ def main(cfg, training_mode="lora"):
             raise ValueError('Training kinetic_model must match the simulation protocol model')
         if 'observation' in report and report['observation'] != protocol.get('observation', 'midpoint'):
             raise ValueError('Simulation observation mode must match the dataset')
+        if report['measurement_noise'] is not None:
+            from measurement_noise import noise_metadata
+            if noise_metadata(protocol) != report['measurement_noise']:
+                raise ValueError('Simulation protocol measurement noise must match the dataset provenance')
     # Repro
     torch.manual_seed(cfg["seed"])
     np.random.seed(cfg["seed"])
@@ -98,7 +103,7 @@ def main(cfg, training_mode="lora"):
                    "y_mean": y_mean.tolist(), "y_std": y_std.tolist(), "t_meas": data["t_meas"].tolist(),
                    "frame_durations_min": report['frame_durations_min'],
                    "observation": str(data['observation']) if 'observation' in data else 'midpoint',
-                   "parameter_names": names}, f)
+                   "parameter_names": names, "measurement_noise": report['measurement_noise']}, f)
         
     with open(os.path.join(save_dir, "model_params.json"), "w", encoding='utf-8') as f:
         json.dump(cfg, f)
@@ -267,6 +272,7 @@ def main(cfg, training_mode="lora"):
     with Path(cfg['dataset_dir']).open('rb') as stream:
         for block in iter(lambda:stream.read(1024*1024),b''): digest.update(block)
     summary={'training_mode':training_mode,'dataset_sha256':digest.hexdigest(),
+             'measurement_noise':report['measurement_noise'],
              'torch_version':str(torch.__version__),'numpy_version':np.__version__,'batch_shuffle_rng':'global_torch',
              'parameter_names':names,'split_counts':report['counts'],'seed':cfg['seed'],
              'trainable_parameters':trainable_parameters,'total_parameters':total_parameters,

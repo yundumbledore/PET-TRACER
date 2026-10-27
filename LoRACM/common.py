@@ -27,6 +27,8 @@ def load_config(path):
     return json.loads(Path(path).read_text(encoding='utf-8'))
 
 def validate_dataset(data, x_dim=5, y_dim=70):
+    from measurement_noise import read_noise_metadata
+    measurement_noise = read_noise_metadata(data)
     required = ['t_meas'] + [f'{a}_{s}' for a in ('x','y') for s in ('train','val','test')]
     if any(k not in data for k in required):
         raise ValueError('Missing dataset arrays: ' + ', '.join(k for k in required if k not in data))
@@ -46,10 +48,14 @@ def validate_dataset(data, x_dim=5, y_dim=70):
     for split in ('train', 'val', 'test'):
         if np.any(data['y_'+split][:, len(t):] < 0):
             raise ValueError(f'Input functions must be nonnegative in {split}')
+        if measurement_noise and measurement_noise['noise_model']=='lognormal' and np.any(data['y_'+split][:,:len(t)] <= 0):
+            raise ValueError(f'Log-normal measurement TACs must be strictly positive in {split}')
     if 'frame_durations_min' in data:
         duration = data['frame_durations_min']
         if duration.shape != t.shape or not np.isfinite(duration).all() or np.any(duration <= 0):
             raise ValueError('frame_durations_min must be finite positive [T]')
+    elif measurement_noise and measurement_noise['noise_timing']=='frame_duration':
+        raise ValueError('Duration-based measurement noise requires frame_durations_min')
 
 def ki_samples(samples, policy='raw'):
     """Transform joint draws; paper policy floors K1/k2/k3 as in HPC code."""

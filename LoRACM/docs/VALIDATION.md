@@ -1,5 +1,15 @@
 # Workflow validation
 
+## Log-normal measurement noise — 27 October 2026
+
+**100 checks passed, with one Windows-only check skipped** (101 total) in Python 3.11 / PyTorch 2.6.0 CPU with JAX/jaxlib 0.10.2. New checks compare the log-normal transform against independently parameterized SciPy quantiles, verify conditional mean/variance with stratified normal draws, exercise zero/near-zero activity and numerical limits, and reject invalid timing/configuration. The legacy Gaussian implementation still agrees with the preserved JAX reference.
+
+Small log-normal UC Davis datasets agree across the portable and research generators, retain unchanged AIF conditioning and remain invariant to numerical chunk size. The terminal wrapper honors explicit log-normal settings. Both GUI training modules retain noise selections across navigation, while unmarked existing projects keep their Gaussian settings. Dataset provenance survives validation and test-file export; conflicting training-protocol provenance is rejected.
+
+Separate one-epoch CPU workflows completed dataset generation, LoRACM 2TC adaptation or custom-1TC scratch-CM training, posterior inference, NLS and posterior-figure export. Both runs retained distribution/timing provenance in the model configuration, scaling and training summary. These small workflows check interfaces, not posterior calibration or research-quality convergence. Source syntax, JSON and changed documentation links were checked; the root README, paper assets, model-selection module/assets, checkpoints and bundled datasets remain unchanged. Windows/Linux and MPS/CUDA execution were not tested in this update.
+
+New simulations deliberately use log-normal measurement noise with actual frame durations; the Gaussian parity results recorded below describe the historical path. See [measurement-noise assumptions and references](MEASUREMENT_NOISE.md).
+
 ## Windows double-click installer — 16 October 2026
 
 `Setup PET-TRACER.cmd` invokes a Windows PowerShell 5.1 helper that detects or prepares 64-bit Python 3.11, offers CPU/NVIDIA installation, calls the existing reusable-environment setup, imports the installed packages and runs the selected device's calculation/gradient check. Setup writes logs outside the checkout and leaves project datasets and model files alone. The launcher keeps the window open and preserves its exit status.

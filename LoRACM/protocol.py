@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import numpy as np
+from measurement_noise import noise_settings, read_noise_metadata
 
 FENG_NAMES = ['beta1', 'beta2', 'beta3', 'kappa1', 'kappa2', 'kappa3', 't0']
 
@@ -36,6 +37,7 @@ def validate_names(names):
 
 
 def validate_protocol(cfg):
+    noise_settings(cfg)
     names = validate_names(cfg['parameter_names'])
     t = validate_times(cfg['t_meas'])
     duration = np.asarray(cfg['frame_durations_min'], dtype=float)
@@ -245,6 +247,7 @@ def validate_file(path):
                 't_meas': data['t_meas'].tolist(),
                 'frame_durations_min': data['frame_durations_min'].tolist() if 'frame_durations_min' in data else None,
                 'observation':str(data['observation']) if 'observation' in data else 'midpoint',
+                'measurement_noise':read_noise_metadata(data),
                 'counts': {s: len(data['x_'+s]) for s in ('train','val','test')}}
 
 

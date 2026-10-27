@@ -70,6 +70,8 @@ def testing_from_dataset(dataset, output):
             raise ValueError('Use the new walkthrough dataset with explicit frame durations')
         arrays=dict(tac=y[:,:count],aif=y[:,count:],t_meas=t,
                     frame_durations_min=data['frame_durations_min'],truth=data['x_test'][:,:-1])
+        if 'measurement_noise_json' in data:
+            arrays['measurement_noise_json']=data['measurement_noise_json']
     output.parent.mkdir(parents=True,exist_ok=True)
     np.savez_compressed(output,**arrays)
 

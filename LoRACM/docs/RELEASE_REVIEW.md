@@ -19,7 +19,7 @@ This review is grounded in the supplied manuscript, scripts, CSV, and locally av
 ## Repairs made in this candidate
 
 - All workflow paths are configurable and relative to the LoRACM working directory.
-- The original training objective, scalar conditioning normalization, EMA update, prior bounds and noise model are retained.
+- The original training objective, scalar conditioning normalization, EMA update and prior bounds are retained. New simulations use [log-normal measurement noise](MEASUREMENT_NOISE.md); supplied checkpoints/datasets retain their original Gaussian provenance.
 - Scheduler settings use the passed configuration instead of a global dictionary.
 - Training rejects empty/incompatible data and batch sizes that would produce zero batches.
 - The builder refuses a foundation checkpoint with no matching tensors and unfreezes missing/new parameters using exact name matching.

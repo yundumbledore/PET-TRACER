@@ -2,13 +2,13 @@
 
 [Portable training-data format](PREPARE_DATA.md) · [Portable prediction inputs and posterior samples](PREDICTION.md) · [Explicit simulation protocols](MODELS_AND_PROTOCOLS.md)
 
-The tables below document the **preserved Scenario 1 assets**. New-project datasets may have another parameter count/frame schedule and include parameter names, actual frame durations and an observation mode. GUI generation uses midpoint Euler observations and noise scaled by adjacent sampling-time differences. Older terminal RK4 protocols use explicit durations. The default UC Davis paper recipe retains the original observations and noise; its explicit `prediction_t_meas` stores the corresponding patient labels alongside the original simulation `t_meas`.
+The tables below document the **preserved Scenario 1 assets**. New-project datasets may have another parameter count/frame schedule and include parameter names, actual frame durations and an observation mode. New GUI/terminal templates use midpoint observations and mean-preserving log-normal measurement noise scaled by actual acquisition frame durations. Old saved Gaussian protocols keep their original timing. The supplied historical UC Davis paper model retains its original Gaussian training provenance; its explicit `prediction_t_meas` stores the corresponding patient labels alongside the original simulation `t_meas`.
 
 ## AIF CSV
 
 The first column contains positive, increasing time points in **minutes**. Each remaining column is one measured input function, with one activity value per time point. The supplied file contains **35 rows and four AIFs**: Sub001, Sub011, Sub080 and Sub087. The HDF5 file labels activity as Bq/mL; confirm the same units and correction convention for all AIFs before public release.
 
-The same input is used for plasma and blood terms in this implementation. The generator uses midpoint observations, a forward Euler step nominally 0.01 min, linear interpolation of the input, and `searchsorted` observation indices. It does not calculate exact frame averages. The noise term uses `[t[0], diff(t)]` as delta time, preserving the original script; this is not an explicit frame-duration vector.
+The same input is used for plasma and blood terms in this implementation. The generator uses midpoint observations, a forward Euler step nominally 0.01 min, linear interpolation of the input, and `searchsorted` observation indices. It does not calculate exact frame averages. The preserved assets used Gaussian noise with `[t[0], diff(t)]` as delta time; new templates use log-normal noise with the actual `frame_durations_min` vector.
 
 ## Simulation NPZ
 
@@ -18,6 +18,8 @@ The same input is used for plasma and blood terms in this implementation. The ge
 | `y_train`, `y_val`, `y_test` | N × 70 | TAC values followed by AIF values |
 | `t_meas` | 35 | Time points in minutes |
 | `aif_index_train`, `aif_index_val`, `aif_index_test` | N | Zero-based AIF column index, excluding time |
+
+New generated NPZ files also contain `measurement_noise_json`, a scalar JSON string specifying the distribution, timing, mean floor, amplitude prior and half-life. [Noise equations and provenance](MEASUREMENT_NOISE.md).
 
 Training uses only the first five columns of x. The sixth column controls simulation noise and is not predicted. Parameter normalization uses five independent training means/stds. Conditioning uses one scalar training mean/std across all TAC and AIF values, preserving the supplied script. No log transform is used.
 

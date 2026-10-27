@@ -247,6 +247,7 @@ def simulate_batch(key, param_matrix, feng_params, custom_inputs_dense, t_dense,
 
 @partial(jax.jit, static_argnames=['is_dual_input'])
 def add_noise(key, y_clean, l1, t_meas, half_life, is_dual_input):
+    """Preserved Gaussian/sample-spacing reference for historical experiments."""
     lamb = jnp.log(2) / half_life
     delta_t = jnp.concatenate([jnp.array([t_meas[0]]), jnp.diff(t_meas)])
     exp_neg = jnp.exp(-lamb * t_meas)
@@ -274,8 +275,23 @@ def generate_dataset(
     half_life,
     is_dual_input=False,
     external_input_curves: Optional[np.ndarray] = None,
-    return_clean=True
+    return_clean=True,
+    *,
+    noise_model='gaussian',
+    frame_durations=None,
+    noise_timing=None,
+    noise_epsilon=1e-8
 ):
+    """Research generator; old calls retain Gaussian/sample-spacing behavior.
+
+    For log-normal measurement noise supply noise_model='lognormal' and actual
+    frame_durations [T]. New GUI/terminal protocol templates do this by default.
+    Noise is applied only to tissue curves, never the conditioning inputs.
+    """
+    from measurement_noise import noise_settings, apply_measurement_noise
+    settings = noise_settings(dict(noise_model=noise_model, simulation_mode='hpc_euler',
+                                   noise_epsilon=noise_epsilon,
+                                   **({'noise_timing':noise_timing} if noise_timing is not None else {})))
     # Time Setup
     max_dt = 0.01
     t_dense = np.arange(t_meas[0], t_meas[-1] + 1e-8, max_dt)
@@ -395,7 +411,13 @@ def generate_dataset(
     if return_clean:
         y_final_tissue = y_tissue
     else:
-        y_final_tissue = add_noise(keys[4], y_tissue, l1, t_meas, half_life, is_dual_input)
+        if settings == dict(noise_model='gaussian',noise_timing='sample_spacing',noise_epsilon=1e-8):
+            y_final_tissue = add_noise(keys[4], y_tissue, l1, t_meas, half_life, is_dual_input)
+        else:
+            y_final_tissue = jnp.asarray(apply_measurement_noise(
+                y_tissue,l1,t_meas,half_life,random.normal(keys[4],shape=y_tissue.shape),
+                frame_durations=frame_durations,model=settings['noise_model'],
+                timing=settings['noise_timing'],signal_floor=settings['noise_epsilon']))
         
     y_combined = jnp.concatenate([y_final_tissue, y_input_to_save], axis=1)
     x_combined = jnp.concatenate([x_kinetic, l1], axis=1)

@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from common import load_config, validate_dataset, PARAMETERS
+from measurement_noise import noise_settings, noise_metadata
 
 
 def main(cfg):
@@ -16,6 +17,9 @@ def main(cfg):
     import jax.numpy as jnp
     from jax import random
     from simulation import generate_dataset, TwoTissueCompartment, get_central_priors
+    legacy_cfg=dict(cfg,simulation_mode='hpc_euler')
+    settings=noise_settings(legacy_cfg)
+    measurement_noise=noise_metadata(legacy_cfg)
     frame = pd.read_csv(cfg['aif_csv'])
     t = frame.iloc[:,0].to_numpy(dtype=float)
     aifs = frame.iloc[:,1:].to_numpy(dtype=float).T
@@ -29,7 +33,12 @@ def main(cfg):
         raise ValueError('Chunk and split sizes must be positive')
     rng=np.random.default_rng(cfg['seed'])
     split_keys=random.split(random.PRNGKey(cfg['seed']),3)
-    data={'t_meas':t}
+    data={'t_meas':t,'measurement_noise_json':np.asarray(json.dumps(measurement_noise,sort_keys=True))}
+    durations=cfg.get('frame_durations_min')
+    if settings['noise_timing']=='frame_duration' and durations is None:
+        raise ValueError('Supply actual frame_durations_min for duration-based measurement noise')
+    if durations is not None:
+        data['frame_durations_min']=np.asarray(durations,dtype=float)
     for split, key in zip(('train','val','test'),split_keys):
         count=cfg[f'n_{split}']
         indices=rng.integers(0,len(aifs),size=count)
@@ -41,7 +50,9 @@ def main(cfg):
             selected=indices[start:start+cfg['chunk_size']]
             y,x=generate_dataset(len(selected),TwoTissueCompartment,priors,{},cfg['noise_prior'],
                 jnp.asarray(t),random.fold_in(key,chunk),cfg['half_life_min'],
-                external_input_curves=aifs[selected],return_clean=False)
+                external_input_curves=aifs[selected],return_clean=False,
+                noise_model=settings['noise_model'],frame_durations=durations,
+                noise_timing=settings['noise_timing'],noise_epsilon=settings['noise_epsilon'])
             xs.append(x);ys.append(y)
         data[f'x_{split}']=np.concatenate(xs)
         data[f'y_{split}']=np.concatenate(ys)
@@ -56,7 +67,8 @@ def main(cfg):
         'conditioning_order':'TAC then AIF','aif_sha256':hashlib.sha256(Path(cfg['aif_csv']).read_bytes()).hexdigest(),
         'numpy_version':np.__version__,'jax_version':jax.__version__,
         'randomness':'Independent keys per split and chunk; chunk size is part of the reproducibility configuration.',
-        'time_convention':'Supplied midpoint sampling; noise delta_t=[t0,diff(t)], not measured frame durations.',
+        'measurement_noise':measurement_noise,
+        'time_convention':'Supplied midpoint sampling; noise timing recorded in measurement_noise.',
         'solver':'Original forward Euler, nominal 0.01 min step; searchsorted sampling.'}
     path.with_suffix('.json').write_text(json.dumps(metadata,indent=2)+'\n')
     print(f'Saved {path}')

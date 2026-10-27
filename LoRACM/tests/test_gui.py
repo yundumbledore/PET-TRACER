@@ -70,6 +70,44 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(next(w for w in lora.number_input if w.label=='Training pairs').value,1234)
         self.assertFalse(list(app.exception))
 
+    def test_noise_defaults_and_selection_survive_navigation_in_both_modules(self):
+        for module,dataset_page,other_page in (('lora','2 · Dataset','3 · Fine-tune'),('cm','CM · Dataset','CM from scratch')):
+            with self.subTest(module=module):
+                app=self.open_app(module)
+                app.sidebar.radio[0].set_value('1 · Model & protocol').run()
+                next(w for w in app.button if w.label=='Save and validate protocol').click().run()
+                app.sidebar.radio[0].set_value(dataset_page).run()
+                self.assertEqual(next(w for w in app.selectbox if w.label=='Measurement noise').value,'Log-normal')
+                self.assertEqual(next(w for w in app.number_input if w.label=='Noise amplitude minimum').value,3.)
+                next(w for w in app.selectbox if w.label=='Measurement noise').set_value('Gaussian (legacy)').run()
+                app.sidebar.radio[0].set_value(other_page).run()
+                app.sidebar.radio[0].set_value(dataset_page).run()
+                self.assertEqual(next(w for w in app.selectbox if w.label=='Measurement noise').value,'Gaussian (legacy)')
+                with patch('gui.jobs.Jobs.start') as start:
+                    next(w for w in app.button if w.label in ('Generate dataset','Generate CM dataset')).click().run()
+                    self.assertTrue(start.called)
+                workspace=Path(self.workspace.name)/('cm' if module=='cm' else '')/'my_project'
+                protocol=workspace/('cm_protocol.json' if module=='cm' else 'protocol.json')
+                self.assertEqual(json.loads(protocol.read_text())['noise_model'],'gaussian')
+                self.assertFalse(list(app.exception))
+
+    def test_legacy_project_noise_settings_are_not_migrated(self):
+        from ucdavis import defaults
+        workspace=Path(self.workspace.name)/'my_project';workspace.mkdir()
+        cfg,_=defaults(workspace)
+        for key in ('noise_model','noise_timing','noise_epsilon'):cfg.pop(key)
+        cfg['noise_prior']['min']=.1
+        saved=workspace/'protocol.json';saved.write_text(json.dumps(cfg));before=saved.read_bytes()
+        app=self.open_app()
+        app.sidebar.radio[0].set_value('2 · Dataset').run()
+        self.assertEqual(next(w for w in app.selectbox if w.label=='Measurement noise').value,'Gaussian (legacy)')
+        self.assertEqual(next(w for w in app.number_input if w.label=='Noise amplitude minimum').value,.1)
+        app.sidebar.radio[0].set_value('1 · Model & protocol').run()
+        app.sidebar.radio[0].set_value('2 · Dataset').run()
+        self.assertEqual(saved.read_bytes(),before)
+        self.assertEqual(next(w for w in app.selectbox if w.label=='Measurement noise').value,'Gaussian (legacy)')
+        self.assertFalse(list(app.exception))
+
     def test_repeated_gui_predictions_preserve_files_and_cm_route_filters_models(self):
         from streamlit.testing.v1 import AppTest
         workspace,run,source,cfg=self.prediction_fixture()

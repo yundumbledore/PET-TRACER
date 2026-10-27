@@ -26,7 +26,8 @@ class HPCReproductionTests(unittest.TestCase):
         from simulation import generate_dataset,TwoTissueCompartment,get_central_priors
         with tempfile.TemporaryDirectory() as folder:
             cfg,_=defaults(folder,small=True)
-            cfg.update(n_train=5,n_val=3,n_test=2,chunk_size=2)
+            cfg.update(n_train=5,n_val=3,n_test=2,chunk_size=2,
+                       noise_model='gaussian',noise_timing='sample_spacing')
             main(cfg)
             with np.load(cfg['output']) as data:
                 first={k:data[k].copy() for k in data.files}

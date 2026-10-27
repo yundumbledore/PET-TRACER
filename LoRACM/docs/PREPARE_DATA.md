@@ -17,6 +17,8 @@ Use a compressed NumPy NPZ containing:
 | `frame_durations_min` | `[T]` | Actual positive durations; recommended for imported data |
 | `observation` | scalar string | `midpoint` or `frame_average`; recommended |
 
+New simulated datasets include `measurement_noise_json` and use [mean-preserving log-normal noise](MEASUREMENT_NOISE.md) with actual frame durations. Keep this field and the sidecar with the dataset; it is carried into trained runs. For imported datasets it is optional, and its absence means unknown noise provenance.
+
 The old five-parameter format without names/durations is still readable. If names are absent, it is interpreted as `K1,k2,k3,k4,Vb`; its final x column is the noise amplitude. For imported labels without a meaningful recorded simulation-noise amplitude, a documented zero placeholder is accepted and is not predicted.
 
 ## Conversion example

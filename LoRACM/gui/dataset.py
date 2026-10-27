@@ -6,6 +6,7 @@ from protocol import validate_protocol, load_model, load_measured_inputs, valida
 from runtime import write_json_atomic
 from gui import state as project_state
 from ucdavis import scratch_protocol
+from measurement_noise import noise_settings
 
 
 def render(root,workspace,launch,upload_or_path,mode='lora',small=False):
@@ -31,6 +32,10 @@ def render(root,workspace,launch,upload_or_path,mode='lora',small=False):
             n_train=a.number_input('Training pairs',min_value=2,value=int(cfg['n_train']),step=1000,key='n_train_'+workspace.name)
             n_val=b.number_input('Validation pairs',min_value=1,value=int(cfg['n_val']),step=1000,key='n_val_'+workspace.name)
             n_test=c.number_input('Test pairs',min_value=1,value=int(cfg['n_test']),step=100,key='n_test_'+workspace.name)
+            saved_noise=noise_settings(cfg)
+            noise_model=st.selectbox('Measurement noise',['Log-normal','Gaussian (legacy)'],
+                                     index=0 if saved_noise['noise_model']=='lognormal' else 1,
+                                     help='Log-normal noise preserves the clean TAC mean and scales variability using actual frame durations. Gaussian is available for older experiments.')
             a,b,c=st.columns(3)
             low=a.number_input('Noise amplitude minimum',min_value=0.,value=float(cfg['noise_prior']['min']))
             high=b.number_input('Noise amplitude maximum',min_value=0.,value=float(cfg['noise_prior']['max']))
@@ -41,6 +46,9 @@ def render(root,workspace,launch,upload_or_path,mode='lora',small=False):
                 try:
                     if st.session_state.jobs.running(): raise ValueError('Wait for or stop the active job first')
                     cfg.update(n_train=n_train,n_val=n_val,n_test=n_test,noise_prior={'type':'uniform','min':low,'max':high},chunk_size=chunk,seed=seed)
+                    cfg.update(noise_model='lognormal' if noise_model=='Log-normal' else 'gaussian',
+                               noise_timing='frame_duration' if noise_model=='Log-normal' else saved_noise['noise_timing'],
+                               noise_epsilon=saved_noise['noise_epsilon'])
                     validate_protocol(cfg);load_model(cfg)
                     if cfg.get('aif_mode','measured')=='measured': load_measured_inputs(cfg)
                     if dataset_path.exists() or dataset_path.with_suffix('.json').exists():

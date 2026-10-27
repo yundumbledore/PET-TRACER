@@ -2,7 +2,7 @@
 
 [User manual](../README.md) · [Installation](INSTALLATION.md) · [Parametric imaging](PARAMETRIC_IMAGING.md)
 
-The default GUI example follows the original **HPC training and inference conventions**. It includes the epoch-2755 paper LoRACM checkpoint, its original normalization, the four measured AIFs, the Sub001 slice and its verified mask/mapping. No retraining is needed to use the paper model.
+The supplied paper-checkpoint route follows the original **HPC inference conventions**. New training datasets use [log-normal measurement noise and actual frame durations](MEASUREMENT_NOISE.md); they are a new experiment rather than an exact regeneration of the historical Gaussian training data. It includes the epoch-2755 paper LoRACM checkpoint, its original normalization, the four measured AIFs, the Sub001 slice and its verified mask/mapping. No retraining is needed to use the paper model.
 
 ## Reproduce the Ki image in the GUI
 
@@ -17,10 +17,10 @@ The expandable **Archived HPC reference map** shows the original saved Ki summar
 
 ## Learn simulation and fine-tuning in steps 1–6
 
-| Step | Default GUI action | HPC convention |
+| Step | Default GUI action | Settings |
 | :--- | :--- | :--- |
 | **1 · Model & protocol** | Review the supplied FDG 2TC recipe | Original `UCDavis_1H35.csv`, five parameters, half-life 109.8 min |
-| **2 · Dataset** | Generate and validate labelled pairs | 100,000 train / 100,000 validation / 100 test; seed 42 |
+| **2 · Dataset** | Generate and validate labelled pairs | 100,000 train / 100,000 validation / 100 test; seed 42; log-normal noise |
 | **3 · Fine-tune** | Select **Use supplied paper checkpoint**, or train a new adaptation | Rank 4, alpha 8, dropout 0.05; batch 512; 5,000 epochs; LR 0.0001; scheduler patience **50**, factor 0.75 |
 | **4 · Predict** | Use the supplied Sub001 patient slice | 1,000 draws, three reverse steps at 1, 2/3, 1/3; all 24,237 foreground TACs |
 | **5 · Single TAC & NLS** | Select a voxel, sample its posterior, optionally fit NLS | Same Euler forward model; posterior-median forward TAC and NLS comparison |
@@ -35,7 +35,7 @@ Full-run prior ranges:
 | k3 | 0.0001–0.5 |
 | k4 | 0.0001–0.2 |
 | Vb | 0.001–1 |
-| Noise amplitude | 0.1–7 |
+| Noise amplitude | 3–7 |
 
 The simulation ranges follow `REGION_PRIORS['universal']` in the supplied HPC `Create_dataset.py`. The author confirmed that fine-tuning used 100,000 examples. The supplied epoch-2755 checkpoint retains its original normalization; its historical saved scales do not set the defaults for new simulations. The older bundled `data/simulated/scenario1.npz` remains available for earlier workflows and is not selected by the paper-checkpoint route.
 
@@ -49,7 +49,7 @@ The original generator reads the CSV's first column as `t_meas`, linearly interp
 
 The CSV and HDF5 carry matching activity samples in frame order but slightly different recorded time labels: their second labels are 0.110216667 and 0.125 minutes. The protocol explicitly stores **CSV simulation times** in `t_meas` and **patient frame midpoints** in `prediction_t_meas`, with the measured frame durations separately. The trained model receives TAC values followed by AIF values, without timestamp inputs. The explicit HPC recipe accepts those two recorded label conventions without interpolating any patient activity. Other schedules and durations are rejected for the supplied model. Custom projects use their configured midpoints consistently for simulation and testing.
 
-Noise uses the original equation with `delta_t=[t_meas[0], diff(t_meas)]`, **not** the frame durations. Half-life is 109.8 min and decay constant is `ln(2)/half_life`. Training and validation share the four-AIF pool; test kinetic priors use the central 50% of each range. These are not subject-held-out splits.
+New simulations use a mean-preserving log-normal transform, with variance scaled by **actual acquisition frame durations**. Noise amplitude defaults to 3–7, half-life to 109.8 min and the mean floor to 1e-8. [Equations, assumptions and configuration](MEASUREMENT_NOISE.md). The supplied historical checkpoint and datasets used Gaussian noise with `delta_t=[t_meas[0], diff(t_meas)]` and remain unchanged. Training and validation share the four-AIF pool; test kinetic priors use the central 50% of each range. These are not subject-held-out splits.
 
 For Ki, the paper recipe floors K1, k2 and k3 at **1e-4 for each joint posterior draw**, computes `Ki=K1*k3/(k2+k3)`, then calculates means, medians and empirical intervals. The transform is recorded in prediction metadata as `ki_policy=hpc_floor_1e-4`. General custom projects retain the separately documented raw transform. Parameter posterior samples themselves are preserved unchanged.
 

@@ -263,7 +263,7 @@ elif page == 'Compare models':
 elif page == 'User manual':
     st.title(MODULES[module]+' user manual')
     sections={'Overview':'README.md','GUI and project settings':'docs/WORKBENCH.md','Installation':'docs/INSTALLATION.md','Models, inputs and protocols':'docs/MODELS_AND_PROTOCOLS.md',
-              'Prepare your dataset':'docs/PREPARE_DATA.md','Fine-tuning':'docs/FINE_TUNING.md','CM from scratch and comparison':'docs/TRAIN_CM.md','Prediction and single-TAC NLS':'docs/PREDICTION.md',
+              'Prepare your dataset':'docs/PREPARE_DATA.md','Measurement noise':'docs/MEASUREMENT_NOISE.md','Fine-tuning':'docs/FINE_TUNING.md','CM from scratch and comparison':'docs/TRAIN_CM.md','Prediction and single-TAC NLS':'docs/PREDICTION.md',
               'Parametric imaging':'docs/PARAMETRIC_IMAGING.md','UC Davis demonstration':'docs/UCDAVIS.md'}
     if module=='cm':
         sections={'CM training workflow':'docs/TRAIN_CM.md',**{k:v for k,v in sections.items() if k not in ('Fine-tuning','UC Davis demonstration')}}

@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 from protocol import validate_protocol, load_model, feng_curve, FENG_NAMES, load_protocol, load_measured_inputs as load_inputs
 from common import validate_dataset
-from hpc_compat import euler_observations, noise_standard_deviation
+from hpc_compat import euler_observations
+from measurement_noise import apply_measurement_noise, noise_metadata
 from runtime import Progress, check_cancelled
 
 
@@ -81,9 +82,11 @@ def main(cfg):
     if cfg.get('random_stream')=='jax_hpc':
         from hpc_random import HPCSampler
         sampler=HPCSampler(cfg,len(pool))
+    measurement_noise = noise_metadata(cfg)
     data = {'t_meas': t, 'frame_durations_min': duration,
             'parameter_names': np.asarray(cfg['parameter_names']),
-            'observation': np.asarray(mode)}
+            'observation': np.asarray(mode),
+            'measurement_noise_json': np.asarray(json.dumps(measurement_noise, sort_keys=True))}
     if historical:
         data.update(simulation_mode=np.asarray('hpc_euler'),prediction_t_meas=np.asarray(cfg.get('prediction_t_meas',t)))
     total_pairs = sum(cfg['n_'+split] for split in ('train','val','test'))
@@ -128,8 +131,10 @@ def main(cfg):
             if full_draws is None:
                 noise=rng.uniform(cfg['noise_prior']['min'],cfg['noise_prior']['max'],(n,1))
                 epsilon=rng.normal(size=clean.shape)
-            sigma = noise_standard_deviation(clean,noise,t,cfg['half_life_min'],None if historical else duration)
-            noisy = clean+sigma*epsilon
+            noisy = apply_measurement_noise(clean,noise,t,cfg['half_life_min'],epsilon,
+                                           frame_durations=duration,model=measurement_noise['noise_model'],
+                                           timing=measurement_noise['noise_timing'],
+                                           signal_floor=measurement_noise['noise_epsilon'])
             xs.append(np.column_stack([parameters,noise]))
             ys.append(np.column_stack([noisy,measured_input]))
             indices.append(selected)
@@ -145,13 +150,14 @@ def main(cfg):
     metadata = {'config':cfg,'parameter_order':cfg['parameter_names']+['noise_scale'],
                 'conditioning_order':'TAC then AIF', 'solver':'Fixed-step RK4, zero initial state, linear input interpolation',
                 'source_sha256':hashlib.sha256(Path(source_path).read_bytes()).hexdigest(),
-                'numpy_version':np.__version__, 'noise_timing':'Explicit frame durations; decay constant ln(2)/half_life_min',
+                'numpy_version':np.__version__, 'measurement_noise':measurement_noise,
                 'split_policy':'Independent parameter/noise draws, shared measured/fitted AIF pool; not subject-held-out'}
     if historical:
         metadata.update(solver='Original forward Euler; grid starts at first observation time; first dt=t0; searchsorted observations',
-                        noise_timing='Historical delta_t=[t0,diff(t_meas)]; not frame durations',
                         conditioning='Original measured AIF activity samples, unchanged',
-                        randomness='Portable NumPy streams; same forward/noise equations, not byte-identical to historical JAX samples')
+                        randomness='Portable NumPy streams; not byte-identical to historical JAX samples')
+    metadata['noise_timing'] = ('Actual acquisition frame durations' if measurement_noise['noise_timing']=='frame_duration'
+                                else 'Historical delta_t=[t0,diff(t_meas)]; not frame durations')
     if sampler:
         metadata['randomness']=sampler.metadata
     if historical:

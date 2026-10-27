@@ -1,5 +1,7 @@
 # Fine-tune the pretrained consistency model
 
+New simulated training data use [log-normal measurement noise with actual frame durations](MEASUREMENT_NOISE.md). The supplied checkpoints retain their original Gaussian training provenance. Generate a fresh dataset/run to evaluate the new noise model.
+
 [Manual](../README.md) · [Prediction](PREDICTION.md) · [CM from scratch and comparison](TRAIN_CM.md)
 
 ## Choose settings

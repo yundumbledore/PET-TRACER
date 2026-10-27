@@ -1,5 +1,7 @@
 # Train a consistency model from scratch
 
+New simulated training data use [log-normal measurement noise with actual frame durations](MEASUREMENT_NOISE.md). The supplied checkpoints retain their original Gaussian training provenance. Generate a fresh dataset/run to evaluate the new noise model.
+
 [User manual](../README.md) · [LoRACM fine-tuning](FINE_TUNING.md) · [Prediction and NLS](PREDICTION.md)
 
 Train a new CM on your own labelled parameter–curve pairs, then compare it with LoRACM on the same held-out data. The scratch module initializes a plain consistency-model U-Net randomly, loads **no foundation checkpoint**, and trains all learnable model weights. The time encoder's Gaussian Fourier features remain fixed, as in the underlying architecture.
