@@ -34,8 +34,9 @@ def render(root,workspace,launch,upload_or_path,mode='lora',small=False):
             n_test=c.number_input('Test pairs',min_value=1,value=int(cfg['n_test']),step=100,key='n_test_'+workspace.name)
             saved_noise=noise_settings(cfg)
             noise_model=st.selectbox('Measurement noise',['Log-normal','Gaussian (legacy)'],
+                                     format_func=lambda option: {'Log-normal':'Lognormal noise model','Gaussian (legacy)':'Gaussian noise model'}[option],
                                      index=0 if saved_noise['noise_model']=='lognormal' else 1,
-                                     help='Log-normal noise preserves the clean TAC mean and scales variability using actual frame durations. Gaussian is available for older experiments.')
+                                     help='The lognormal noise model preserves the clean TAC mean and scales variability using actual frame durations. The Gaussian noise model is also available.')
             a,b,c=st.columns(3)
             low=a.number_input('Noise amplitude minimum',min_value=0.,value=float(cfg['noise_prior']['min']))
             high=b.number_input('Noise amplitude maximum',min_value=0.,value=float(cfg['noise_prior']['max']))

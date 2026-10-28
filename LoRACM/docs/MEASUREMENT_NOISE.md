@@ -2,7 +2,7 @@
 
 [Manual](../README.md) · [Dataset preparation](PREPARE_DATA.md) · [UC Davis example](UCDAVIS.md)
 
-New CM and LoRACM simulation projects use **mean-preserving log-normal noise**, with the **actual acquisition duration of each frame**. In **2 · Dataset** (or **CM · Dataset**), retain **Measurement noise → Log-normal** and choose the amplitude range for your study. The starting range is **3–7**, with FDG half-life **109.8 min**. Existing projects retain their saved settings; **Gaussian (legacy)** remains available for comparisons.
+New CM and LoRACM simulation projects use **mean-preserving log-normal noise**, with the **actual acquisition duration of each frame**. In **2 · Dataset** (or **CM · Dataset**), retain **Measurement noise → Lognormal noise model** and choose the amplitude range for your study. The starting range is **3–7**, with FDG half-life **109.8 min**. Existing projects retain their saved settings; **Gaussian noise model** remains available for comparisons.
 
 ## Equations
 

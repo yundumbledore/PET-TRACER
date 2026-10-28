@@ -78,6 +78,7 @@ class GuiTests(unittest.TestCase):
                 next(w for w in app.button if w.label=='Save and validate protocol').click().run()
                 app.sidebar.radio[0].set_value(dataset_page).run()
                 self.assertEqual(next(w for w in app.selectbox if w.label=='Measurement noise').value,'Log-normal')
+                self.assertEqual(next(w for w in app.selectbox if w.label=='Measurement noise').options,['Lognormal noise model','Gaussian noise model'])
                 self.assertEqual(next(w for w in app.number_input if w.label=='Noise amplitude minimum').value,3.)
                 next(w for w in app.selectbox if w.label=='Measurement noise').set_value('Gaussian (legacy)').run()
                 app.sidebar.radio[0].set_value(other_page).run()
