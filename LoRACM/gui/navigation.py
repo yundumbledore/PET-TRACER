@@ -8,7 +8,7 @@ WORKFLOW_PAGES={
     'cm':['Welcome','1 · Model & protocol','CM · Dataset','CM from scratch','CM · Predict','5 · Single TAC & NLS','6 · Parametric imaging','User manual'],
     'lora':['Welcome','1 · Model & protocol','2 · Dataset','3 · Fine-tune','4 · Predict','5 · Single TAC & NLS','6 · Parametric imaging','UC Davis demonstration','User manual'],
     'selection':['1 · P001 demonstration','2 · Inference settings','3 · Run inference','4 · Explore results']}
-CM_LABELS={'Welcome':'Overview','CM · Dataset':'2 · Dataset','CM from scratch':'3 · Train CM','CM · Predict':'4 · Predict',
+CM_LABELS={'Welcome':'Overview','CM · Dataset':'2 · Dataset','CM from scratch':'3 · Train a model','CM · Predict':'4 · Predict',
            '5 · Single TAC & NLS':'5 · Single TAC & NLS','6 · Parametric imaging':'6 · Parametric imaging'}
 
 
@@ -74,7 +74,7 @@ def home(root):
 [data-testid="stHorizontalBlock"]:has([data-testid="stImage"]) > [data-testid="stColumn"] [data-testid="stVerticalBlock"] > :last-child {margin-top:auto}
 </style>''',unsafe_allow_html=True)
     columns=st.columns(3)
-    items=[('cm','1 · TRAIN A NEW CM FOR KINETIC POSTERIOR ESTIMATION','Train a consistency model from scratch for your kinetic model and acquisition protocol.',
+    items=[('cm','1 · TRAIN A MODEL','Choose the original CM, Improved MeanFlow (iMF), or Continuous-Time Consistency (sCM) for your kinetic model and protocol.',
             root.parent/'Assets/Welcome_CM_Workflow.png','Open CM workflow'),
            ('lora','2 · ADAPT A PRE-TRAINED CM TO A NEW SCENARIO WITH LORA','Fine-tune a pretrained consistency model with LoRA to handle a new study or protocol.',
             root.parent/'Assets/Welcome_LoRACM_Workflow.png','Open LoRACM workflow'),
@@ -99,9 +99,9 @@ def home(root):
 def module_overview(module):
     st.title(MODULES[module])
     if module=='cm':
-        st.write('Train a new consistency model from random initialisation, then estimate kinetic parameter posteriors and make parametric images.')
+        st.write('Train a model from random initialisation using CM, iMF or sCM, then estimate kinetic parameter posteriors and make parametric images.')
         st.info('Start with the supplied UC Davis model, AIFs and protocol. Choose Quick installation check for a short run, or use your own data and a custom kinetic model.')
-        st.markdown('1. Define the kinetic model and acquisition protocol.\n2. Simulate labelled pairs or upload your dataset.\n3. Configure the U-Net and train the CM.\n4. Predict on your own data.\n5. Inspect a TAC, parameter posteriors and an NLS reference.\n6. Create and inspect parametric images.')
+        st.markdown('1. Define the kinetic model and acquisition protocol.\n2. Simulate labelled pairs or upload your dataset.\n3. Choose a posterior method and train the model.\n4. Predict on your own data.\n5. Inspect a TAC, parameter posteriors and an NLS reference.\n6. Create and inspect parametric images.')
     else:
         st.write('Use low-rank adaptation to fine-tune the pretrained consistency model for a new protocol or study.')
         st.info('UC Davis remains the default example. Reproduce its supplied paper checkpoint or follow the workflow to simulate data and fine-tune. Switch to My own project to start from your own data and kinetics.')

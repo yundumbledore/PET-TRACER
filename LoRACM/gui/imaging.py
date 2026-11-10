@@ -14,6 +14,7 @@ from common import file_sha256
 from parametric_imaging import load_image,plane,display_limits,display_plane,map_figure,parameter_samples,density_figure,STATISTICS
 from protocol import read_prediction_input
 from inspect_voxel import inspect
+from posterior_registry import DEFAULT_STEPS, run_method, run_model_label, posterior_method
 from gui.state import model_run_picker
 from gui import state as project_state
 
@@ -55,7 +56,9 @@ def render(root,workspace,run_default,input_default,upload_or_path,launch=None,m
             checkpoint_to_predict=checkpoint_picker(run,'Imaging checkpoint')
             a,b,c=st.columns(3)
             map_draws=a.number_input('Map posterior samples per voxel',min_value=2,value=1000)
-            map_steps=b.number_input('Map reverse sampling steps',min_value=1,value=3)
+            method=run_method(run)
+            map_steps=b.number_input('Map reverse sampling steps',min_value=1,value=DEFAULT_STEPS[method],
+                                     key='Map reverse sampling steps' if method=='cm' else 'map_steps_'+method)
             map_batch=c.number_input('Map curve batch size',min_value=1,value=16)
             map_chunk=st.number_input('Map sample chunk',min_value=1,value=64)
             st.caption('Each map prediction is preserved. An existing filename gets a new numbered output automatically.')
@@ -88,7 +91,7 @@ def render(root,workspace,run_default,input_default,upload_or_path,launch=None,m
     provenance=initial['provenance']
     producer=provenance.get('config',{})
     if producer:
-        model_label='LoRACM' if producer.get('training_mode','lora')=='lora' else 'CM from scratch'
+        model_label=run_model_label(producer)
         st.caption('Map produced by '+model_label+' · '+producer.get('exp_name','saved run')+' · '+Path(provenance.get('checkpoint','best.pth')).name)
     if provenance.get('device','').startswith('mps') and provenance.get('batch_size',0)*provenance.get('sample_chunk',0)>65536 and not provenance.get('expanded_batch_limit'):
         st.warning('This saved map used an oversized MPS batch that can corrupt predictions. Regenerate it with the updated inference path before interpreting it.')
@@ -143,6 +146,9 @@ def render(root,workspace,run_default,input_default,upload_or_path,launch=None,m
             if cfg.get('parameter_names',['K1','k2','k3','k4','Vb'])!=result['parameter_names']:
                 raise ValueError('The selected model parameter names differ from this map')
             provenance=result['provenance'];checkpoint=Path(provenance.get('checkpoint','best.pth')).name
+            method=posterior_method(cfg)
+            if producer and method!=posterior_method(producer):
+                raise ValueError('Use the posterior method that produced this map')
             if not (run/checkpoint).exists() and (run/'epochs'/checkpoint).exists(): checkpoint='epochs/'+checkpoint
             for field,path in [('input_sha256',source),('checkpoint_sha256',run/checkpoint)]:
                 if provenance.get(field) and checked_hash(path)!=provenance[field]:
@@ -154,8 +160,9 @@ def render(root,workspace,run_default,input_default,upload_or_path,launch=None,m
             ax.plot(t,y[i,:len(t)],color='#247b84',label='Measured TAC');ax.plot(t,y[i,len(t):],color='#ac744e',label='Input function')
             ax.set(xlabel='Time (minutes)',ylabel='Activity (input units)',title=f'Voxel {voxel}');ax.legend(fontsize=8);fig.tight_layout();st.pyplot(fig);plt.close(fig)
             if st.session_state.jobs.running(): st.info('Voxel sampling will be available when the active job finishes.');return
-            seed=int(provenance.get('seed',0));steps=len(provenance.get('sampling_times',[1.,2/3,1/3]))
-            digest=hashlib.sha256(json.dumps([checked_hash(run/checkpoint),checked_hash(source),voxel,draws,seed,steps,device,'safe-mps-merged-v2']).encode()).hexdigest()[:20]
+            seed=int(provenance.get('seed',0))
+            steps=int(provenance.get('sampling_steps',len(provenance.get('sampling_times',[])) or DEFAULT_STEPS[method]))
+            digest=hashlib.sha256(json.dumps([checked_hash(run/checkpoint),checked_hash(source),voxel,draws,seed,steps,device,method,'method-aware-v1']).encode()).hexdigest()[:20]
             cache=workspace/'imaging_voxels'/digest/'posterior.npz'
             marker=cache.parent/'completed.json'
             if marker.exists():

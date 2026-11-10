@@ -9,7 +9,7 @@ from protocol import read_prediction_input
 from infer import main as infer
 
 
-def inspect(run,input_file,voxel_id,output,samples=1000,checkpoint='best.pth',device='auto',seed=0,steps=3,sample_chunk=64):
+def inspect(run,input_file,voxel_id,output,samples=1000,checkpoint='best.pth',device='auto',seed=0,steps=None,sample_chunk=64):
     run=Path(run);output=Path(output)
     cfg=json.loads((run/'model_params.json').read_text(encoding='utf-8'))
     scale=json.loads((run/'scaling_params.json').read_text(encoding='utf-8'))
@@ -32,5 +32,5 @@ if __name__=='__main__':
     p.add_argument('--run',required=True);p.add_argument('--input',required=True);p.add_argument('--voxel-id',required=True)
     p.add_argument('--output',required=True);p.add_argument('--samples',type=int,default=1000)
     p.add_argument('--checkpoint',default='best.pth');p.add_argument('--device',default='auto',choices=['auto','cpu','cuda:0','mps'])
-    p.add_argument('--steps',type=int,default=3);p.add_argument('--sample-chunk',type=int,default=64);p.add_argument('--seed',type=int,default=0)
+    p.add_argument('--steps',type=int,help='Network evaluations per draw (default: CM 3, iMF 1, sCM 2)');p.add_argument('--sample-chunk',type=int,default=64);p.add_argument('--seed',type=int,default=0)
     a=p.parse_args();inspect(a.run,a.input,a.voxel_id,a.output,a.samples,a.checkpoint,a.device,a.seed,a.steps,a.sample_chunk)

@@ -1,4 +1,4 @@
-"""Shared, concise training controls for adaptation and scratch baselines."""
+"""Shared training controls for adaptation and training from scratch."""
 import json
 from pathlib import Path
 import numpy as np
@@ -6,6 +6,12 @@ import streamlit as st
 from protocol import validate_file, load_protocol, validate_protocol
 from training_config import resolve_training_config
 from runtime import write_json_atomic
+
+POSTERIOR_METHODS={
+    'cm':('Consistency Model (CM)','The original PET-TRACER model learns to predict the same clean parameters at neighbouring noise levels.'),
+    'imf':('Improved MeanFlow (iMF)','Learns a jump between two noise levels; try one sampling step first.'),
+    'scm':('Continuous-Time Consistency Model (sCM)','Learns a consistent clean prediction along a continuous noise path; try two sampling steps first.'),
+}
 
 
 @st.cache_data(show_spinner=False)
@@ -17,9 +23,10 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
     is_lora=mode=='lora'
     defaults={} if defaults is None else defaults
     prefix=mode+'_'+workspace.name
-    title='Fine-tune with LoRACM' if is_lora else 'Train a CM from scratch'
+    title='Fine-tune with LoRACM' if is_lora else 'Train a model'
     st.title(title)
-    st.caption('Adapt the foundation model with LoRA and selected trainable layers.' if is_lora else 'Initialize a new consistency model randomly and train all learnable weights.')
+    st.caption('Adapt the foundation model with LoRA and selected trainable layers.' if is_lora else
+               'Train a new model to sample kinetic parameters given a tissue TAC and arterial input function.')
     if is_lora and defaults.get('workflow_preset')=='UC Davis Scenario 1':
         st.info('To reproduce the paper example, use its supplied epoch-2755 checkpoint and original normalization. Fine-tuning below is a separate retraining experiment; device and random-stream differences can change the selected model.')
         if st.button('Use supplied paper checkpoint',key='prepare_paper_'+workspace.name):
@@ -36,6 +43,16 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
     if not is_lora:
         previous={k:v for k,v in previous.items() if k not in ('pretrained','lora_r','lora_alpha','lora_dropout','train_norms')}
         if not settings_path.exists(): previous['exp_name']='cm_scratch'
+    method='cm'
+    if not is_lora:
+        methods=list(POSTERIOR_METHODS)
+        saved_method=previous.get('posterior_method','cm')
+        method=st.selectbox('Posterior method',methods,index=methods.index(saved_method) if saved_method in methods else 0,
+                            format_func=lambda value:POSTERIOR_METHODS[value][0],key=prefix+'_posterior_method')
+        st.caption(POSTERIOR_METHODS[method][1])
+    use_jvp=method!='cm'
+    saved_for_method=previous.get('posterior_method','cm')==method
+    method_suffix='_'+method if use_jvp else ''
     selection=workspace/('dataset_selection.json' if is_lora else 'cm_dataset_selection.json')
     fallback=previous.get('dataset_dir',str(workspace/'dataset.npz')) if is_lora or settings_path.exists() else str(workspace/'cm_dataset.npz')
     selected=json.loads(selection.read_text(encoding='utf-8'))['path'] if selection.exists() else fallback
@@ -61,17 +78,24 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
     batch=b.number_input('Batch size',min_value=1,max_value=report['counts']['train'] if report else None,value=batch_default,key=prefix+'_batch',help='Reduce for limited memory. The initial value is capped by the dataset size.')
     lr=c.number_input('Learning rate',min_value=1e-8,value=float(previous.get('lr',.0001)),step=.00001,format='%.8f',key=prefix+'_lr',help='AdamW starting rate. Default: 0.0001.')
     a,b=st.columns(2)
-    devices=['auto','cpu','cuda:0','mps']
-    device=a.selectbox('Compute device',devices,index=devices.index(previous.get('device','auto')),key=prefix+'_device')
-    name=b.text_input('Run name',previous.get('exp_name','adaptation' if is_lora else 'cm_scratch'),key=prefix+'_name',help='Use a new name for each experiment.')
+    devices=['auto','cpu','cuda:0'] if use_jvp else ['auto','cpu','cuda:0','mps']
+    saved_device=previous.get('device','auto') if saved_for_method else 'auto'
+    device=a.selectbox('Compute device',devices,index=devices.index(saved_device) if saved_device in devices else 0,
+                       key=prefix+'_device'+method_suffix)
+    default_name='adaptation' if is_lora else method+'_scratch'
+    name=b.text_input('Run name',previous.get('exp_name',default_name) if saved_for_method else default_name,
+                      key=prefix+'_name'+method_suffix,help='Use a new name for each experiment.')
     if not is_lora: st.caption('Prepare your training dataset in step 2, or select an existing labelled NPZ.')
+    if use_jvp:
+        st.caption('iMF and sCM train on CPU or CUDA. Auto uses CUDA when available, otherwise CPU.')
+    diagnostic=workspace/('environment-check'+method_suffix+'.json')
     if st.button('Check compute setup',key=prefix+'_compute_check'):
-        launch('Compute environment check',['check_environment.py','--device',device,'--output',workspace/'environment-check.json'])
-    diagnostic=workspace/'environment-check.json'
+        launch('Compute environment check',['check_environment.py','--device',device,'--posterior-method',method,
+                                           '--output',diagnostic])
     if diagnostic.exists():
         with st.expander('Last compute check'):
             details=json.loads(diagnostic.read_text(encoding='utf-8'));st.json(details)
-            st.download_button('Download compute report',diagnostic.read_bytes(),file_name='environment-check.json')
+            st.download_button('Download compute report',diagnostic.read_bytes(),file_name=diagnostic.name)
     if is_lora:
         st.subheader('LoRA settings')
         a,b,c=st.columns(3)
@@ -81,19 +105,30 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
         with st.expander('Foundation checkpoint',expanded=False):
             checkpoint=upload_or_path('Pretrained foundation (.pth)',previous.get('pretrained','checkpoints/foundation.pth'),['pth'],'training_foundation')
     with st.expander('Advanced settings',expanded=False):
-        st.caption('Keep these defaults for a first run. For LoRACM, retaining the foundation architecture preserves more compatible weights.')
+        st.caption('Keep these defaults for a first run. Retaining the foundation architecture preserves more compatible weights.' if is_lora else
+                   'Keep these defaults for a first run.')
         st.markdown('**Architecture**')
         a,b,c=st.columns(3)
         embed=a.number_input('Embedding dimension · embed_dim',min_value=2,value=int(previous.get('embed_dim',1024)),step=128,key=prefix+'_embed',help='Must be even. The bundled foundation uses 1024.')
-        embeddings=['Linear','MLP','Conv1D','GRU','LSTM']
-        embedy=b.selectbox('Conditioning embedding · embedy',embeddings,index=embeddings.index(previous.get('embedy','Linear')),key=prefix+'_embedy')
-        sigma=c.number_input('Boundary scale · sigma_data',min_value=.000001,value=float(previous.get('sigma_data',1.)),key=prefix+'_sigma')
-        channels=st.text_input('U-Net channels',', '.join(map(str,previous.get('channels',[32,64,128,256]))),key=prefix+'_channels',help='Four widths. First divisible by 4; remaining widths divisible by 32.')
+        embeddings=['Linear','MLP','Conv1D'] if use_jvp else ['Linear','MLP','Conv1D','GRU','LSTM']
+        saved_embedy=previous.get('embedy','Linear') if saved_for_method else 'Linear'
+        embedy=b.selectbox('Conditioning embedding · embedy',embeddings,index=embeddings.index(saved_embedy) if saved_embedy in embeddings else 0,
+                           key=prefix+'_embedy'+method_suffix)
+        sigma=float(previous.get('sigma_data',1.))
+        if method!='imf':
+            sigma=c.number_input('TrigFlow data scale · sigma_data' if method=='scm' else 'Boundary scale · sigma_data',
+                                 min_value=.000001,value=sigma,key=prefix+'_sigma'+method_suffix)
+        channels=st.text_input('U-Net channels',', '.join(map(str,previous.get('channels',[32,64,128,256]))),key=prefix+'_channels',help='Four widths, each divisible by 32.')
         st.caption('x_dim and y_dim are defined by the labelled dataset. Change the data schema to change these dimensions; conflicting manual CLI dimensions are rejected.')
-        st.markdown('**Optimizer and consistency training**')
+        st.markdown('**Optimizer and objective**' if use_jvp else '**Optimizer and consistency training**')
         a,b,c=st.columns(3)
         weight_decay=a.number_input('Weight decay',min_value=0.,value=float(previous.get('weight_decay',.01)),key=prefix+'_decay')
-        noise_levels=b.number_input('Consistency noise intervals',min_value=2,value=int(previous.get('noise_levels',15)),key=prefix+'_noise')
+        noise_levels=int(previous.get('noise_levels',15))
+        if method=='cm':
+            noise_levels=b.number_input('Consistency noise intervals',min_value=2,value=noise_levels,key=prefix+'_noise')
+        elif method=='scm':
+            warmup_steps=b.number_input('sCM tangent warmup (batches)',min_value=0,value=int(previous.get('scm_warmup_steps',10000)),
+                                        key=prefix+'_scm_warmup',help='Batches used to ramp up the directional derivative term. Set zero to disable.')
         ema=c.number_input('EMA decay',min_value=0.,max_value=.99999,value=float(previous.get('ema_decay',.99)),step=.001,format='%.5f',key=prefix+'_ema')
         a,b,c=st.columns(3)
         patience=a.number_input('Scheduler patience (epochs)',min_value=0,value=int(previous.get('lr_scheduler_patience',25)),key=prefix+'_patience')
@@ -135,6 +170,9 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
                    loss_weights='auto' if weights_text.strip()=='auto' else [float(x.strip()) for x in weights_text.split(',')],
                    save_dir=str(workspace/'runs'))
         if is_lora: cfg.update(pretrained=str(checkpoint),lora_r=rank,lora_alpha=alpha,lora_dropout=dropout,train_norms=train_norms)
+        else:
+            cfg['posterior_method']=method
+            if method=='scm': cfg['scm_warmup_steps']=warmup_steps
         if protocol_source.strip():
             p=Path(protocol_source).expanduser()
             if not p.is_absolute(): p=root/p
@@ -156,14 +194,15 @@ def render(root, workspace, launch, upload_or_path, mode='lora', defaults=None):
             cfg=configuration();st.success('Configuration validated.');st.json(cfg)
             st.download_button('Download configuration',json.dumps(cfg,indent=2),file_name=settings_path.name)
         except Exception as e: st.error(str(e))
-    if b.button('Start LoRACM fine-tuning' if is_lora else 'Start CM training',type='primary',disabled=report is None,key=prefix+'_start'):
+    if b.button('Start LoRACM fine-tuning' if is_lora else 'Start training',type='primary',disabled=report is None,key=prefix+'_start'):
         try:
             if st.session_state.jobs.running(): raise ValueError('Wait for or stop the active job before starting another')
             cfg=configuration();run=workspace/'runs'/cfg['exp_name']
             if run.exists(): raise ValueError('Run already exists; choose another run name')
             settings_path.parent.mkdir(parents=True,exist_ok=True)
             write_json_atomic(settings_path,cfg)
-            launch(title,['train.py' if is_lora else 'train_cm.py','--config',settings_path],run=run)
+            job_title=title if is_lora else 'Train '+POSTERIOR_METHODS[method][0]
+            launch(job_title,['train.py' if is_lora else 'train_cm.py','--config',settings_path],run=run)
         except Exception as e: st.error(str(e))
-    st.caption('Training and validation curves appear below. Both are consistency losses; assess parameter accuracy and calibration with held-out data.')
+    st.caption('Training and validation curves appear below. Compare posterior accuracy and calibration on held-out data; different training objectives do not share a loss scale.')
     return workspace/'runs'/name

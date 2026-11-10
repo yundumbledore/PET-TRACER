@@ -10,7 +10,7 @@
 
 ## Choose the imaging model
 
-Select **Model for parametric imaging**: LoRACM or a trained scratch CM. A map belongs to the selected model's own prediction file. **Generate a map prediction with the selected model** creates it from step 6 with checkpoint, sample count, sampling steps and memory controls. Existing outputs are preserved with new numbered filenames. The voxel inspector checks the input and checkpoint checksums against the map.
+Select **Model for parametric imaging** in your module: a trained CM, iMF or sCM in Module 1, or LoRACM in Module 2. A map belongs to the selected model's own prediction file. **Generate a map prediction with the selected model** creates it from step 6 with checkpoint, sample count, sampling steps and memory controls. Starting step counts are 3 for CM/LoRACM, 1 for iMF and 2 for sCM. Existing outputs are preserved with new numbered filenames. The voxel inspector checks the input and checkpoint checksums against the map and uses the sampler recorded for that run.
 
 ## GUI workflow
 
@@ -44,7 +44,7 @@ New prediction files contain `params_ci95_low`, `params_ci95_high`, `params_ci95
 
 ### Your own patient scan and mask
 
-Reuse a trained model on a new patient through **4 · Predict** (LoRACM) or **CM · Predict** (scratch CM):
+Reuse a trained model on a new patient through **4 · Predict** in its module:
 
 1. Choose **My own patient scan**, then load its coronal TAC/AIF slice as prediction NPZ or pandas HDF5. The trained frame schedule and durations must match.
 2. Load the **corresponding mask** as a binary `.npy`, or an `.npz` containing `mask`. A 2D mask directly describes the slice. For a 3D mask, choose its array axis and slice index. The mask must have exactly one foreground pixel per TAC.

@@ -7,6 +7,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from plot_posteriors import posterior_figure
 from gui.state import checkpoint_picker
+from posterior_registry import posterior_label
 
 
 def render(root, workspace, launch, upload_or_path):
@@ -72,5 +73,7 @@ def render(root, workspace, launch, upload_or_path):
             if 'posterior_samples' in lora_data and 'posterior_samples' in cm_data:
                 ids=lora_data['voxel_columns'].tolist();chosen=st.selectbox('Posterior overlay · TAC',ids)
                 i=ids.index(chosen)
-                fig=posterior_figure(lora_data['posterior_samples'][i],lora_data['parameter_names'].tolist(),comparison_draws=cm_data['posterior_samples'][i])
+                fig=posterior_figure(lora_data['posterior_samples'][i],lora_data['parameter_names'].tolist(),
+                                     comparison_draws=cm_data['posterior_samples'][i],
+                                     comparison_label=posterior_label(cm_data,'CM from scratch'))
                 st.pyplot(fig);plt.close(fig)

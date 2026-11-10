@@ -263,10 +263,10 @@ elif page == 'Compare models':
 elif page == 'User manual':
     st.title(MODULES[module]+' user manual')
     sections={'Overview':'README.md','GUI and project settings':'docs/WORKBENCH.md','Installation':'docs/INSTALLATION.md','Models, inputs and protocols':'docs/MODELS_AND_PROTOCOLS.md',
-              'Prepare your dataset':'docs/PREPARE_DATA.md','Measurement noise':'docs/MEASUREMENT_NOISE.md','Fine-tuning':'docs/FINE_TUNING.md','CM from scratch and comparison':'docs/TRAIN_CM.md','Prediction and single-TAC NLS':'docs/PREDICTION.md',
+              'Prepare your dataset':'docs/PREPARE_DATA.md','Measurement noise':'docs/MEASUREMENT_NOISE.md','Fine-tuning':'docs/FINE_TUNING.md','Model training and comparison':'docs/TRAIN_CM.md','Prediction and single-TAC NLS':'docs/PREDICTION.md',
               'Parametric imaging':'docs/PARAMETRIC_IMAGING.md','UC Davis demonstration':'docs/UCDAVIS.md'}
     if module=='cm':
-        sections={'CM training workflow':'docs/TRAIN_CM.md',**{k:v for k,v in sections.items() if k not in ('Fine-tuning','UC Davis demonstration')}}
+        sections={'Model training workflow':'docs/TRAIN_CM.md',**{k:v for k,v in sections.items() if k not in ('Fine-tuning','UC Davis demonstration','Model training and comparison')}}
     section=st.selectbox('Manual section',list(sections))
     document = ROOT/sections[section]
     content = document.read_text(encoding='utf-8')
@@ -349,7 +349,9 @@ def monitor():
             st.subheader('Training progress')
             resolved=json.loads((displayed_run/'model_params.json').read_text(encoding='utf-8'))
             epoch=int(metrics.iloc[-1]['epoch'])
-            st.progress(min(1.,epoch/resolved['epochs']),text=f"Epoch {epoch:,} / {resolved['epochs']:,} · {resolved.get('training_mode','lora').upper()}")
+            mode=resolved.get('training_mode','lora')
+            label='LoRACM' if mode=='lora' else {'cm':'CM','imf':'iMF','scm':'sCM'}.get(resolved.get('posterior_method','cm'),'Model')
+            st.progress(min(1.,epoch/resolved['epochs']),text=f"Epoch {epoch:,} / {resolved['epochs']:,} · {label}")
             a,b,c=st.columns(3)
             a.metric('Training loss',f"{metrics.iloc[-1]['train_loss']:.6g}")
             b.metric('Validation loss',f"{metrics.iloc[-1]['val_loss']:.6g}")
@@ -360,6 +362,6 @@ def monitor():
             st.caption(f"Lowest validation loss at epoch {int(metrics.loc[metrics.val_loss.idxmin(),'epoch'])}. Select best.pth or a saved epoch in prediction.")
             with st.expander('Epoch metrics'):
                 st.dataframe(metrics.tail(5),hide_index=True)
-            st.caption('These are consistency/self-consistency losses; assess posterior accuracy on held-out labelled data separately.')
+            st.caption('These losses are specific to the selected method. Assess posterior accuracy and calibration on held-out labelled data separately.')
 
 monitor()

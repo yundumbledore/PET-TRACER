@@ -11,7 +11,7 @@
 | You need labelled fine-tuning data | Define your kinetic model, input functions and acquisition protocol; simulate parameter–curve pairs. |
 | You already have labelled fine-tuning data | Convert it to the NPZ format, validate it, and skip simulation. |
 | You have only measured TACs and input functions | These are prediction inputs. Obtain or simulate labelled pairs to adapt the model first. |
-| You want a scratch-CM baseline | Prepare a separately sized dataset and train [CM from scratch](docs/TRAIN_CM.md), then evaluate both models on shared held-out curves. |
+| You want to train a model from scratch | Prepare a labelled dataset and [choose CM, iMF or sCM](docs/TRAIN_CM.md) in Module 1, then evaluate on held-out curves. |
 | You have a new patient scan | Reuse a compatible trained model with the coronal TAC/AIF slice and its corresponding mask; [prepare and image your patient](docs/PARAMETRIC_IMAGING.md#your-own-patient-scan-and-mask). |
 | You want to learn with supplied assets | Follow the [UC Davis demonstration](docs/UCDAVIS.md), starting with the small CPU check. |
 
@@ -51,13 +51,13 @@ GUI: **3 · Fine-tune**. Select the dataset and foundation checkpoint, confirm t
 
 Dimensions and parameter names are derived from the dataset. **Advanced settings** includes embedding width, channels, optimizer, consistency intervals, EMA, scheduler, seed and loss weights; defaults are documented in [the shared settings table](docs/TRAIN_CM.md#defaults-and-settings). Training loss and validation self-consistency loss refresh in the job monitor. See [fine-tuning settings and transfer limits](docs/FINE_TUNING.md). Preserve the checkpoint, model configuration and scaling together.
 
-### Train a scratch CM for comparison
+### Train a model
 
-Enable the optional CM route, then use **CM · Dataset → CM from scratch → CM · Predict**. It prepares independently sized data and trains a randomly initialized model without foundation weights. The full starting dataset is 1,000,000 / 100,000 / 1,000 pairs; edit these values for your study. Training controls and output formats are shared with LoRACM. **Compare models** evaluates both runs on one held-out testing file. Follow the [CM training and comparison manual](docs/TRAIN_CM.md).
+Open **CM Posterior Estimation** (Module 1), then use **2 · Dataset → 3 · Train a model → 4 · Predict**. In step 3, choose **CM** (the default), **iMF**, or **sCM** under **Posterior method**. Each trains from random initialization on the same labelled parameter–curve format. The full starting dataset is 1,000,000 / 100,000 / 1,000 pairs; edit these values for your study. The [Module 1 guide](docs/TRAIN_CM.md) covers method options, device support and comparison on a held-out testing file.
 
 ## 5. Predict on your project
 
-GUI: **4 · Predict** for LoRACM, **CM · Predict** for scratch CM, or **5 · Single TAC & NLS** for a CSV/selected curve from either model. Both batch pages support another testing file. **My own patient scan** requires the coronal TAC/AIF slice and matching mask. Inputs must match the model's schedule, units and observation convention. Repeated predictions preserve previous files with numbered names and an explicit history selector.
+GUI: **4 · Predict** in your module, or **5 · Single TAC & NLS** for a CSV or selected curve. Module 1 uses the method stored with the selected run. Both batch pages support another testing file. **My own patient scan** requires the coronal TAC/AIF slice and matching mask. Inputs must match the model's schedule, units and observation convention. Repeated predictions preserve previous files with numbered names and an explicit history selector.
 
 The single-TAC page displays parameter posterior histograms, exports joint samples and figures, and optionally overlays dashed nonlinear least-squares estimates. Read the [prediction manual](docs/PREDICTION.md) for an exact file example, terminal commands and interpretation.
 
@@ -84,8 +84,8 @@ python protocol.py workspaces/my_project/dataset.npz
 # Set data paths; dimensions, parameter names and equal weights resolve automatically.
 python train.py --config configs/train_custom.json
 
-# Optional baseline: configure its separate dataset (or explicitly reuse data).
-python train_cm.py --config configs/train_cm.json
+# Module 1: use cm (default), imf or scm. Set a distinct run name in the config.
+python train_cm.py --config configs/train_cm.json --posterior-method imf
 
 # Predict your own TACs. Supply a testing file in the documented format.
 python infer.py --run workspaces/my_project/runs/adaptation --input workspaces/my_project/testing.npz --output workspaces/my_project/predictions.npz --samples 1000

@@ -1,5 +1,6 @@
 {
   "topic": "Custom PET protocol",
+  "posterior_method": "cm",
   "dataset_dir": "workspaces/my_project/dataset.npz",
   "x_dim": "auto",
   "y_dim": "auto",

@@ -12,17 +12,46 @@ from model_factory import build_model
 from training_config import resolve_training_config
 from common import load_config, validate_dataset, PARAMETERS
 from protocol import validate_file, validate_names
-from runtime import select_device, probe_device, Progress, stop_requested, write_json_atomic
+from runtime import select_device, select_training_device, probe_device, Progress, stop_requested, write_json_atomic
 import signal
 
 def get_device():
     return select_device('auto')
+
+
+def _cm_loss(model, teacher, x, y, weights, noise_levels, noise_device):
+    """The original discrete CM objective, shared by scratch and LoRA."""
+    noise = torch.randn(x.shape, dtype=x.dtype, device=noise_device).to(x.device)
+    index = torch.randint(0, noise_levels, (x.size(0),), device=noise_device).to(x.device)
+    t, t_next = index/noise_levels, (index+1)/noise_levels
+    pred = model(x + t_next[:, None, None]*noise, y, t_next)
+    with torch.no_grad():
+        target = teacher(x + t[:, None, None]*noise, y, t)
+    return torch.mean(weights * (pred-target)**2)
+
+
+def _probe_posterior_training(model, loss_fn, cfg, device):
+    """Exercise the real JVP and backward kernels before creating a run."""
+    x = torch.zeros((2, 1, cfg['x_dim']), device=device)
+    y = torch.zeros((2, cfg['y_dim']), device=device)
+    cuda_devices = [device.index] if device.type=='cuda' else []
+    try:
+        with torch.random.fork_rng(devices=cuda_devices), torch.enable_grad():
+            loss = loss_fn(model, x, y)
+            grads = torch.autograd.grad(loss, [p for p in model.parameters() if p.requires_grad], allow_unused=True)
+            if not torch.isfinite(loss).item() or any(g is not None and not torch.isfinite(g).all().item() for g in grads):
+                raise RuntimeError('the objective or its gradient is non-finite')
+    except (RuntimeError, NotImplementedError) as error:
+        advice = ' Select CPU or install a PyTorch build that supports forward-mode autodiff for this device.' if device.type!='cpu' else ' Check the installed PyTorch version and conditioning embedding.'
+        raise ValueError(f"{cfg['posterior_method']} training check failed on {device}: {error}.{advice}") from error
+
 
 def main(cfg, training_mode="lora"):
     if not cfg.get('dataset_dir'):
         raise ValueError('Specify dataset_dir for your labelled NPZ file')
     report = validate_file(cfg['dataset_dir'])
     cfg = resolve_training_config(cfg, report, training_mode)
+    method = cfg['posterior_method']
     cfg['measurement_noise'] = report['measurement_noise']
     if (Path(cfg["save_dir"]) / cfg["exp_name"]).exists():
         raise FileExistsError("Run directory already exists; choose a new exp_name or move the old run")
@@ -48,9 +77,9 @@ def main(cfg, training_mode="lora"):
     torch.manual_seed(cfg["seed"])
     np.random.seed(cfg["seed"])
 
-    device = select_device(cfg["device"])
+    device = select_training_device(cfg["device"], method)
     compute = probe_device(device)
-    print(f"[{training_mode}] Device: {device}; epochs: {cfg['epochs']}; embedding: {cfg['embed_dim']}; dimensions: {cfg['x_dim']} / {cfg['y_dim']}", flush=True)
+    print(f"[{training_mode}/{method}] Device: {device}; epochs: {cfg['epochs']}; embedding: {cfg['embed_dim']}; dimensions: {cfg['x_dim']} / {cfg['y_dim']}", flush=True)
     print('Compute check: '+json.dumps(compute),flush=True)
 
     data = np.load(cfg['dataset_dir'], allow_pickle=False)
@@ -87,6 +116,14 @@ def main(cfg, training_mode="lora"):
                         log_transform=False)
     val_loader = DataLoader(val_set, batch_size=cfg["batch_size"], shuffle=False)
 
+    loss_weights = torch.tensor(cfg["loss_weights"], dtype=torch.float32, device=device).view(1, 1, -1)
+    model = build_model(cfg, device, training=True)
+    if method!='cm':
+        from posterior_methods import imf_loss, scm_loss
+        objective = imf_loss if method=='imf' else scm_loss
+        _probe_posterior_training(model, lambda m,x,y: objective(m,x,y,loss_weights), cfg, device)
+    noise_device = 'cpu' if device.type=='mps' else device
+
     save_dir = os.path.join(cfg["save_dir"], cfg["exp_name"])
     os.makedirs(save_dir, exist_ok=False)
     if protocol is not None:
@@ -108,7 +145,6 @@ def main(cfg, training_mode="lora"):
     with open(os.path.join(save_dir, "model_params.json"), "w", encoding='utf-8') as f:
         json.dump(cfg, f)
 
-    model = build_model(cfg, device, training=True)
     total_parameters=sum(p.numel() for p in model.parameters())
     trainable_parameters=sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f'Trainable parameters: {trainable_parameters:,} / {total_parameters:,}', flush=True)
@@ -138,10 +174,6 @@ def main(cfg, training_mode="lora"):
         min_lr=cfg["min_lr"]      # Don't let the learning rate drop below this
     )
 
-    loss_weights = torch.tensor(cfg["loss_weights"], dtype=torch.float32, device=device)
-    loss_weights = loss_weights.view(1, 1, -1)
-
-    Nk = cfg["noise_levels"]
     best = float("inf")
     start_time = time.time()
 
@@ -160,6 +192,7 @@ def main(cfg, training_mode="lora"):
     def cancelled(): return interrupted or stop_requested()
     progress = Progress('Training', cfg['epochs']*(len(train_loader)+len(val_loader)), 'batches')
     completed_batches = 0
+    training_batches = 0
     for epoch in range(1, cfg["epochs"] + 1):
         if cancelled(): break
         model.train()
@@ -169,22 +202,14 @@ def main(cfg, training_mode="lora"):
             y = y.to(device)
             x = x.unsqueeze(1).float().to(device)
 
-            noise_device = 'cpu' if device.type == 'mps' else device
-            z = torch.randn(x.shape, dtype=x.dtype, device=noise_device).to(device)
-            n = torch.randint(0, Nk, (x.size(0),), device=noise_device).to(device)
-            t_n = n / Nk
-            t_n_plus_1 = (n + 1) / Nk
-            x_noisy_n        = x + t_n.unsqueeze(1).unsqueeze(2) * z
-            x_noisy_n_plus_1 = x + t_n_plus_1.unsqueeze(1).unsqueeze(2) * z
-
-            pred_n_plus_1 = model(x_noisy_n_plus_1, y, t_n_plus_1)
-            with torch.no_grad():
-                # USE THE TARGET MODEL HERE
-                target_n = target_model(x_noisy_n, y, t_n)
-            
-            # Apply the weighted penalty
-            loss = torch.mean(loss_weights * (pred_n_plus_1 - target_n) ** 2)
-            # loss = torch.mean((pred_n_plus_1 - target_n) ** 2)
+            if method=='cm':
+                loss = _cm_loss(model, target_model, x, y, loss_weights, cfg['noise_levels'], noise_device)
+            elif method=='imf':
+                loss = objective(model, x, y, loss_weights)
+            else:
+                warmup_steps = cfg['scm_warmup_steps']
+                warmup = min(1., training_batches/warmup_steps) if warmup_steps else 1.
+                loss = objective(model, x, y, loss_weights, warmup=warmup)
 
             if not torch.isfinite(loss):
                 raise ValueError('Non-finite training loss; check data/scaling and learning rate')
@@ -196,6 +221,7 @@ def main(cfg, training_mode="lora"):
             update_ema(model, target_model, mu=cfg["ema_decay"])
             run_loss += loss.item()
             completed_batches += 1
+            training_batches += 1
             progress.update(completed_batches, epoch=epoch, epochs=cfg['epochs'], phase='Training',
                             train_loss=run_loss/(i+1), learning_rate=optimizer.param_groups[0]['lr'], device=str(device))
 
@@ -210,20 +236,12 @@ def main(cfg, training_mode="lora"):
                 for j, (vy, vx) in enumerate(val_loader):
                     vy = vy.to(device)
                     vx = vx.unsqueeze(1).float().to(device)
-                    vz = torch.randn(vx.shape, dtype=vx.dtype, device=noise_device).to(device)
-                    vn = torch.randint(0, Nk, (vx.size(0),), device=noise_device).to(device)
-                    vt_n = vn / Nk
-                    vt_n_plus_1 = (vn + 1) / Nk
-                    vx_noisy_n        = vx + vt_n.unsqueeze(1).unsqueeze(2) * vz
-                    vx_noisy_n_plus_1 = vx + vt_n_plus_1.unsqueeze(1).unsqueeze(2) * vz
-                    
-                    # Both predictions come from the EMA model to test its self-consistency
-                    vpred_n_plus_1 = target_model(vx_noisy_n_plus_1, vy, vt_n_plus_1)
-                    vtarget_n      = target_model(vx_noisy_n, vy, vt_n)
-                    
-                    # Use weighted loss
-                    vloss = torch.mean(loss_weights * (vpred_n_plus_1 - vtarget_n) ** 2)
-                    # vloss = torch.mean((vpred_n_plus_1 - vtarget_n) ** 2)
+                    if method=='cm':
+                        vloss = _cm_loss(target_model, target_model, vx, vy, loss_weights, cfg['noise_levels'], noise_device)
+                    else:
+                        # Keep forward-mode AD available in validation. The
+                        # nonnegative defect is independent of adaptive weighting.
+                        vloss = objective(target_model, vx, vy, loss_weights, adaptive=False)
                     v_run += vloss.item()
                     completed_batches += 1
                     progress.update(completed_batches, epoch=epoch, epochs=cfg['epochs'], phase='Validation',
@@ -248,7 +266,8 @@ def main(cfg, training_mode="lora"):
             csv.writer(f).writerow([epoch, avg_loss, avg_v, optimizer.param_groups[0]['lr'], time.time()-start_time])
         writer.flush()
         completed_epoch = epoch
-        item = {'epoch':epoch, 'val_loss':avg_v, 'train_loss':avg_loss, 'learning_rate':current_lr}
+        item = {'epoch':epoch, 'val_loss':avg_v, 'train_loss':avg_loss, 'learning_rate':current_lr,
+                'posterior_method':method}
         save_checkpoint(target_model, cfg, Path(save_dir, 'last.pth'), epoch, avg_v)
         checkpoint_index['last.pth'] = item
         if avg_v < best:
@@ -271,7 +290,7 @@ def main(cfg, training_mode="lora"):
     digest=hashlib.sha256()
     with Path(cfg['dataset_dir']).open('rb') as stream:
         for block in iter(lambda:stream.read(1024*1024),b''): digest.update(block)
-    summary={'training_mode':training_mode,'dataset_sha256':digest.hexdigest(),
+    summary={'training_mode':training_mode,'posterior_method':method,'dataset_sha256':digest.hexdigest(),
              'measurement_noise':report['measurement_noise'],
              'torch_version':str(torch.__version__),'numpy_version':np.__version__,'batch_shuffle_rng':'global_torch',
              'parameter_names':names,'split_counts':report['counts'],'seed':cfg['seed'],
@@ -280,14 +299,18 @@ def main(cfg, training_mode="lora"):
              'best_validation_loss':best if np.isfinite(best) else None,
              'best_epoch':checkpoint_index.get('best.pth',{}).get('epoch'),
              'checkpoint_policy':'Lowest validation loss across all completed epochs; last completed epoch; periodic EMA snapshots',
-             'fixed_features':'Gaussian Fourier projection is held fixed; transferred when compatible, random for scratch or resized embeddings'}
+             'validation_metric':{'cm':'Discrete consistency MSE','imf':'Instantaneous velocity MSE',
+                                  'scm':'Unnormalized squared continuous consistency defect'}[method],
+             'fixed_features':('Gaussian Fourier projection is held fixed; transferred when compatible, random for scratch or resized embeddings'
+                               if method=='cm' else 'Fixed sinusoidal time features')}
     Path(save_dir,'training_summary.json').write_text(json.dumps(summary,indent=2)+'\n', encoding='utf-8')
     print(f"Training {'stopped' if stopped else 'completed'} after {completed_epoch} completed epochs in {elapsed:.3f} seconds. Run: {save_dir}",flush=True)
     return Path(save_dir)
 
 
 def save_checkpoint(model, cfg, path, epoch, val_loss=None):
-    checkpoint={'model_state_dict':model.state_dict(),'training_mode':cfg['training_mode'],'epoch':epoch,'val_loss':val_loss}
+    checkpoint={'model_state_dict':model.state_dict(),'training_mode':cfg['training_mode'],
+                'posterior_method':cfg.get('posterior_method','cm'),'epoch':epoch,'val_loss':val_loss}
     for key in ('lr','lora_r','lora_alpha','lora_dropout','channels','embed_dim','embedy','x_dim','y_dim'):
         if key in cfg: checkpoint[key]=cfg[key]
     path = Path(path)
@@ -298,11 +321,14 @@ def save_checkpoint(model, cfg, path, epoch, val_loss=None):
 
 
 def run_cli(mode='lora'):
-    parser=argparse.ArgumentParser(description=__doc__ if mode=='lora' else 'Train a consistency model from scratch')
+    parser=argparse.ArgumentParser(description=__doc__ if mode=='lora' else 'Train a CM, iMF or sCM posterior sampler from scratch')
     parser.add_argument('--config',default='configs/train_scenario1.json' if mode=='lora' else 'configs/train_cm.json')
     for flag,kind in [('checkpoint-interval',int),('epochs',int),('lr',float),('batch-size',int),('embed-dim',int),('x-dim',int),('y-dim',int),('seed',int)]:
         parser.add_argument('--'+flag,type=kind,help='Override the corresponding JSON setting')
     parser.add_argument('--device',choices=['auto','cpu','cuda:0','mps'])
+    if mode=='cm':
+        parser.add_argument('--posterior-method',choices=['cm','imf','scm'],
+                            help='Choose the posterior objective (overrides the config)')
     args=parser.parse_args();cfg=load_config(args.config)
     for key,value in vars(args).items():
         if key!='config' and value is not None: cfg[key]=value

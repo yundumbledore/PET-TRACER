@@ -3,6 +3,7 @@ from protocol import prediction_times
 import argparse
 import json
 from pathlib import Path
+from posterior_registry import posterior_method
 import numpy as np
 from scipy.optimize import least_squares
 from protocol import validate_protocol, load_model, read_prediction_input, load_protocol
@@ -103,7 +104,7 @@ def main(args):
         for run,checkpoint,posterior in models:
             infer(SimpleNamespace(run=str(run), input=args.input, output=str(posterior),
                   checkpoint=checkpoint,samples=args.samples,batch_size=1,sample_chunk=getattr(args,'sample_chunk',64),
-                  steps=getattr(args,'steps',3),seed=getattr(args,'seed',0),device=args.device,multi_gpu=False,max_voxels=None,
+                  steps=getattr(args,'steps',None),seed=getattr(args,'seed',0),device=args.device,multi_gpu=False,max_voxels=None,
                   allow_time_mismatch=False,save_samples=True))
     result=None
     if cfg:
@@ -117,7 +118,8 @@ def main(args):
                 with np.load(posterior,allow_pickle=False) as data:
                     median=np.median(data['posterior_samples'][0],axis=0)
                 model_cfg=json.loads((run/'model_params.json').read_text(encoding='utf-8'))
-                item={'model':model_cfg.get('training_mode','lora'),'run':str(run),'checkpoint':checkpoint,
+                item={'model':model_cfg.get('training_mode','lora'),'posterior_method':posterior_method(model_cfg),
+                      'run':str(run),'checkpoint':checkpoint,
                       'parameter_names':cfg['parameter_names'],'posterior_median':median.tolist()}
                 try:
                     fitted=predict_curve(median,t,duration,y[0,len(t):],cfg)
@@ -150,7 +152,7 @@ if __name__=='__main__':
     p.add_argument('--posterior-output',default='posterior.npz')
     p.add_argument('--checkpoint',default='best.pth')
     p.add_argument('--samples',type=int,default=1000)
-    p.add_argument('--steps',type=int,default=3)
+    p.add_argument('--steps',type=int,help='Network evaluations per draw (default: CM 3, iMF 1, sCM 2)')
     p.add_argument('--sample-chunk',type=int,default=64)
     p.add_argument('--seed',type=int,default=0)
     p.add_argument('--skip-nls',action='store_true',help='With --protocol, simulate posterior medians without fitting NLS')

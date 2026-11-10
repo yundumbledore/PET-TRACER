@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 from infer import main as infer
+from posterior_registry import posterior_method, METHOD_NAMES
 
 
 def sha256(path):
@@ -41,13 +42,16 @@ def main(args):
                               steps=args.steps,seed=args.seed,device=args.device,multi_gpu=False,
                               max_voxels=None,allow_time_mismatch=False,save_samples=args.save_samples))
         metadata=json.loads(prediction.with_suffix('.json').read_text(encoding='utf-8'))
-        details[label]={'inference_seconds':time.perf_counter()-start,'run':str(run),'checkpoint':checkpoint}
+        method=posterior_method(configs[label])
+        details[label]={'inference_seconds':time.perf_counter()-start,'run':str(run),'checkpoint':checkpoint,
+                        'posterior_method':method,'sampling_steps':metadata['sampling_steps']}
         summary_path=Path(run)/'training_summary.json'
         if summary_path.exists(): details[label]['training']=json.loads(summary_path.read_text(encoding='utf-8'))
         with np.load(prediction,allow_pickle=False) as data:
             predictions[label]=data['voxel_columns'].copy()
             for i,name in enumerate(names):
-                row={'model':label,'parameter':name,'mean_posterior_std':float(data['params_std'][:,i].mean()),
+                row={'model':label if label=='LoRACM' else METHOD_NAMES[method],
+                     'parameter':name,'mean_posterior_std':float(data['params_std'][:,i].mean()),
                      'negative_draw_fraction':float(data['params_negative_fraction'][:,i].mean())}
                 if 'test_rmse' in metadata:
                     row.update(rmse=metadata['test_rmse'][i],bias=metadata['test_bias'][i])

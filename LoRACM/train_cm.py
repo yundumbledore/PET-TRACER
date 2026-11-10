@@ -1,4 +1,4 @@
-"""Train a consistency model from random initialization on your labelled pairs."""
+"""Train a conditional CM, iMF or sCM from scratch on your labelled pairs."""
 from train import main as train, run_cli
 
 

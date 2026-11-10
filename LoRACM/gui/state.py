@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 from runtime import write_json_atomic
+from posterior_registry import run_model_label
 
 _installed = False
 
@@ -144,7 +145,7 @@ def model_run_picker(workspace, default, label='Model to use', mode=None):
     runs = [p for p in sorted((Path(workspace)/'runs').glob('*')) if (p/'model_params.json').exists()]
     if mode is not None:
         runs=[p for p in runs if json.loads((p/'model_params.json').read_text(encoding='utf-8')).get('training_mode','lora')==mode]
-    labels = {str(p):('LoRACM' if json.loads((p/'model_params.json').read_text(encoding='utf-8')).get('training_mode','lora')=='lora' else 'CM from scratch')+' · '+p.name for p in runs}
+    labels = {str(p):run_model_label(json.loads((p/'model_params.json').read_text(encoding='utf-8')))+' · '+p.name for p in runs}
     paper=Path(workspace)/'runs/paper_ucdavis'
     if mode!='cm':
         labels[str(paper)]='Paper LoRACM · UC Davis · epoch 2755'

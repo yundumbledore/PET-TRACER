@@ -67,6 +67,55 @@ class TrainingTests(unittest.TestCase):
             with self.subTest(override=override),self.assertRaises(ValueError):
                 resolve_training_config(dict(self.cfg,**override),self.report,'cm')
 
+    def test_alternative_objective_configuration_is_scoped_to_module_one(self):
+        from runtime import select_training_device
+        self.assertEqual(resolve_training_config(self.cfg,self.report,'cm')['posterior_method'],'cm')
+        for override in ({'posterior_method':'unknown'},
+                         {'posterior_method':'scm','scm_warmup_steps':-1},
+                         {'posterior_method':'imf','embedy':'LSTM'},
+                         {'posterior_method':'scm','device':'mps'}):
+            with self.subTest(override=override),self.assertRaises(ValueError):
+                resolve_training_config(dict(self.cfg,**override),self.report,'cm')
+        for method in ('imf','scm'):
+            with self.subTest(method=method),self.assertRaisesRegex(ValueError,'Module 1'):
+                resolve_training_config(dict(self.cfg,posterior_method=method),self.report,'lora')
+            with patch('torch.cuda.is_available',return_value=False),patch('torch.backends.mps.is_available',return_value=True):
+                self.assertEqual(select_training_device('auto',method).type,'cpu')
+
+    def test_alternative_objectives_train_and_restore_checkpoint_architectures(self):
+        torch.set_num_threads(2)
+        for method in ('imf','scm'):
+            with self.subTest(method=method):
+                cfg=dict(self.cfg,posterior_method=method,exp_name=method,
+                         channels=[32,32,32,32],scm_warmup_steps=1)
+                resolved=resolve_training_config(cfg,self.report,'cm')
+                torch.manual_seed(cfg['seed'])
+                initial=build_model(resolved,torch.device('cpu'),training=True)
+                initial_weights=initial.conv1.weight.detach().clone()
+                run=train_cm(cfg)
+                saved=json.loads((run/'model_params.json').read_text())
+                state=torch.load(run/'best.pth',map_location='cpu',weights_only=True)
+                incompatible=resolve_training_config(dict(self.cfg,pretrained=str(run/'best.pth')),self.report,'lora')
+                with self.assertRaisesRegex(ValueError,'discrete CM foundation'):
+                    build_model(incompatible,torch.device('cpu'),training=True)
+                summary=json.loads((run/'training_summary.json').read_text())
+                self.assertEqual(saved['posterior_method'],method)
+                self.assertEqual(state['posterior_method'],method)
+                self.assertEqual(summary['posterior_method'],method)
+                self.assertTrue(np.isfinite(summary['best_validation_loss']))
+                self.assertGreaterEqual(summary['best_validation_loss'],0.)
+                self.assertFalse(torch.equal(initial_weights,state['model_state_dict']['conv1.weight']))
+                if method=='scm':
+                    self.assertFalse(torch.equal(initial.loss_weight_head.bias,state['model_state_dict']['loss_weight_head.bias']))
+                restored=build_model(saved,torch.device('cpu'))
+                restored.load_state_dict(state['model_state_dict'],strict=True)
+                args=(torch.zeros(2,1,3),torch.ones(2,4),torch.full((2,),.7))
+                if method=='imf':
+                    args=(*args,torch.full((2,),.2))
+                result=restored(*args)
+                self.assertEqual(result.shape,(2,1,3))
+                self.assertTrue(torch.isfinite(result).all())
+
     def test_stop_keeps_lowest_validation_checkpoint_before_legacy_warmup(self):
         torch.set_num_threads(2)
         from runtime import Progress

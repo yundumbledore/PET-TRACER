@@ -13,6 +13,7 @@ from protocol import read_prediction_input, validate_protocol, load_model, load_
 from plot_posteriors import posterior_figure
 from gui.state import checkpoint_picker, model_run_picker
 from gui import state as project_state
+from posterior_registry import DEFAULT_STEPS, posterior_method, run_model_label, posterior_label
 
 
 @st.cache_data(show_spinner=False)
@@ -22,7 +23,7 @@ def prediction_payload(filename,modified,size,dim,times,durations):
 
 def render(root, workspace, launch, default_run=None, default_input=None,enable_cm=False,mode=None):
     st.title('5 · One TAC, full posterior, and an NLS comparison')
-    st.write('Load a tissue time–activity curve and its input function. The trained consistency model returns joint posterior samples; nonlinear least squares supplies a bounded point estimate from the same kinetic model.')
+    st.write('Load a tissue time–activity curve and its input function. The trained model returns joint posterior samples; nonlinear least squares supplies a bounded point estimate from the same kinetic model.')
     default_run=default_run or workspace/'runs'/'adaptation'
     if st.session_state.get('active_run') and workspace in Path(st.session_state.active_run).parents:
         default_run=Path(st.session_state.active_run)
@@ -42,9 +43,10 @@ def render(root, workspace, launch, default_run=None, default_input=None,enable_
         if not input_path.exists(): input_path.write_bytes(upload.getbuffer())
         project_state.remember('single_file',str(input_path))
         project_state.remember('5 · Single TAC & NLS:text_input:single_source_'+workspace.name,str(input_path))
-    cfg=None; payload=None; selected=None
+    cfg=None; payload=None; selected=None; method='cm'
     try:
         cfg=json.loads((run/'model_params.json').read_text(encoding='utf-8'))
+        method=posterior_method(cfg)
         cfg.setdefault('parameter_names',['K1','k2','k3','k4','Vb'])
         scale=json.loads((run/'scaling_params.json').read_text(encoding='utf-8'))
         if 'smoke' in cfg.get('exp_name','').lower():
@@ -74,7 +76,8 @@ def render(root, workspace, launch, default_run=None, default_input=None,enable_
     with b: checkpoint=checkpoint_picker(run,'Single-TAC checkpoint')
     device=c.selectbox('Single-TAC device',['auto','cpu','cuda:0','mps'])
     a,b,c=st.columns(3)
-    steps=a.number_input('Reverse sampling steps',min_value=1,value=3)
+    steps=a.number_input('Reverse sampling steps',min_value=1,value=DEFAULT_STEPS[method],
+                         key='Reverse sampling steps' if method=='cm' else 'single_steps_'+method)
     chunk=b.number_input('Sample chunk',min_value=1,value=64)
     seed=c.number_input('Inference random seed',min_value=0,value=0)
     comparison_run=None;comparison_checkpoint='best.pth'
@@ -144,14 +147,17 @@ def render(root, workspace, launch, default_run=None, default_input=None,enable_
             return run
         with np.load(result_folder/'posterior.npz',allow_pickle=False) as data:
             draws=data['posterior_samples'][0];names=data['parameter_names'].tolist()
+            label=posterior_label(data,'Posterior samples')
         nls=json.loads((result_folder/'nls.json').read_text(encoding='utf-8')) if (result_folder/'nls.json').exists() else None
         with np.load(result_folder/'input.npz',allow_pickle=False) as selected_input:
             st.caption('Showing completed analysis for TAC '+str(selected_input['voxel_columns'][0]))
         st.subheader('Kinetic parameter posteriors')
-        comparison_draws=None
+        comparison_draws=None; comparison_label='CM from scratch'
         if (result_folder/'cm_posterior.npz').exists():
-            with np.load(result_folder/'cm_posterior.npz',allow_pickle=False) as baseline: comparison_draws=baseline['posterior_samples'][0]
-        fig=posterior_figure(draws,names,nls,comparison_draws)
+            with np.load(result_folder/'cm_posterior.npz',allow_pickle=False) as baseline:
+                comparison_draws=baseline['posterior_samples'][0]
+                comparison_label=posterior_label(baseline,comparison_label)
+        fig=posterior_figure(draws,names,nls,comparison_draws,label=label,comparison_label=comparison_label)
         st.pyplot(fig);image_bytes=io.BytesIO();fig.savefig(image_bytes,format='png',dpi=180);plt.close(fig)
         st.download_button('Download posterior figure',image_bytes.getvalue(),file_name='posteriors.png')
         st.download_button('Download joint posterior samples',pd.DataFrame(draws,columns=names).to_csv(index=False),file_name='posterior_samples.csv')
@@ -168,7 +174,7 @@ def render(root, workspace, launch, default_run=None, default_input=None,enable_
             if (result_folder/'forward.json').exists():
                 forward=json.loads((result_folder/'forward.json').read_text(encoding='utf-8'))
                 for item in forward['curves']:
-                    label='LoRACM' if item['model']=='lora' else 'CM from scratch'
+                    label=run_model_label({'training_mode':item['model'],'posterior_method':item.get('posterior_method','cm')})
                     if item['fitted_tac'] is not None: curves[label+' median forward TAC']=item['fitted_tac']
                     else: st.warning(label+' median forward curve could not be simulated: '+item.get('error','Invalid median parameters'))
                 st.caption('Forward curves use the componentwise posterior medians and the selected kinetic model; parameters are not clipped to fitting bounds.')
@@ -176,7 +182,7 @@ def render(root, workspace, launch, default_run=None, default_input=None,enable_
             st.line_chart(pd.DataFrame(curves,index=data['t_meas']),x_label='Time (minutes)',y_label='Activity (input units)')
             st.download_button('Download TAC comparison CSV',pd.DataFrame(dict(time_min=data['t_meas'],**curves)).to_csv(index=False),file_name='tac_comparison.csv')
             st.caption('Saved result for TAC '+str(data['voxel_columns'][0]))
-        if comparison_draws is not None: summary['Scratch CM median']=np.median(comparison_draws,axis=0)
+        if comparison_draws is not None: summary[comparison_label+' median']=np.median(comparison_draws,axis=0)
         st.dataframe(summary,hide_index=True)
         st.caption('Dashed lines are NLS point estimates, not ground truth. Posterior quantiles describe the selected model’s samples; validate calibration and fit quality on independent data before interpretation.')
     return run

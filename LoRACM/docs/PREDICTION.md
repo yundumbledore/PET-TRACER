@@ -2,7 +2,7 @@
 
 [Manual](../README.md) · [Prepare training data](PREPARE_DATA.md) · [Parametric imaging](PARAMETRIC_IMAGING.md)
 
-Use your LoRACM or scratch-CM model to estimate **joint kinetic parameter samples**, then inspect marginal histograms, numerical summaries or maps. Prediction uses the selected run’s scaling and parameter order and selects its model architecture automatically. See [paired LoRACM/CM comparisons](TRAIN_CM.md#compare-the-two-models).
+Use LoRACM or a trained Module 1 model (CM, iMF or sCM) to estimate **joint kinetic parameter samples**, then inspect marginal histograms, numerical summaries or maps. Prediction reads the selected run’s method, scaling and parameter order and uses its matching network and sampler. See [paired comparisons with LoRACM](TRAIN_CM.md#compare-trained-models).
 
 In the default UC Davis walkthrough, step 4 selects the supplied patient-slice file and the model from step 3. Predict the complete foreground before opening step 6. New outputs include equal-tailed 95% credible intervals and widths for parameters and per-draw 2TC Kᵢ; whole-image draws do not need to be saved. The [imaging page](PARAMETRIC_IMAGING.md) displays maps and retrieves the clicked voxel's TAC/AIF and posterior KDE.
 
@@ -30,7 +30,9 @@ np.savez_compressed(
 
 A legacy pandas HDF5 table is also supported: rows are frames; columns are duration, midpoint, AIF, then TACs. Negative **noisy TAC** values are accepted; AIF values must be nonnegative. Non-finite values are rejected.
 
-GUI: **4 · Predict** for LoRACM, or **CM · Predict** for a trained scratch CM. Each page lists its own model type. Choose **My own file** to reuse the model on another compatible testing file, then validate it, select the checkpoint, device, posterior samples, reverse sampling steps, seed, curve batch and sample chunk. Summaries and a download appear after completion.
+GUI: **4 · Predict** in the module where you trained the model. Choose **My own file** to reuse the model on another compatible testing file, then validate it, select the checkpoint, device, posterior samples, reverse sampling steps, seed, curve batch and sample chunk. Summaries and a download appear after completion.
+
+Starting sampling steps are **3 for CM and LoRACM**, **1 for iMF**, and **2 for sCM**. Omit `--steps` to use the method default in direct CLI prediction. The step count is the number of network evaluations per draw; it is not the number of training noise intervals.
 
 For another patient's anatomical maps, choose **My own patient scan** and provide both the coronal TAC/AIF file and the corresponding mask. See [patient scan and mask preparation](PARAMETRIC_IMAGING.md#your-own-patient-scan-and-mask). A different patient does not require retraining when the trained protocol remains suitable and testing conventions match; a changed acquisition protocol still requires appropriate adaptation/training.
 
@@ -63,19 +65,19 @@ time_min,duration_min,tac,aif
 2.5,1,200,150
 ```
 
-This is a **format example**, not a complete input for the pretrained 35-frame model. Supply every frame expected by your adapted run. You can also load a batch NPZ/HDF5 and select one TAC by identifier.
+This is a **format example**, not a complete input for the pretrained 35-frame model. Supply every frame expected by your run. You can also load a batch NPZ/HDF5 and select one TAC by identifier.
 
-1. Select your adapted run and checkpoint, then load the TAC and input function.
-2. Choose posterior draws (default 1,000), reverse sampling steps (3), sample chunk (64), random seed (0) and device (`auto`). The steps are consistency-sampling evaluations, not training noise intervals; more steps do not guarantee better estimates.
+1. Select your trained run and checkpoint, then load the TAC and input function.
+2. Choose posterior draws (default 1,000), reverse sampling steps (default depends on the method), sample chunk (64), random seed (0) and device (`auto`). More steps do not guarantee better estimates.
 3. Enable **Compare with nonlinear least squares** and select the matching protocol JSON. Generated projects preserve it; for imported datasets, define the same kinetic model and protocol separately.
 4. Review/edit the NLS parameter bounds and acknowledge the displayed input interpolation assumptions.
 5. Choose **Predict posterior and compare**. The page plots one posterior histogram per parameter, overlays a **dashed vertical NLS estimate**, shows posterior summaries and a graph with the measured TAC, AIF, NLS fitted TAC and forward TAC evaluated at the componentwise posterior median, and provides figure/joint-sample downloads.
 
-Enable **Overlay forward TAC from posterior median** to simulate without NLS. A matching protocol is still required. With the optional scratch route enabled, **Overlay CM from scratch posterior** adds its distribution and median forward TAC for the same voxel and inference settings. New predictions replace the active display immediately; earlier analyses are available only through the explicit saved-analysis selector.
+Enable **Overlay forward TAC from posterior median** to simulate without NLS. A matching protocol is still required. Use the terminal `--comparison-run` option below to compare distributions from two trained runs for the same TAC. New predictions replace the active display immediately; earlier analyses are available only through the explicit saved-analysis selector.
 
 The median forward curve is `forward_model(median(parameters))`. It is not the median of posterior-predictive TACs, because the forward model is nonlinear. Parameters are not clipped to NLS bounds.
 
-**How to read the figure.** The histogram is the marginal distribution of samples from your adapted consistency model. The dashed line is a bounded NLS point estimate, not ground truth or an uncertainty interval. Agreement is useful, but both estimators depend on the forward model, input and data conventions. Inspect convergence, active bounds, residual fit, posterior tails and independent truth when available. No line is drawn for a nonconverged NLS fit.
+**How to read the figure.** The histogram is the marginal distribution of samples from your selected model. The dashed line is a bounded NLS point estimate, not ground truth or an uncertainty interval. Agreement is useful, but both estimators depend on the forward model, input and data conventions. Inspect convergence, active bounds, residual fit, posterior tails and independent truth when available. No line is drawn for a nonconverged NLS fit.
 
 NLS uses three deterministic initializations and **unweighted** squared TAC residuals. Bounds default to the configured uniform kinetic-prior ranges. It uses the same plugin/built-in kinetics and saved simulation mode as the protocol. GUI protocols use midpoint Euler observations and linearly interpolated input samples. Older terminal RK4 protocols retain their saved endpoint and frame-averaging settings. UC Davis retains the original CSV sample values and Euler observation times for both NLS and the posterior-median forward overlay; its patient-label convention is documented in [the UC Davis guide](UCDAVIS.md).
 

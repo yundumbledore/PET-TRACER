@@ -378,5 +378,42 @@ class GuiTests(unittest.TestCase):
             self.assertEqual(next(w for w in app.selectbox if w.label=='Dataset kinetic model').value,'2TC')
             self.assertEqual(next(w for w in app.number_input if w.label=='Embedding dimension · embed_dim').value,1024)
 
+    def test_module_one_method_selection_reaches_training_config(self):
+        workspace=Path(self.workspace.name)/'cm/my_project'
+        workspace.mkdir(parents=True)
+        path=workspace/'cm_dataset.npz'
+        arrays={'t_meas':np.array([.5,1.5]),'frame_durations_min':np.ones(2),
+                'parameter_names':np.asarray(['K1','k2','k3','k4','Vb'])}
+        for split in ('train','val','test'):
+            arrays['x_'+split]=np.array([[.1,.2,.3,.4,.1,0],[.2,.3,.4,.5,.2,0]])
+            arrays['y_'+split]=np.array([[1,2,3,4],[2,3,4,5]])
+        np.savez_compressed(path,**arrays)
+        app=self.open_app('cm')
+        app.sidebar.radio[0].set_value('CM from scratch').run()
+        def selector():
+            return next(w for w in app.selectbox if w.label=='Posterior method')
+        self.assertEqual(selector().value,'cm')
+        self.assertEqual(selector().options,['Consistency Model (CM)','Improved MeanFlow (iMF)',
+                                             'Continuous-Time Consistency Model (sCM)'])
+        for method in ('imf','scm'):
+            with self.subTest(method=method):
+                selector().set_value(method).run()
+                self.assertFalse(any(w.label=='Consistency noise intervals' for w in app.number_input))
+                self.assertNotIn('mps',next(w for w in app.selectbox if w.label=='Compute device').options)
+                app.sidebar.radio[0].set_value('CM · Dataset').run()
+                app.sidebar.radio[0].set_value('CM from scratch').run()
+                self.assertEqual(selector().value,method)
+                with patch('gui.jobs.Jobs.start') as start:
+                    next(w for w in app.button if w.label=='Start training').click().run()
+                    self.assertTrue(start.called)
+                    self.assertEqual(start.call_args.args[1][0],'train_cm.py')
+                cfg=json.loads((workspace/'train_cm.json').read_text())
+                self.assertEqual((cfg['training_mode'],cfg['posterior_method']),('cm',method))
+                self.assertEqual(cfg['exp_name'],method+'_scratch')
+                self.assertFalse(list(app.exception))
+        lora=self.open_app('lora')
+        lora.sidebar.radio[0].set_value('3 · Fine-tune').run()
+        self.assertFalse(any(w.label=='Posterior method' for w in lora.selectbox))
+
 
 if __name__=='__main__':unittest.main()

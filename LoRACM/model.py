@@ -67,6 +67,14 @@ class OneDUnet(nn.Module):
         embedt = self.act(self.embedt(t))
         embedy = self.act(self.embedy(y))
         embed = embedt + embedy
+        h = self._predict(x, embed)
+
+        # Preserve the discrete CM's checkpoint and boundary parameterization.
+        c_skip = self.sigma_data**2 / (t**2 + self.sigma_data**2)
+        c_out = self.sigma_data * t / torch.sqrt(t**2 + self.sigma_data**2)
+        return c_skip[:, None, None] * x + c_out[:, None, None] * h
+
+    def _predict(self, x, embed):
         _x = self.encodex(x)
         # Encoding path
         h1 = self.conv1(_x)
@@ -103,12 +111,42 @@ class OneDUnet(nn.Module):
         h = self.act(h)
         h = self.tconv1(torch.cat([h, h1], dim=1))
 
-        # Normalize output
-        h = self.decodex(h)
+        return self.decodex(h)
 
-        # Compute c_skip(t) and c_out(t)
-        c_skip = self.sigma_data**2 / (t**2 + self.sigma_data**2)
-        c_out = self.sigma_data * t / torch.sqrt(t**2 + self.sigma_data**2)
-        
-        # Enforce boundary condition using skip connections
-        return c_skip.unsqueeze(1).unsqueeze(2) * x + c_out.unsqueeze(1).unsqueeze(2) * h
+
+class SmoothTimeFeatures(nn.Module):
+    """Positional features with bounded time derivatives for the JVP."""
+
+    def __init__(self, width):
+        super().__init__()
+        self.register_buffer('frequencies', torch.exp(torch.linspace(0., -9.21034037, width//2)))
+
+    def forward(self, t):
+        angles = t[:, None] * self.frequencies[None, :]
+        return torch.cat((angles.sin(), angles.cos()), dim=-1)
+
+
+class PosteriorVelocityUNet(OneDUnet):
+    """Shared conditional backbone with raw iMF or TrigFlow sCM output."""
+
+    def __init__(self, x_dim, y_dim, embed_dim, channels, embedy, sigma_data, method):
+        super().__init__(x_dim, y_dim, embed_dim, channels, embedy, sigma_data)
+        self.method = method
+        self.embedt = nn.Sequential(SmoothTimeFeatures(embed_dim), nn.Linear(embed_dim, embed_dim))
+        if method == 'imf':
+            self.embed_interval = nn.Sequential(SmoothTimeFeatures(embed_dim), nn.Linear(embed_dim, embed_dim))
+        else:
+            self.loss_weight_head = nn.Linear(embed_dim, 1)
+            nn.init.zeros_(self.loss_weight_head.weight)
+            nn.init.zeros_(self.loss_weight_head.bias)
+
+    def scm_log_weight(self, t):
+        return self.loss_weight_head(self.embedt[0](t)).squeeze(-1)
+
+    def forward(self, x, y, t, r=None):
+        embed = self.act(self.embedt(t)) + self.act(self.embedy(y))
+        if self.method == 'imf':
+            if r is None:
+                raise ValueError('iMF requires both the current time and the destination time')
+            embed = embed + self.act(self.embed_interval(t-r))
+        return self._predict(x, embed)

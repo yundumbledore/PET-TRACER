@@ -1,4 +1,4 @@
-"""Shared defaults and preflight validation for LoRACM and scratch CM training."""
+"""Shared defaults and preflight validation for LoRACM and training from scratch."""
 from pathlib import Path
 import math
 import re
@@ -11,6 +11,7 @@ DEFAULTS = {
     'epochs':5000, 'batch_size':512, 'lr':.0001, 'weight_decay':.01,
     'lr_scheduler_patience':25, 'lr_factor':.75, 'min_lr':1e-8,
     'noise_levels':15, 'ema_decay':.99, 'seed':0, 'checkpoint_start_epoch':1, 'checkpoint_interval':25,
+    'posterior_method':'cm', 'scm_warmup_steps':10000,
     'device':'auto', 'save_dir':'runs', 'drop_last':True,
     'lora_r':8, 'lora_alpha':16, 'lora_dropout':.05, 'train_norms':True,
 }
@@ -35,7 +36,12 @@ def resolve_training_config(config, report, mode='lora'):
         raise ValueError('Use train.py for lora or train_cm.py for cm; configuration mode differs')
     cfg=dict(DEFAULTS,**config)
     cfg['training_mode']=mode
-    cfg.setdefault('exp_name','adaptation' if mode=='lora' else 'cm_scratch')
+    method=cfg['posterior_method']
+    if method not in ('cm','imf','scm'):
+        raise ValueError('posterior_method must be cm, imf or scm')
+    if mode=='lora' and method!='cm':
+        raise ValueError('iMF and sCM are available only in Module 1, not LoRACM')
+    cfg.setdefault('exp_name','adaptation' if mode=='lora' else f'{method}_scratch')
     cfg.setdefault('topic','Custom PET protocol')
     for key in ('x_dim','y_dim'):
         if cfg[key] in (None,'auto'):
@@ -61,16 +67,21 @@ def resolve_training_config(config, report, mode='lora'):
         cfg['checkpoint_start_epoch'] = 1
     for key in ('seed','lr_scheduler_patience'):
         _integer(cfg,key,0)
-    _integer(cfg,'noise_levels',2)
+    if method=='cm':
+        _integer(cfg,'noise_levels',2)
+    if method=='scm':
+        _integer(cfg,'scm_warmup_steps',0)
     if cfg['embed_dim'] % 2:
         raise ValueError('embed_dim must be even for Gaussian Fourier features')
     channels=cfg['channels']
     if not isinstance(channels,list) or len(channels)!=4 or any(isinstance(c,bool) or not isinstance(c,int) or c<1 for c in channels):
         raise ValueError('channels must contain four positive integers')
-    if channels[0]%4 or any(c%32 for c in channels[1:]):
-        raise ValueError('channels[0] must be divisible by 4; remaining channels by 32 (GroupNorm)')
+    if any(c%32 for c in channels):
+        raise ValueError('All four channel widths must be divisible by 32 (GroupNorm)')
     if cfg['embedy'] not in ('Linear','MLP','Conv1D','GRU','LSTM'):
         raise ValueError('Supported conditioning embeddings: Linear, MLP, Conv1D, GRU, LSTM')
+    if method!='cm' and cfg['embedy'] not in ('Linear','MLP','Conv1D'):
+        raise ValueError('iMF and sCM require a Linear, MLP or Conv1D conditioning embedding for forward-mode autodiff')
     for key in ('lr','min_lr','sigma_data'):
         _finite(cfg,key)
     _finite(cfg,'weight_decay',False)
@@ -80,6 +91,8 @@ def resolve_training_config(config, report, mode='lora'):
         raise ValueError('Require EMA decay in [0,1), scheduler factor in (0,1), and min_lr <= lr')
     if cfg['device'] not in ('auto','cpu','cuda:0','mps'):
         raise ValueError('Choose device auto, cpu, cuda:0 or mps')
+    if method!='cm' and cfg['device']=='mps':
+        raise ValueError('iMF and sCM training require forward-mode autodiff; select CPU or CUDA instead of MPS')
     if not isinstance(cfg['drop_last'],bool) or not isinstance(cfg['train_norms'],bool):
         raise ValueError('drop_last and train_norms must be true or false')
     if not isinstance(cfg['exp_name'],str) or not re.fullmatch(r'[A-Za-z0-9_-]+',cfg['exp_name']):

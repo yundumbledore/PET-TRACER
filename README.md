@@ -4,13 +4,13 @@
 
 **Bayesian kinetic modelling for dynamic total-body PET**
 
-PET-TRACER uses consistency models (CMs) to estimate kinetic parameter posteriors, create parametric images, and perform Bayesian kinetic model selection from dynamic PET time–activity curves (TACs) and input functions.
+PET-TRACER uses generative models to estimate kinetic parameter posteriors, create parametric images, and perform Bayesian kinetic model selection from dynamic PET time–activity curves (TACs) and input functions.
 
-The toolbox provides a local browser GUI and terminal workflows for Windows, Linux, and Apple Silicon macOS. Computation supports NVIDIA CUDA and Apple MPS, with CPU as a fallback.
+The toolbox provides a local browser GUI and terminal workflows for Windows, Linux, and Apple Silicon macOS. Computation supports NVIDIA CUDA and Apple MPS, with CPU as a fallback. iMF and sCM training use CUDA or CPU.
 
 ## Three functions
 
-1. **Train a new CM for kinetic posterior estimation.** Define your kinetic model, simulate or upload training data, and train a CM to estimate parameter posteriors and generate parametric images.
+1. **Train a model from scratch.** Choose the original **Consistency Model (CM)**, **Improved MeanFlow (iMF)** or **Continuous-Time Consistency Model (sCM)**. All three learn to sample kinetic parameters conditioned on a tissue TAC and arterial input function. [Module 1 training guide](LoRACM/docs/TRAIN_CM.md)
 2. **Adapt a pre-trained CM to a new scenario with LoRA.** Use LoRACM to fine-tune a pre-trained CM for a new study or acquisition protocol.
 3. **Use CM for Bayesian kinetic model selection.** Explore model probabilities, model-conditional parameter posteriors, and forward-simulated TACs with credible bands. The current release includes a pre-trained seven-model FDG demonstration for P001 coronal slice 116; model-selection training is planned for a future release.
 

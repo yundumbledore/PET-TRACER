@@ -1,18 +1,25 @@
 """Build the correct architecture for adapted or scratch-trained inference runs."""
-from model import OneDUnet
+from model import OneDUnet, PosteriorVelocityUNet
 from model_lora import build_lora_unet
 from common import PARAMETERS
 
 
 def build_model(cfg, device, training=False):
     mode=cfg.get('training_mode','lora')  # Existing release run folders remain readable.
+    method=cfg.get('posterior_method','cm')
+    if method not in ('cm','imf','scm'):
+        raise ValueError(f'Unknown posterior_method in model configuration: {method!r}')
     if mode=='cm':
-        model=OneDUnet(cfg['x_dim'],cfg['y_dim'],cfg['embed_dim'],cfg['channels'],cfg['embedy'],cfg['sigma_data']).to(device)
-        model.transfer_report={'training_mode':'cm','initialization':'Random; no pretrained checkpoint or LoRA adapters',
+        args=(cfg['x_dim'],cfg['y_dim'],cfg['embed_dim'],cfg['channels'],cfg['embedy'],cfg['sigma_data'])
+        model=(OneDUnet(*args) if method=='cm' else PosteriorVelocityUNet(*args,method)).to(device)
+        model.transfer_report={'training_mode':'cm','posterior_method':method,
+                               'initialization':'Random; no pretrained checkpoint or LoRA adapters',
                                'foundation_loaded':False,'new_or_resized_parameters':[]}
         return model
     if mode!='lora':
         raise ValueError('Unknown training_mode in model configuration')
+    if method!='cm':
+        raise ValueError('iMF and sCM are available only in Module 1, not LoRACM')
     return build_lora_unet(
         x_dim=cfg['x_dim'],y_dim=cfg['y_dim'],embed_dim=cfg['embed_dim'],channels=cfg['channels'],
         embedy=cfg['embedy'],sigma_data=cfg['sigma_data'],r=cfg['lora_r'],alpha=cfg['lora_alpha'],

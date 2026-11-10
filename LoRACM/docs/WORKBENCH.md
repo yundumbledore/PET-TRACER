@@ -6,7 +6,7 @@
 
 The GUI opens with toolbox graphics, team information and three independent modules:
 
-1. **CM Posterior Estimation** trains a consistency model from random initialisation.
+1. **CM Posterior Estimation** trains the original CM, Improved MeanFlow (iMF) or Continuous-Time Consistency Model (sCM) from random initialisation.
 2. **LoRACM Adaptation** fine-tunes a pretrained CM using LoRA.
 3. **Bayesian Model Selection** runs the pretrained P001 FDG demonstration and its linked model/parameter posterior viewer. Model-selection training is reserved for a future release.
 
@@ -16,7 +16,7 @@ Choose a module to see its workflow steps in the left menu. **All modules** retu
 
 1. Define a kinetic model, input functions and acquisition timing.
 2. Simulate labelled pairs or upload your dataset.
-3. Configure the U-Net and training, then train from scratch.
+3. Open **Train a model**, choose the **Posterior method**, and configure training.
 4. Predict on your own data.
 5. Inspect a single TAC, parameter posteriors and an NLS reference.
 6. Generate parametric images and click voxels to inspect their TACs and posteriors.
@@ -49,4 +49,4 @@ New installations use `~/.pet-tracer/workspaces`, or the folder selected by `PET
 
 Computations run locally as background jobs with saved logs. Return to the originating module/project to monitor progress. A running job blocks starting another job in the same browser session. Stop requests are cooperative. Incomplete model-selection runs are not published as completed results; training retains its completed checkpoints. Restarting the app can interrupt jobs, so retain project configurations and outputs.
 
-The browser does not require Jupyter. CPU, supported CUDA installations and Apple MPS are available through the existing PyTorch environment. [Hardware and platform guide](INSTALLATION.md#hardware-and-platform-support).
+The browser does not require Jupyter. CPU, supported CUDA installations and Apple MPS are available through the existing PyTorch environment. For iMF and sCM training, select CPU or CUDA; Auto uses CUDA if available, otherwise CPU. [Hardware and platform guide](INSTALLATION.md#hardware-and-platform-support).

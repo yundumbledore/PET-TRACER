@@ -28,6 +28,8 @@ def build_lora_unet(
     if pretrained_ckpt is not None:
         # Load checkpoint (suppressing the warning if possible, but reading purely)
         ckpt = torch.load(pretrained_ckpt, map_location=device, weights_only=True)
+        if ckpt.get("posterior_method", "cm") != "cm":
+            raise ValueError("LoRACM needs a discrete CM foundation; iMF and sCM checkpoints are for Module 1")
         state = ckpt.get("model_state_dict", None)
         if state is None:
             state = ckpt.get("ema_state_dict", ckpt)

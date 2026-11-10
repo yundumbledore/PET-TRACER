@@ -19,6 +19,17 @@ def select_device(requested='auto'):
     return device
 
 
+def select_training_device(requested='auto', posterior_method='cm'):
+    """Select a device for objectives that need forward-mode autodiff."""
+    if posterior_method in ('imf','scm'):
+        if requested=='mps':
+            raise ValueError('iMF and sCM training require forward-mode autodiff; select CPU or CUDA instead of MPS')
+        if requested=='auto':
+            import torch
+            requested='cuda:0' if torch.cuda.is_available() else 'cpu'
+    return select_device(requested)
+
+
 def write_json_atomic(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

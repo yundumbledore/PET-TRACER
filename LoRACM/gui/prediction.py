@@ -12,6 +12,7 @@ from protocol import read_prediction_input
 from ucdavis import testing_from_dataset, PRESETS
 from common import next_prediction_output as available_output, file_sha256
 from prepare_scan import prepare as prepare_scan
+from posterior_registry import DEFAULT_STEPS, METHOD_NAMES, run_method
 
 
 def remember_prediction(workspace,run,output,input_path,mode,geometry=None,geometry_metadata=None):
@@ -37,12 +38,14 @@ def remember_prediction(workspace,run,output,input_path,mode,geometry=None,geome
 
 
 def render(root,workspace,launch,upload_or_path,default_run,preset,small,mode='lora'):
-    label='LoRACM' if mode=='lora' else 'CM from scratch'
+    label='LoRACM' if mode=='lora' else 'Module 1'
     st.title('4 · Predict with LoRACM' if mode=='lora' else 'CM · Predict with your scratch model')
     st.caption('Reuse a trained '+label+' model with another patient or slice. Testing times and frame durations must match its training protocol; select a new model or adapt/train for a new protocol.')
     run=model_run_picker(workspace,default_run,mode=mode)
     run=Path(st.text_input('Model run folder',str(run),key='predict_run_'+str(run))).expanduser()
     if not run.is_absolute(): run=root/run
+    method=run_method(run)
+    if mode=='cm': st.caption(f'Posterior method: {METHOD_NAMES[method]}')
     routes=['UC Davis patient slice','Held-out simulated pairs','My own patient scan','My own file']
     route=st.selectbox('Prediction input',routes,index=0 if preset==PRESETS[0] else 2)
     testing=workspace/('testing.npz' if mode=='lora' else 'cm_testing.npz')
@@ -85,7 +88,9 @@ def render(root,workspace,launch,upload_or_path,default_run,preset,small,mode='l
     batch=b.number_input('Curve batch size',min_value=1,value=64 if small else 16,key='prediction_batch_'+workspace.name)
     chunk=c.number_input('Sample chunk',min_value=1,value=8 if small else 64,key='prediction_chunk_'+workspace.name)
     a,b,c=st.columns(3)
-    steps=a.number_input('Reverse sampling steps',min_value=1,value=3,help='Consistency sampling evaluations. More steps do not necessarily improve a consistency model.')
+    steps=a.number_input('Reverse sampling steps',min_value=1,value=DEFAULT_STEPS[method],
+                         key='Reverse sampling steps' if method=='cm' else 'prediction_steps_'+method,
+                         help='Network evaluations per posterior draw. More steps do not necessarily improve predictions.')
     seed=b.number_input('Inference random seed',min_value=0,value=0)
     device=c.selectbox('Prediction device',['auto','cpu','cuda:0','mps'])
     st.caption('Auto selects CUDA, then Apple MPS, then CPU. Expanded MPS batches are capped and checked against CPU.')
